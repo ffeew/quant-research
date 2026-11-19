@@ -235,3 +235,42 @@ def test_h2_delisting_stress_applies_to_held_position():
     ov, srec = pnl.h2_delisting_stress(b, W, pos)
     assert np.isclose(srec[0]["stress_weight"], 0.001)
     assert np.isclose(ov.iloc[20], 0.001 * -0.30) and np.isclose(ov.sum(), ov.iloc[20])
+
+
+def _terminal_short(n, h_i):
+    b = _bars(n)
+    b["PX"].iloc[20:, 0] = np.nan
+    b["VOL"].iloc[20:, 0] = 0
+    b["R"].iloc[20:, 0] = np.nan
+    d = b["R"].index
+    W = pd.DataFrame(0.0, index=d, columns=["A"])
+    W.iloc[10:25, 0] = -0.05
+    terms = {
+        "h": str(d[h_i].date()),
+        "alternatives": [{"cash": 25.0, "ratio": 1.0, "acquirer_id": "ACQ", "acquirer_identity_accepted": True}],
+    }
+    roster = [{"symbol": "A", "identity_ok": True, "short_terms": terms}]
+    _, ov, rec = pnl.h1_terminal_bound(b, W, roster, pnl.build_cost_config("unknown_borrow_required"), client=Closes())
+    return d, ov, rec
+
+
+def test_h1_terminal_borrow_accrues_three_days_over_a_weekend():
+    d, ov, rec = _terminal_short(30, 27)
+    per_day = 0.05 * AUM * 0.10 / 360 / AUM  # shared model: 10%/yr, 360-day basis, per calendar day
+    mon = next(j for j in range(21, 28) if d[j].day_of_week == 0)
+    assert np.isclose(ov.iloc[mon], -3 * per_day)  # Fri close -> Mon close: 3 calendar days
+    assert np.isclose(ov.iloc[mon + 1], -per_day)
+    assert rec[0]["borrow_rate"] == 0.10
+
+
+def test_h1_terminal_borrow_over_a_year_is_about_ten_percent():
+    n = 300
+    d0 = pd.bdate_range("2018-01-01", periods=n)
+    h_i = int(np.searchsorted(d0.values, (d0[19] + pd.Timedelta(days=365)).to_datetime64()))
+    d, ov, _ = _terminal_short(n, h_i)
+    liability = 0.05 * (55.0 / 50.0 - 1.0)
+    borrow = -ov.sum() - liability
+    days = (d[h_i] - d[19]).days  # tau close -> h close
+    assert days >= 365
+    assert np.isclose(borrow, 0.05 * 0.10 * days / 360)
+    assert 0.10 <= borrow / 0.05 < 0.1025  # ~10% of the short over a year (360-day basis)
