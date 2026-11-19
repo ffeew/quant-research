@@ -180,7 +180,7 @@ jobs:
           JOB_TYPECHECK: ${{ needs.typecheck.result }}
           JOB_TEST: ${{ needs.test.result }}
           JOB_PACKAGE: ${{ needs.package.result }}
-          JOB_PRE_COMMIT: ${{ needs.pre-commit.result }}
+          JOB_PRE_COMMIT: ${{ needs['pre-commit'].result }}
           JOB_AUDIT: ${{ needs.audit.result }}
           JOB_GITLEAKS: ${{ needs.gitleaks.result }}
           JOB_HYGIENE: ${{ needs.hygiene.result }}
