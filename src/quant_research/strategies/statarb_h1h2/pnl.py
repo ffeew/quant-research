@@ -220,7 +220,10 @@ def _fills(
     PX, VOL = bars["PX"], bars["VOL"]
     TP = tradable_mask(bars)
     W_exec = W.shift(1).fillna(0.0)
-    DV = (PX * VOL).mask(~TP & PX.notna(), 0.0)  # a priced non-print session trades $0
+    # Dollar volume: from a name's first tradable print on, every non-print session (zero or NaN
+    # volume, no close, forward-filled) counts as $0 traded in the ADV20 window, never skipped.
+    # Before its first print the name has no history (NaN), so min_periods still means history.
+    DV = (PX * VOL).where(TP, 0.0).where(TP.cummax())
     ADV20 = DV.rolling(20, min_periods=10).mean().shift(1)  # row k: window ending k-1; read at the fill day
     last_print = {str(c): last_print_index(bars, str(c), TP) for c in PX.columns}
     pos = {d: i for i, d in enumerate(PX.index)}
