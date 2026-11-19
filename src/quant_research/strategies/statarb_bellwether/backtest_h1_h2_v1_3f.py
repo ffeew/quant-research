@@ -1054,7 +1054,9 @@ def signal_h1(
     eval_end: date,
     last_exit_i: int,
 ) -> tuple[pd.DataFrame, list[Any]]:
-    """Build H1 target weights (sleeve fraction). Signal at t, fill at t+1 (caller shifts)."""
+    """Build H1 target weights (sleeve fraction). A tranche formed on signal bar i (close t) is
+    held from session i+1, the same entry as H2; with the caller's one-row lag it first earns
+    i+1 -> i+2. Nothing is ever held on its own signal bar."""
     R = bars["R"]
     DV = bars["PX"] * bars["VOL"]
     MEDDV60 = DV.rolling(60, min_periods=40).median()
@@ -1119,7 +1121,7 @@ def signal_h1(
         )
         rows[t] = book
     Wk = pd.DataFrame(rows).T.fillna(0.0)
-    W = Wk.reindex(dates).ffill().fillna(0.0)
+    W = Wk.reindex(dates).ffill().shift(1).fillna(0.0)  # held from i+1, never on the signal bar
     # Name cap (LIMITS H1): trim, do not reallocate
     W = W.clip(-NAME_CAP, NAME_CAP)
     return W, list(Wk.index)
@@ -1311,7 +1313,8 @@ def apply_costs_and_returns(bars: dict[str, Any], W: pd.DataFrame, cfg: Any, *, 
         raise RuntimeError("required gate borrow_rate must be >= 0.10")
 
     R, PX, VOL = bars["R"], bars["PX"], bars["VOL"]
-    # Signal at t, fill at t+1
+    # W row k is the weight filled at close k (signals put it at their fill session, never the
+    # signal bar); it earns the next row's return, close k -> k+1.
     W_exec = W.shift(1).fillna(0.0)
     # Participation cap: clip |Δw|*AUM / ADV20 <= 1%; carry remainder (simplified single-day carry)
     DV = PX * VOL
