@@ -667,7 +667,7 @@ def main() -> None:
         help="no validated signal: 'derisk' (CIO policy) = shadow book + de-risk-only tradable file",
     )
     ap.add_argument(
-        "--victor_passed",
+        "--validator_passed",
         default="",
         help="comma list of signal keys with validator PASS/COND PASS (none as of 2026-10-30)",
     )
@@ -901,7 +901,7 @@ def main() -> None:
     keys = ["MOM_12_1", "RS63", "TREND", "REV5", "PEAD"]
     stats, series = ic_study(sig, C, alpha_univ)
     sw, mode, passed, ic_shr, sigcorr = signal_weights(stats, series, keys)
-    vp = [x.strip() for x in a.victor_passed.split(",") if x.strip()]
+    vp = [x.strip() for x in a.validator_passed.split(",") if x.strip()]
     validated = [k for k in passed if k in vp]
     fallback_derisk = ((not validated) and a.fallback == "derisk") or halted  # HALTED -> de-risk only regardless
     gp = None
@@ -1747,7 +1747,7 @@ def main() -> None:
             excluded_assets="crypto (hard exclusion, CIO 2026-10-30)",
             blackout=bl,
             fallback_policy=a.fallback,
-            victor_passed=vp,
+            validator_passed=vp,
             garleanu_pedersen=gp if gp_on else "off",
         ),
         risk_overlays=dict(
