@@ -395,3 +395,37 @@ def test_h1_suspension_gap_check_uses_the_held_position():
     assert pnl.held_positions(b, W2)["A"].iloc[17] == 0
     _, ov, rec = pnl.h1_terminal_bound(b, W2, roster, cfg)
     assert rec == [] and ov.sum() == 0
+
+
+def test_zero_adv_allows_cuts_toward_zero_at_stress_cost_never_grows():
+    b = _bars()
+    d = b["R"].index
+    b["VOL"].iloc[13:, 0] = np.nan  # ADV20 for A is NaN from fill day 24 (fewer than 10 sessions left)
+    W = pd.DataFrame(0.0, index=d, columns=["A", "B"])
+    W.iloc[11:25, 0] = 0.1  # held 0.1 from close 11
+    W.iloc[25, 0] = 0.04  # cut at close 25 with no ADV: allowed, in full
+    W.iloc[26, 0] = 0.08  # grow at close 26 with no ADV: never
+    W.iloc[27:, 0] = -0.05  # flip at close 27: cut to 0 only
+    cfg = pnl.build_cost_config("unknown_borrow_required")
+    held = pnl.held_positions(b, W)["A"]
+    assert np.isclose(held.iloc[25], 0.1) and np.isclose(held.iloc[26], 0.04)
+    assert np.isclose(held.iloc[27], 0.04) and held.iloc[28:].eq(0).all()
+    out = pnl.apply_costs_and_returns(b, W, cfg, idea="H1", costs=FlatCost())
+    tc = out["daily"]["tc"]
+    stress = pnl.STRESS_COST_MULT * 10.0
+    assert np.isclose(tc.loc[d[26]], 0.06 * stress / 1e4) and np.isclose(tc.loc[d[28]], 0.04 * stress / 1e4)
+    assert out["n_forced_cuts_zero_adv"] == 2 and np.isclose(out["forced_cut_notional_usd"], 0.10 * AUM)
+
+
+def test_settlement_after_the_last_print_is_not_free():
+    b = _thin_terminal_bars()  # A's last print is close 19 at $50
+    d = b["R"].index
+    W = pd.DataFrame(0.0, index=d, columns=["A", "B"])
+    W.iloc[12:18, 0] = 0.0012  # capped exit leaves 2e-4 held past the last print
+    out = pnl.apply_costs_and_returns(
+        b, W, pnl.build_cost_config("unknown_borrow_required"), idea="H1", costs=FlatCost()
+    )
+    assert pnl.held_positions(b, W)["A"].iloc[20:22].tolist() == [pytest.approx(0.0002), 0.0]
+    assert np.isclose(out["daily"]["tc"].loc[d[21]], 0.0002 * pnl.STRESS_COST_MULT * 10.0 / 1e4)
+    assert out["n_post_last_print_settlements"] == 1
+    assert np.isclose(out["post_last_print_settlement_notional_usd"], 0.0002 * AUM)
