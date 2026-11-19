@@ -1,4 +1,7 @@
-"""Earnings rows -> transcript mapping -> events with day0 / return windows, timing filters and purge counts."""
+"""Earnings rows -> transcript mapping -> events with day0 / return windows, timing filters and purge counts.
+
+Pre-2010 transcript exclusion (the ``exclude_mapped_before`` rule) and the ``excl_before_partition`` status for pre-partition holdout earnings rows are unverified against main_holdout; not for holdout use.
+"""
 from __future__ import annotations
 
 import bisect

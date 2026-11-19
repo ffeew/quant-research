@@ -13,6 +13,8 @@ Pure functions over in-memory inputs (no file or network IO here):
 - ``pipeline`` end-to-end ``run_h2c`` over one partition.
 
 The frozen pre-registered runner stays in ``sentiment_returns/h2c_dev_run.py``; this package is a refactor for reuse.
+
+Pre-2010 transcript exclusion and the ``excl_before_partition`` status for pre-partition holdout earnings rows are unverified against main_holdout; not for holdout use.
 """
 from .config import H2CParams, HoldoutExpectations, Partition, load_h2c_params, load_holdout_expectations
 from .errors import H2CError
