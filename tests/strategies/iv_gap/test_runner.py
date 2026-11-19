@@ -11,7 +11,6 @@ sys.dont_write_bytecode = True
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
 from quant_research.strategies.iv_gap import runner as R
-from quant_research.utils.pins import desk_pin
 
 
 def trading_days():
@@ -396,9 +395,6 @@ class T(unittest.TestCase):
         self.assertRaises(R.RunStop, R.run, self.tmp(), MockReader(), None, lambda: next(ticks))
 
     def test_static_pins(self):
-        # pins come from the desk pin file (PENDING in the public copy)
-        for name in ("PREREG_SHA256", "W1D_CP_SUMS_SHA256", "DEV_DATES_SHA256"):
-            self.assertEqual(getattr(R, name), desk_pin("strategies.iv_gap.runner", name))
         bad = dict(R.EXPECTED_PINS, DEV_BOUND="2016-07-01")
 
         class A:

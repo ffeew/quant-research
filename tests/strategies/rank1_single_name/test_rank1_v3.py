@@ -14,7 +14,6 @@ from quant_research.strategies.rank1_single_name import rank1_bootstrap as Boot
 from quant_research.strategies.rank1_single_name import rank1_core as C
 from quant_research.strategies.rank1_single_name import rank1_gates as G
 from quant_research.strategies.rank1_single_name.rank1_sigma import SIGMA_DEFINITION_SHA256 as SIGMA_SHA
-from quant_research.utils.pins import desk_pin
 from tests.strategies.rank1_single_name.test_rank1_v2 import (
     END,
     MOCK_BASIS_SHA,
@@ -366,9 +365,6 @@ class SignedSigmaCorrection(unittest.TestCase):
         self.assertEqual(
             hashlib.sha256(S.DEFINITION_BYTES).hexdigest(),
             "75da49ee5c68dd95587f7a26917870dbae3c6ddae81ce77634485e871acd7ef2",
-        )
-        self.assertEqual(
-            S.COSTS_SIGNED_NOTE_SHA256, desk_pin("strategies.rank1_single_name.rank1_sigma", "COSTS_SIGNED_NOTE_SHA256")
         )
         self.assertEqual(cost_adapter().sigma_estimator_pin(), S.SIGMA_DEFINITION_SHA256)
         c = mock_sigma_contract()

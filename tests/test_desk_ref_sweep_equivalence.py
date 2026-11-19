@@ -17,6 +17,7 @@ Each file is checked as the sweep left it (its recorded git blob), so later edit
 from __future__ import annotations
 
 import ast
+import hashlib
 import json
 import os
 import re
@@ -164,11 +165,11 @@ def _fstring_text(node: ast.JoinedStr) -> str:
     return "".join(str(v.value) if isinstance(v, ast.Constant) else " {} " for v in node.values)
 
 
-def compare(o: Any, n: Any, ctx: Renames, pins_seen: list[tuple[str, str]], where: str, field: str = "") -> None:
+def compare(o: Any, n: Any, ctx: Renames, pins_seen: list[tuple[str, str, str]], where: str, field: str = "") -> None:
     if isinstance(n, ast.AST) and _is_pin_call(n):
         assert isinstance(o, ast.Constant) and isinstance(o.value, str) and HEX64.search(o.value), where
         assert isinstance(n, ast.Call)
-        pins_seen.append((n.args[0].value, n.args[1].value))  # type: ignore[attr-defined]
+        pins_seen.append((n.args[0].value, n.args[1].value, o.value))  # type: ignore[attr-defined]
         return
     if isinstance(o, list):
         assert isinstance(n, list) and len(o) == len(n), where
@@ -234,7 +235,7 @@ def _pin_tables() -> dict[str, dict[str, Any]]:
         return tomllib.load(fh)
 
 
-Result = tuple[str, list[tuple[str, str]], str]  # status, pins seen, message
+Result = tuple[str, list[tuple[str, str, str]], str]  # status, pins seen (ns, key, base literal), message
 
 
 @pytest.fixture(scope="module")
@@ -258,7 +259,7 @@ def sweep_check() -> tuple[dict[str, Result], Renames, set[str]]:
         old = _strip(ast.parse(_git("show", f"{rec['ref']}:{path}")), False)
         old_names |= _old_names(old)
         new = _strip(ast.parse(swept_src), True)
-        seen: list[tuple[str, str]] = []
+        seen: list[tuple[str, str, str]] = []
         try:
             compare(old, new, ctx, seen, path)
         except AssertionError as e:
@@ -276,12 +277,12 @@ def test_swept_module_is_equivalent(path: str, sweep_check: tuple[dict[str, Resu
         pytest.skip(msg)
     assert status == "ok", msg
     tables = _pin_tables()
-    for ns, key in seen:
+    for ns, key, _ in seen:
         assert tables[ns][key] == pins.PENDING, (ns, key)
     if path.startswith("src/"):
-        assert len(set(seen)) == len(seen), "duplicate pin keys"
+        assert len({(n, k) for n, k, _ in seen}) == len(seen), "duplicate pin keys"
         ns = path.removeprefix("src/quant_research/").removesuffix(".py").replace("/", ".")
-        assert {k for n, k in seen if n == ns} == set(tables.get(ns, {})), "pin table out of step with the module"
+        assert {k for n, k, _ in seen if n == ns} == set(tables.get(ns, {})), "pin table out of step with the module"
 
 
 def test_renames_are_one_to_one_role_renames(sweep_check: tuple[dict[str, Result], Renames, set[str]]) -> None:
@@ -299,6 +300,43 @@ def test_changed_prose_only_swaps_names(sweep_check: tuple[dict[str, Result], Re
     for old, new, where in ctx.prose:
         renamed = ctx.apply(old)
         assert renamed == new or prose_ok(renamed, new), (where, old, new)
+
+
+# sha256 of the whole pin table {ns: {key: value}} (canonical JSON), computed from the sha256 literals
+# the base modules held where the sweep put a desk_pin call. A filled desk pin file must hash to this.
+BASE_PIN_TABLE_SHA256 = "f7b5b33fc6c2c0674c0c92a5c81c3e07f020e478772bfafec8087ec4f59a23f6"
+
+
+def pin_table_digest(table: dict[str, dict[str, str]]) -> str:
+    canon = json.dumps(table, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    return hashlib.sha256(canon.encode()).hexdigest()
+
+
+def _flat_table(tables: dict[str, dict[str, Any]]) -> dict[str, dict[str, str]]:
+    return {ns: {k: str(v) for k, v in t.items()} for ns, t in tables.items()}
+
+
+def test_pin_table_digest_matches_base(sweep_check: tuple[dict[str, Result], Renames, set[str]]) -> None:
+    results, _, _ = sweep_check
+    if any(status == "skip" for status, _, _ in results.values()):
+        pytest.skip("base history not available for every swept file")
+    base: dict[str, dict[str, str]] = {}
+    for _, seen, _ in results.values():
+        for ns, key, literal in seen:
+            assert base.setdefault(ns, {}).setdefault(key, literal) == literal, (ns, key)
+    assert {ns: set(t) for ns, t in base.items()} == {ns: set(t) for ns, t in _pin_tables().items()}
+    assert pin_table_digest(base) == BASE_PIN_TABLE_SHA256, pin_table_digest(base)
+
+
+def test_desk_pin_file_matches_base_digest() -> None:
+    path = os.environ.get(pins.PINS_ENV)
+    if not path or not Path(path).is_file():
+        pytest.skip("no desk pin file ($QR_DESK_PINS) on this machine")
+    with Path(path).open("rb") as fh:
+        table = _flat_table(tomllib.load(fh))
+    if any(v == pins.PENDING for t in table.values() for v in t.values()):
+        pytest.skip("desk pin file is not filled")
+    assert pin_table_digest(table) == BASE_PIN_TABLE_SHA256
 
 
 def test_public_pin_file_is_all_pending() -> None:
