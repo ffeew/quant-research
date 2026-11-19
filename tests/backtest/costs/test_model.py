@@ -19,8 +19,8 @@ from quant_research.backtest.costs.model import (
     adverse_tick_round,
     ceil_cent,
     commission_cost,
-    example_equity_schedule,
     exact,
+    example_equity_schedule,
     impact_cost,
     regulatory_fees,
     spread_cost,
@@ -232,11 +232,15 @@ def test_composed_total() -> None:
 
 def test_monotonicity_size_spread_vol() -> None:
     schedule = example_equity_schedule()
-    base_market = MarketState(adv=exact(1_000_000), sigma=exact("0.02"), spread=exact("0.02"), trade_date=date(2027, 2, 1))
+    base_market = MarketState(
+        adv=exact(1_000_000), sigma=exact("0.02"), spread=exact("0.02"), trade_date=date(2027, 2, 1)
+    )
 
     def sell(qty: int, spread: str, sigma: str) -> Fraction:
         order = _order(side="sell", quantity=qty, price=50)
-        market = MarketState(adv=exact(1_000_000), sigma=exact(sigma), spread=exact(spread), trade_date=date(2027, 2, 1))
+        market = MarketState(
+            adv=exact(1_000_000), sigma=exact(sigma), spread=exact(spread), trade_date=date(2027, 2, 1)
+        )
         return total_cost(order, market, schedule).total
 
     quantities = [1, 2, 10, 100, 1_000, 10_000, 80_000]

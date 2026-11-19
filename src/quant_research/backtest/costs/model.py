@@ -14,11 +14,12 @@ from __future__ import annotations
 
 import math
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from decimal import Decimal, localcontext
 from fractions import Fraction
-from typing import Literal, Mapping
+from typing import Literal
 
 Side = Literal["buy", "sell"]
 Unit = Literal["share", "contract"]
@@ -138,11 +139,7 @@ class RegulatoryComponent:
             raise ValueError(f"{self.name}: min_price must be nonnegative")
         if (self.inactive_from is None) ^ (self.inactive_to is None):
             raise ValueError(f"{self.name}: inactive_from and inactive_to must be set together")
-        if (
-            self.inactive_from is not None
-            and self.inactive_to is not None
-            and self.inactive_from > self.inactive_to
-        ):
+        if self.inactive_from is not None and self.inactive_to is not None and self.inactive_from > self.inactive_to:
             raise ValueError(f"{self.name}: inactive_from must be on or before inactive_to")
 
 
@@ -558,7 +555,7 @@ def _component_amount(
     trade_date: date | None,
     ceil_to_cent: bool,
 ) -> Fraction:
-    if component.applies_to != "both" and component.applies_to != order.side:
+    if component.applies_to not in ("both", order.side):
         return Fraction(0)
     if component.inactive_from is not None and component.inactive_to is not None:
         if trade_date is None:

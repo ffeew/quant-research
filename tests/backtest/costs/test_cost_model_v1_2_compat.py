@@ -59,15 +59,15 @@ def _v12_equivalent_schedule(include_taf_holiday: bool) -> CostSchedule:
 
 
 @pytest.mark.parametrize("side", ["buy", "sell"])
-@pytest.mark.parametrize("price,shares", [("50", "100"), ("50", "3333.3337"), ("100.1", "1"), ("0.0001", "1000"), ("50", "60000")])
+@pytest.mark.parametrize(
+    "price,shares", [("50", "100"), ("50", "3333.3337"), ("100.1", "1"), ("0.0001", "1000"), ("50", "60000")]
+)
 @pytest.mark.parametrize("trade_date", [date(2026, 10, 30), date(2027, 2, 1)])
 def test_regulatory_equivalence_with_v1_2(side: str, price: str, shares: str, trade_date: date) -> None:
     """Migrating a v1.2 regulatory-fee call to the new schedule yields identical component amounts."""
     schedule = _v12_equivalent_schedule(include_taf_holiday=True)
     order = _order(side=side, quantity=shares, price=price)
-    new_total, detail = regulatory_fees(
-        order, schedule.regulatory, trade_date=trade_date, ceil_to_cent=True
-    )
+    new_total, detail = regulatory_fees(order, schedule.regulatory, trade_date=trade_date, ceil_to_cent=True)
     legacy = v12_fees(side, price, shares, trade_date, True)
     assert detail["sec_usd"] == exact(str(legacy["sec_usd_exact"]))
     assert detail["taf_usd"] == exact(str(legacy["taf_usd_exact"]))
