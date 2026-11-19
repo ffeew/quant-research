@@ -26,7 +26,19 @@ Review round 3 fixes (ported from the H1/H2 harness, #10):
   `post_last_print_settlement_notional_usd`. No DEV run yet, so no counts to report.
 - **Costs.** This runner prices trades with the frozen `costs_original` model; the harness's
   standard floor table (`backtest/engine.py:39-40`) is not applied here.
-- One last-print definition (price present and > 0) is used everywhere.
+- Round 3 said one last-print definition (price present and > 0) was used everywhere. That was
+  inaccurate: the H1 tau / suspension check also required volume > 0 and no forward-fill.
+
+Review round 4 fixes (ported from #10):
+- **One tradable-print rule.** `tradable_mask` (close > 0 AND volume > 0 AND not forward-filled;
+  a missing FFILL flag counts as forward-filled) is the single definition used by fills, zero-ADV
+  cuts, last print, tau, the suspension check, the H1 bound, H2 receipts / stress and settlement.
+  A positive close with zero volume after the real last trade is not a print: a held remainder
+  there is settled at the last real close at the stress cost, never sold at 1x, and earns no
+  gross after the last print (or after the H1 bound).
+- **Stress cost.** `STRESS_ONE_WAY_COST_MULT = 2.0` x the one-way cost of the forced trade, a
+  desk choice pinned by a test; it is not the cost model's round-trip break-even multiple.
+- Weights on sessions outside the price index fail closed.
 
 ## Results
 - No returns computed.

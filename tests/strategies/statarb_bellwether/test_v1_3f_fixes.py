@@ -234,14 +234,18 @@ def test_round2_no_adv_history_means_no_trade(mod: Any) -> None:
 # ---- review round 3 (from #10) ----
 
 
-def test_round3_one_last_print_definition(mod: Any) -> None:
-    PX = pd.DataFrame({"A": [10.0, 0.0, np.nan, 11.0, 0.0, -1.0, np.nan]})
-    assert [mod.has_print(v) for v in PX["A"]] == [True, False, False, True, False, False, False]
-    assert mod.printed_mask(PX)["A"].tolist() == [True, False, False, True, False, False, False]
-    assert mod.last_print_index(PX, "A") == 3 and mod.last_print_index(PX, "Z") == -1
+def test_round4_one_tradable_print_definition(mod: Any) -> None:
+    PX = pd.DataFrame({"A": [10.0, 0.0, np.nan, 11.0, 12.0, -1.0, 13.0, 14.0, 15.0]})
+    VOL = pd.DataFrame({"A": [1.0, 1.0, 1.0, 1.0, 0.0, 1.0, np.nan, 1.0, 1.0]})
+    FF = pd.DataFrame({"A": [False] * 7 + [True, np.nan]})
+    one = {"PX": PX, "VOL": VOL, "FFILL": FF}
+    want = [True, False, False, True, False, False, False, False, False]  # close > 0 AND volume > 0, no ffill
+    assert mod.tradable_mask(one)["A"].tolist() == want
+    assert mod.last_print_index(one, "A") == 3 == mod._trusted_tau(one, "A")
+    assert mod.last_print_index(one, "Z") == -1 and mod._trusted_tau(one, "Z") is None
     b = _flat()
     b["PX"].iloc[20:, 0] = 0.0  # a zero price is no print (not only NaN), even with volume
-    assert mod._trusted_tau(b, "A") == 19 == mod.last_print_index(b["PX"], "A")
+    assert mod._trusted_tau(b, "A") == 19 == mod.last_print_index(b, "A")
     W = pd.DataFrame({"A": 0.0}, index=b["R"].index)
     W.iloc[10:28, 0] = 0.005
     pos = [{"sym": "A", "etf": "XLK", "w_sym": 0.005, "w_etf": 0.0, "entry_i": 10, "exit_i": 28}]
@@ -323,7 +327,8 @@ def test_round3_h1_suspension_gap_check_uses_the_held_position(mod: Any) -> None
 def test_round3_zero_adv_allows_cuts_toward_zero_at_stress_cost_never_grows(mod: Any) -> None:
     b = _flat(vol=1e7)
     d = b["R"].index
-    b["VOL"].iloc[13:, 0] = np.nan  # ADV20 for A is NaN from fill day 24 (fewer than 10 sessions left)
+    b["PX"].iloc[13:25, 0] = np.nan  # no prints 13-24 (suspended); from fill day 25 the ADV20
+    b["VOL"].iloc[13:25, 0] = np.nan  # window has 8 sessions, fewer than 10, so ADV20 is NaN
     W = pd.DataFrame({"A": 0.0}, index=d)
     W.iloc[11:25, 0] = 0.1  # held 0.1 from close 11
     W.iloc[25, 0] = 0.04  # cut at close 25 with no ADV: allowed, in full
@@ -334,7 +339,7 @@ def test_round3_zero_adv_allows_cuts_toward_zero_at_stress_cost_never_grows(mod:
     assert np.isclose(held.iloc[27], 0.04) and held.iloc[28:].eq(0).all()
     out = mod.apply_costs_and_returns(b, W, mod.build_cost_config("unknown_borrow_required"), idea="H1")
     tc = out["daily"]["tc"]
-    stress = mod.STRESS_COST_MULT * 4.0  # fake cost model: 4 bp on a sell, doubled
+    stress = 2.0 * 4.0  # fake cost model: 4 bp on a sell, doubled
     assert np.isclose(tc.loc[d[26]], 0.06 * stress / 1e4) and np.isclose(tc.loc[d[28]], 0.04 * stress / 1e4)
     assert out["n_forced_cuts_zero_adv"] == 2 and np.isclose(out["forced_cut_notional_usd"], 0.10 * mod.AUM)
 
@@ -347,6 +352,83 @@ def test_round3_settlement_after_the_last_print_is_not_free(mod: Any) -> None:
     W.iloc[12:18, 0] = 12_000 * k  # capped exit leaves 2k held past the last print
     out = mod.apply_costs_and_returns(b, W, mod.build_cost_config("unknown_borrow_required"), idea="H1")
     assert mod.held_positions(b, W)["A"].iloc[20:22].tolist() == [pytest.approx(2_000 * k), 0.0]
-    assert np.isclose(out["daily"]["tc"].loc[d[21]], 2_000 * k * mod.STRESS_COST_MULT * 4.0 / 1e4)
+    assert np.isclose(out["daily"]["tc"].loc[d[21]], 2_000 * k * 2.0 * 4.0 / 1e4)
     assert out["n_post_last_print_settlements"] == 1
     assert np.isclose(out["post_last_print_settlement_notional_usd"], 2_000.0)
+
+
+def test_round4_stress_cost_is_two_times_the_one_way_cost(mod: Any) -> None:
+    assert mod.STRESS_ONE_WAY_COST_MULT == 2.0  # pinned, not net_edge's round-trip break-even multiple
+    b = _delisting()
+    d = b["R"].index
+    k = 1.0 / float(mod.AUM)
+    W = pd.DataFrame({"A": 0.0}, index=d)
+    W.iloc[12:18, 0] = 12_000 * k
+    out = mod.apply_costs_and_returns(b, W, mod.build_cost_config("unknown_borrow_required"), idea="H1")
+    assert np.isclose(out["daily"]["tc"].loc[d[21]], 2_000 * k * 8.0 / 1e4)  # 2 x 4 bp one-way sell
+    assert out["forced_trade_cost"] == "stress: 2.0 x one-way cost at no ADV"
+
+
+def _trailing_zero_volume_bars() -> dict[str, pd.DataFrame]:
+    b = _flat()  # A last trades at close 24: closes 25-29 remain $50 with zero volume
+    b["VOL"].iloc[25:, 0] = 0.0
+    b["R"].iloc[25:, 0] = 0.02  # deliberately stale marks, not prints
+    return b
+
+
+def test_round4_trailing_zero_volume_h1_tau_last_print_no_trade_after_bound(mod: Any) -> None:
+    b = _trailing_zero_volume_bars()
+    d = b["R"].index
+    assert (b["PX"]["A"].iloc[25:] == 50.0).all() and len(b["PX"]) - 25 == 5
+    assert mod._trusted_tau(b, "A") == 24 == mod.last_print_index(b, "A")
+    W = pd.DataFrame({"A": 0.0}, index=d)
+    W.iloc[10:, 0] = 0.05  # held long through the stale closes
+    cfg = mod.build_cost_config("unknown_borrow_required")
+    Wa, ov, rec = mod.h1_terminal_bound(b, W, [{"symbol": "A", "identity_ok": True}], cfg)
+    assert rec[0]["tau"] == str(d[24].date()) and np.isclose(ov.iloc[25], -0.05) and np.isclose(ov.sum(), -0.05)
+    assert Wa["A"].iloc[24] == 0.05 and Wa["A"].iloc[25:].eq(0).all()  # W_adj zeroed from tau+1
+    held = mod.held_positions(b, Wa)["A"]
+    assert np.isclose(held.iloc[25], 0.05) and held.iloc[26:].eq(0).all()
+    after_tau = [(fd, t) for _d, fd, _h, ts, _c in mod._fills(b, Wa) for t in ts if t[0] == "A" and fd > d[24]]
+    assert len(after_tau) == 1  # only a forced settlement, never a normal fill on a zero-volume close
+    assert after_tau[0][1][5] == mod.FORCED_SETTLEMENT and after_tau[0][1][2] == 50.0
+    out = mod.apply_costs_and_returns(b, Wa, cfg, idea="H1")
+    assert out["daily"]["gross"].loc[d[25] :].eq(0).all()  # nothing earned after its -100% bound
+    assert np.isclose(out["daily"]["tc"].loc[d[26]], 0.05 * 2.0 * 4.0 / 1e4)  # 2 x the 4 bp one-way sell
+
+
+def test_round4_zero_volume_close_cannot_be_exited_at_one_x(mod: Any) -> None:
+    b = _trailing_zero_volume_bars()
+    b["VOL"].iloc[:25, 0] = 1e4  # 1% ADV = $5k per session
+    d = b["R"].index
+    k = 1.0 / float(mod.AUM)
+    W = pd.DataFrame({"A": 0.0}, index=d)
+    W.iloc[12:24, 0] = 12_000 * k  # capped exit at close 24 leaves $7k past the last real print
+    held = mod.held_positions(b, W)["A"]
+    assert np.isclose(held.iloc[25], 7_000 * k) and held.iloc[26:].eq(0).all()
+    out = mod.apply_costs_and_returns(b, W, mod.build_cost_config("unknown_borrow_required"), idea="H2")
+    assert np.isclose(out["daily"]["tc"].loc[d[26]], 7_000 * k * 2.0 * 4.0 / 1e4)  # stress, not 1x
+    assert out["n_post_last_print_settlements"] == 1
+    assert np.isclose(out["post_last_print_settlement_notional_usd"], 7_000)
+    assert out["daily"]["gross"].loc[d[25] :].eq(0).all()
+    pos = [{"sym": "A", "etf": "XLK", "w_sym": 12_000 * k, "w_etf": 0.0, "entry_i": 12, "exit_i": 24}]
+    rec = mod.h2_delisting_receipts(b, W, pos)
+    assert len(rec) == 1 and rec[0]["last_close_session"] == str(d[24].date())
+    assert np.isclose(rec[0]["held_weight"], 7_000 * k)
+    ov, _ = mod.h2_delisting_stress(b, W, pos)
+    assert np.isclose(ov.iloc[25], 7_000 * k * -0.30) and np.isclose(ov.sum(), ov.iloc[25])
+
+
+def test_round4_weights_off_the_price_index_fail_closed(mod: Any) -> None:
+    b = _flat()
+    d = b["R"].index
+    extra = d.append(pd.DatetimeIndex([d[-1] + pd.Timedelta(days=7)]))
+    W = pd.DataFrame({"A": 0.0}, index=extra)
+    W.iloc[12:, 0] = 0.1
+    cfg = mod.build_cost_config("unknown_borrow_required")
+    with pytest.raises(SystemExit, match="not in the price index"):
+        mod.apply_costs_and_returns(b, W, cfg, idea="H1")
+    with pytest.raises(SystemExit, match="not in the price index"):
+        mod.held_positions(b, W)
+    with pytest.raises(SystemExit, match="not in the price index"):
+        mod.h1_terminal_bound(b, W, [{"symbol": "A", "identity_ok": True}], cfg)
