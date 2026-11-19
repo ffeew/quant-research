@@ -1,5 +1,8 @@
+import itertools
 import math
 from collections.abc import Callable
+
+import pytest
 
 from quant_research.strategies.sentiment_returns.h2c import errors, run_h2c
 from quant_research.strategies.sentiment_returns.h2c.config import HoldoutExpectations, load_h2c_params
@@ -370,10 +373,14 @@ def test_non_iso_calendar_session_fails_closed() -> None:
     assert "calendar_sessions: '2012/06/01' is not a date object or strict ISO YYYY-MM-DD date" in msg
 
 
-def test_calendar_outcome_guard_refuses_in_window_session_after_day0() -> None:
+def test_calendar_outcome_guard_refuses_in_window_session_after_day0(monkeypatch: pytest.MonkeyPatch) -> None:
     # Candidate path (pipeline: the calendar check on a0..a0+h1 before each candidate's target). The 2013 warm-up
     # calendar session passes the input guard (warm-up allowance) but is moved into a scored event's outcome window;
-    # the price panel is untouched, so only the calendar outcome guard can refuse it.
+    # the price panel is untouched, so only the calendar outcome guard can refuse it. The moved calendar is unsorted,
+    # so the sortedness check refuses it first; that check is switched off here to keep the outcome guard (defence in
+    # depth) covered on its own.
+    from quant_research.strategies.sentiment_returns.h2c import pipeline as pl
+
     p, kw = world(seed=3, dev=True)
     r = run_h2c(p, "T", **kw)
     ev = next(e for e in r["events"] if e["symbol"] == "S00" and e["day0"] == "2015-04-21")
@@ -382,14 +389,19 @@ def test_calendar_outcome_guard_refuses_in_window_session_after_day0() -> None:
     cal = list(kw["calendar_sessions"])
     moved = cal.pop(cal.index("2013-12-31"))
     cal.insert(cal.index("2015-04-21") + 3, moved)
+    assert "not strictly increasing" in _spent(run_h2c, p, "T", **dict(kw, calendar_sessions=cal))
+    monkeypatch.setattr(pl, "_refuse_unordered_sessions", lambda cal, ps: None)
     msg = _spent(run_h2c, p, "T", **dict(kw, calendar_sessions=cal))
     assert "(calendar S00 2015-04-21 outcome row: 2013-12-31)" in msg
 
 
-def test_default_count_outcome_guard_refuses_in_window_session() -> None:
+def test_default_count_outcome_guard_refuses_in_window_session(monkeypatch: pytest.MonkeyPatch) -> None:
     # INFO path (pipeline: the second-session default-count check from info_i0): every fiscal-2015 Q3 row loses its
     # reportTime, so those events are excl_no_reporttime and never reach the candidate path. The 2013 warm-up
-    # calendar session moved just after S00's info_i0 session is refused by the default-count outcome guard.
+    # calendar session moved just after S00's info_i0 session is refused by the default-count outcome guard. As
+    # above, the sortedness check refuses the unsorted calendar first and is switched off to reach that guard.
+    from quant_research.strategies.sentiment_returns.h2c import pipeline as pl
+
     p, kw = world(seed=3, dev=True)
     er = [dict(e, reportTime="") if e["fiscalDateEnding"] == "2015-09-30" else e for e in kw["earnings_rows"]]
     r = run_h2c(p, "T", **dict(kw, earnings_rows=er))
@@ -401,6 +413,8 @@ def test_default_count_outcome_guard_refuses_in_window_session() -> None:
     cal = list(kw["calendar_sessions"])
     moved = cal.pop(cal.index("2013-12-31"))
     cal.insert(cal.index(d0) + 1, moved)
+    assert "not strictly increasing" in _spent(run_h2c, p, "T", **dict(kw, earnings_rows=er, calendar_sessions=cal))
+    monkeypatch.setattr(pl, "_refuse_unordered_sessions", lambda cal, ps: None)
     msg = _spent(run_h2c, p, "T", **dict(kw, earnings_rows=er, calendar_sessions=cal))
     assert f"(calendar S00 {d0} outcome row: 2013-12-31)" in msg
 
@@ -418,3 +432,61 @@ def test_transcript_object_dated_in_window_is_refused() -> None:
         msg = _spent(run_h2c, p, "T", **dict(kw, load_transcript=loader))
         # Refused by the date guard, before schema validation (which would reject the extra key otherwise).
         assert f": {val})" in msg and "(transcript S" in msg and "for event" not in msg
+
+
+def _sorted_unique(seq: list[str]) -> bool:
+    return all(a < b for a, b in itertools.pairwise(seq))
+
+
+def test_synthetic_worlds_have_sorted_unique_sessions() -> None:
+    for dev in (False, True):
+        _, kw = world(seed=3, dev=dev)
+        assert _sorted_unique(list(kw["calendar_sessions"])) and _sorted_unique(list(kw["price_sessions"]))
+
+
+def test_unsorted_calendar_sessions_refused() -> None:
+    p, kw = world(seed=3, dev=True)
+    cal = list(kw["calendar_sessions"])
+    i = cal.index("2015-06-01")
+    cal[i], cal[i + 1] = cal[i + 1], cal[i]  # two in-partition sessions swapped; no in-window date involved
+    msg = _spent(run_h2c, p, "T", **dict(kw, calendar_sessions=cal))
+    assert f"calendar_sessions: not strictly increasing at index {i + 1}: '{cal[i]}' then '{cal[i + 1]}'" in msg
+
+
+def test_duplicate_calendar_session_refused() -> None:
+    import datetime as dt
+
+    p, kw = world(seed=3, dev=True)
+    cal = list(kw["calendar_sessions"])
+    i = cal.index("2015-06-01")
+    for dup in ("2015-06-01", dt.date(2015, 6, 1)):  # same day as a string or as a date object
+        bad = [*cal[: i + 1], dup, *cal[i + 1 :]]
+        msg = _spent(run_h2c, p, "T", **dict(kw, calendar_sessions=bad))
+        assert f"calendar_sessions: not strictly increasing at index {i + 1}" in msg
+
+
+def test_duplicate_price_session_refused() -> None:
+    import datetime as dt
+
+    p, kw = world(seed=3, dev=True)
+    ps = list(kw["price_sessions"])
+    i = ps.index("2015-06-01")
+    for bad in ([*ps[: i + 1], "2015-06-01", *ps[i + 1 :]], [*ps, dt.date(2015, 6, 1)], [*ps, "2013-12-31"]):
+        msg = _spent(run_h2c, p, "T", **dict(kw, price_sessions=bad))
+        assert "price_sessions: duplicate session" in msg
+    # One price sequence serves every symbol: a symbol's duplicate row is refused by the panel builder.
+    rows = list(kw["price_rows"])
+    _raises(errors.SchemaError, run_h2c, p, "T", **dict(kw, price_rows=[*rows, dict(rows[0])]))
+
+
+def test_moved_in_window_session_refused_by_sortedness() -> None:
+    # Bypass found by review: the 2013-12-31 warm-up calendar session passes the input guard (warm-up allowance);
+    # moved mid-partition (just after 2015-08-03) it shifts the binary-search day0 of later events, and without the
+    # sortedness check run_h2c completes with no outcome-guard refusal. It must be refused.
+    p, kw = world(seed=3, dev=True)
+    cal = list(kw["calendar_sessions"])
+    moved = cal.pop(cal.index("2013-12-31"))
+    cal.insert(cal.index("2015-08-03") + 1, moved)
+    msg = _spent(run_h2c, p, "T", **dict(kw, calendar_sessions=cal))
+    assert "calendar_sessions: not strictly increasing" in msg and "'2015-08-03' then '2013-12-31'" in msg
+    assert "outcome row" not in msg
