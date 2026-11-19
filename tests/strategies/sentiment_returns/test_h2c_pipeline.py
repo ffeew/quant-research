@@ -321,3 +321,100 @@ def test_spent_window_bounds_are_inclusive() -> None:
     outside: tuple[object, ...] = ("2010-12-31", "2014-01-01", dt.date(2015, 1, 1), "", None, "not a date", 2012)
     for w in outside:
         assert not pl._in_spent_window(w)
+
+
+def test_non_iso_price_dates_fail_closed() -> None:
+    import datetime as dt
+
+    from quant_research.strategies.sentiment_returns.h2c import pipeline as pl
+
+    p, kw = world(seed=3, dev=True)
+    ps = list(kw["price_sessions"])
+    rows = list(kw["price_rows"])
+    # '2012/06/01' is in the spent window but not ISO: it used to parse as "no date" and pass.
+    for over in (
+        dict(price_sessions=["2012/06/01", *ps]),
+        dict(price_rows=[*rows, dict(rows[0], date="2012/06/01")]),
+    ):
+        msg = _spent(run_h2c, p, "T", **dict(kw, **over))
+        assert "'2012/06/01' is not a date object or strict ISO YYYY-MM-DD date" in msg
+    # Fail closed whatever the date: other non-strict forms, a datetime, an impossible date, a missing row date.
+    for bad in (
+        "2015/06/01",
+        "2012-06-01T00:00:00",
+        " 2012-06-01",
+        "2012-06-01\n",
+        "2014-02-30",
+        "20120601",
+        dt.datetime(2012, 6, 1, tzinfo=dt.UTC),
+        None,
+        20120601,
+    ):
+        msg = _spent(run_h2c, p, "T", **dict(kw, price_sessions=[*ps, bad]))
+        assert "fail closed" in msg and "price_sessions" in msg
+    nodate = {k: v for k, v in rows[0].items() if k != "date"}
+    assert "price_rows date: None" in _spent(run_h2c, p, "T", **dict(kw, price_rows=[*rows, nodate]))
+    assert pl._strict_session_date("2014-01-02") == dt.date(2014, 1, 2)
+    assert pl._strict_session_date(dt.date(2012, 6, 1)) == dt.date(2012, 6, 1)
+    assert pl._strict_session_date(dt.datetime(2014, 1, 2, tzinfo=dt.UTC)) is None
+    # Valid DEV and default worlds, including the 2013 beta warm-up, still run.
+    assert run_h2c(p, "T", **kw)["stats"]["periods"] >= 6
+    p0, kw0 = world(seed=3)
+    assert run_h2c(p0, "T", **kw0)["stats"]["periods"] >= 6
+
+
+def test_non_iso_calendar_session_fails_closed() -> None:
+    p, kw = world(seed=3, dev=True)
+    cal = list(kw["calendar_sessions"])
+    msg = _spent(run_h2c, p, "T", **dict(kw, calendar_sessions=["2012/06/01", *cal]))
+    assert "calendar_sessions: '2012/06/01' is not a date object or strict ISO YYYY-MM-DD date" in msg
+
+
+def test_calendar_outcome_guard_refuses_in_window_session_after_day0() -> None:
+    # Candidate path (pipeline: the calendar check on a0..a0+h1 before each candidate's target). The 2013 warm-up
+    # calendar session passes the input guard (warm-up allowance) but is moved into a scored event's outcome window;
+    # the price panel is untouched, so only the calendar outcome guard can refuse it.
+    p, kw = world(seed=3, dev=True)
+    r = run_h2c(p, "T", **kw)
+    ev = next(e for e in r["events"] if e["symbol"] == "S00" and e["day0"] == "2015-04-21")
+    assert ev["status"] == "included"
+    assert r["counts"]["status"].get("excl_no_reporttime", 0) == 0  # no default-count path in this world
+    cal = list(kw["calendar_sessions"])
+    moved = cal.pop(cal.index("2013-12-31"))
+    cal.insert(cal.index("2015-04-21") + 3, moved)
+    msg = _spent(run_h2c, p, "T", **dict(kw, calendar_sessions=cal))
+    assert "(calendar S00 2015-04-21 outcome row: 2013-12-31)" in msg
+
+
+def test_default_count_outcome_guard_refuses_in_window_session() -> None:
+    # INFO path (pipeline: the second-session default-count check from info_i0): every fiscal-2015 Q3 row loses its
+    # reportTime, so those events are excl_no_reporttime and never reach the candidate path. The 2013 warm-up
+    # calendar session moved just after S00's info_i0 session is refused by the default-count outcome guard.
+    p, kw = world(seed=3, dev=True)
+    er = [dict(e, reportTime="") if e["fiscalDateEnding"] == "2015-09-30" else e for e in kw["earnings_rows"]]
+    r = run_h2c(p, "T", **dict(kw, earnings_rows=er))
+    nr = [e for e in r["events"] if e["status"] == "excl_no_reporttime"]
+    assert len(nr) == len(SYMS) and r["counts"]["info_default_would_keep"] == {"2015Q4": len(SYMS)}
+    ev = min(nr, key=lambda e: e["info_i0"])
+    d0 = kw["calendar_sessions"][ev["info_i0"]]
+    assert ev["symbol"] == "S00" and d0 not in {e["day0"] for e in r["events"] if e["status"] == "included"}
+    cal = list(kw["calendar_sessions"])
+    moved = cal.pop(cal.index("2013-12-31"))
+    cal.insert(cal.index(d0) + 1, moved)
+    msg = _spent(run_h2c, p, "T", **dict(kw, earnings_rows=er, calendar_sessions=cal))
+    assert f"(calendar S00 {d0} outcome row: 2013-12-31)" in msg
+
+
+def test_transcript_object_dated_in_window_is_refused() -> None:
+    # Transcript-object guard: event dates are outside the window (the pre-load check passes), but the loaded object
+    # carries an in-window date. Refused after loading, with the transcript's own date in the message.
+    p, kw = world(seed=3, dev=True)
+    real = kw["load_transcript"]
+    for key, val in (("date", "2012-03-01"), ("reportedDate", "2013-12-31")):
+
+        def loader(s: str, lab: str, key: str = key, val: str = val) -> object:
+            return dict(real(s, lab), **{key: val})
+
+        msg = _spent(run_h2c, p, "T", **dict(kw, load_transcript=loader))
+        # Refused by the date guard, before schema validation (which would reject the extra key otherwise).
+        assert f": {val})" in msg and "(transcript S" in msg and "for event" not in msg

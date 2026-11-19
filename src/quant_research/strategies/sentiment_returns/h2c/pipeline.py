@@ -7,13 +7,16 @@ transcripts dated in it, and any return/outcome row in it that would feed a targ
 is a label, not an observation date, and is not checked. In-window price history (price rows, price sessions,
 calendar sessions) is allowed only as beta warm-up: dated before the partition start and among the last
 ``beta_n + 1`` sessions before it (the prices behind the ``beta_n`` returns of a beta estimated at the first partition
-session). This library must not be used to run the holdout.
+session). Session and price dates fail closed: any value that is not a ``datetime.date`` (``datetime.datetime``
+excluded) or a strict ISO ``YYYY-MM-DD`` string is refused, since it cannot be shown to lie outside the window. This
+library must not be used to run the holdout.
 """
 
 from __future__ import annotations
 
 import datetime as dt
 import math
+import re
 from collections.abc import Callable, Iterable, Sequence
 from typing import Any
 
@@ -41,6 +44,7 @@ SPENT_WINDOW_REFUSED_MSG = (
 EARNINGS_DATE_FIELDS = ("reportedDate",)  # observation dates only; fiscalDateEnding is a label
 TRANSCRIPT_DATE_FIELDS = ("date", "reportedDate")  # date keys a loaded transcript object may carry
 WARMUP_EXTRA_SESSIONS = 1  # beta_n returns need beta_n + 1 prices
+_STRICT_ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$", re.ASCII)
 
 
 def _as_date(v: Any) -> dt.date | None:
@@ -52,6 +56,23 @@ def _as_date(v: Any) -> dt.date | None:
     if isinstance(v, str):
         try:
             return dt.date.fromisoformat(v.strip()[:10])
+        except ValueError:
+            return None
+    return None
+
+
+def _strict_session_date(v: Any) -> dt.date | None:
+    """Session/price date parser for the fail-closed guards: a ``date`` object, or a string that is exactly
+    ``YYYY-MM-DD`` (no time part, whitespace or other separator) and a valid calendar date -> ``date``; anything else
+    -> None. ``datetime.datetime`` (a ``date`` subclass) -> None: a session date is a calendar day, and a timestamp
+    (possibly tz-aware) is not one, so it is refused rather than truncated."""
+    if isinstance(v, dt.datetime):
+        return None
+    if isinstance(v, dt.date):
+        return v
+    if isinstance(v, str) and _STRICT_ISO_DATE.fullmatch(v):
+        try:
+            return dt.date.fromisoformat(v)
         except ValueError:
             return None
     return None
@@ -72,14 +93,21 @@ def _refuse_spent_window(what: str, values: Iterable[Any]) -> None:
 def _warmup_allowance(sessions: Iterable[Any], part_lo: dt.date, lookback: int) -> frozenset[dt.date]:
     """The last ``lookback`` distinct session dates strictly before ``part_lo``: the only dates where in-window
     price history may appear (beta warm-up)."""
-    before = sorted({d for d in map(_as_date, sessions) if d is not None and d < part_lo})
+    before = sorted({d for d in map(_strict_session_date, sessions) if d is not None and d < part_lo})
     return frozenset(before[-lookback:]) if lookback > 0 else frozenset()
 
 
 def _refuse_spent_window_except_warmup(what: str, values: Iterable[Any], allowed: frozenset[dt.date]) -> None:
-    """Like ``_refuse_spent_window``, but an in-window date in ``allowed`` (pre-partition beta warm-up) passes."""
+    """Session/price guard, fail closed: refuse any value that is not a strict date (``_strict_session_date``), and
+    any in-window date not in ``allowed`` (pre-partition beta warm-up)."""
     for v in values:
-        if _in_spent_window(v) and _as_date(v) not in allowed:
+        d = _strict_session_date(v)
+        if d is None:
+            raise HoldoutRefusedError(
+                f"{SPENT_WINDOW_REFUSED_MSG} ({what}: {v!r} is not a date object or strict ISO YYYY-MM-DD date;"
+                " session and price dates fail closed)"
+            )
+        if SPENT_HOLDOUT_LO <= d <= SPENT_HOLDOUT_HI and d not in allowed:
             raise HoldoutRefusedError(
                 f"{SPENT_WINDOW_REFUSED_MSG} ({what}: {v}; in-window dates are allowed only as pre-partition beta"
                 " warm-up within beta_n + 1 sessions before the partition start)"
@@ -126,13 +154,16 @@ def run_h2c(
     - before any computation: an ``earnings_rows`` ``reportedDate`` in the window (``fiscalDateEnding`` is a label
       and is not checked); a ``calendar_sessions``, ``price_sessions`` or ``price_rows`` ``date`` in the window
       unless it is beta warm-up, i.e. before ``lo`` and among the last ``beta_n + 1`` sessions of that sequence
-      before ``lo``;
+      before ``lo``; and (fail closed) any of those session/price dates that is not a ``datetime.date`` (a
+      ``datetime.datetime`` is refused) or a strict ISO ``YYYY-MM-DD`` string;
     - per transcript: before ``load_transcript``, an event whose ``reportedDate`` or ``day0`` is in the window; after
       loading, a transcript object carrying an in-window ``date`` / ``reportedDate``;
     - per target and score: any session from ``day0`` through ``day0 + h1`` (price panel and calendar) in the
       window, so no in-window return row ever feeds an outcome.
 
-    Dates may be ISO strings or ``date`` objects. The holdout is spent and this library must not be used to run it.
+    Session and price dates must be ``date`` objects or strict ISO ``YYYY-MM-DD`` strings; earnings and transcript
+    dates may be ISO strings (first 10 characters) or ``date`` objects, and an unparseable ``reportedDate`` keeps its
+    existing handling. The holdout is spent and this library must not be used to run it.
     """
     if partition.strip().upper() == HOLDOUT_PARTITION:
         raise HoldoutRefusedError(HOLDOUT_REFUSED_MSG)

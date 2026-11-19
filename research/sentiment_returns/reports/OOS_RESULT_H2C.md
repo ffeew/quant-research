@@ -23,5 +23,6 @@ Earnings-call tone surprise predicts post-call return drift. This was a confirma
 The gate fails on significance and on net-of-cost return.
 
 ## Consequences
-- Under the preregistered kill rule, this holdout is not reused for any H2 variant, and the 2011-2013 transcript holdout is treated as spent for all transcript-based hypotheses.
+- Under the preregistered kill rule, a failed gate closes H2-C: "no variants, no re-specification, no reruns, and no reuse of 2011–2013 (the holdout) for transcript tone".
+- The code guard in run_h2c is deliberately stricter than that policy: it refuses any 2011-2013 event, transcript or outcome date for any H2-C run.
 - Holdout spent; no reruns.
