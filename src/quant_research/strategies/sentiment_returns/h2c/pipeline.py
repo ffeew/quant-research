@@ -9,10 +9,10 @@ calendar sessions) is allowed only as beta warm-up: dated before the partition s
 ``beta_n + 1`` sessions before it (the prices behind the ``beta_n`` returns of a beta estimated at the first partition
 session). Session and price dates fail closed: any value that is not a ``datetime.date`` (``datetime.datetime``
 excluded) or a strict ISO ``YYYY-MM-DD`` string is refused, since it cannot be shown to lie outside the window.
-Session order is checked too: day0 is found by binary search over ``calendar_sessions``, so a calendar that is not
-strictly increasing (unsorted or with a duplicate) is refused, as is a duplicated price session; otherwise a
-misplaced in-window session could shift day0 and slip past the outcome guards. This library must not be used to
-run the holdout.
+Session order is checked too: ``calendar_sessions`` and ``price_sessions`` must each be strictly increasing, so
+an unsorted or duplicated sequence is refused. Day0 is found by binary search over the calendar and beta windows are
+read by position in the price panel, so a misplaced in-window session could otherwise shift day0 past the outcome
+guards or feed a warm-up price into a scored beta. This library must not be used to run the holdout.
 """
 
 from __future__ import annotations
@@ -118,26 +118,21 @@ def _refuse_spent_window_except_warmup(what: str, values: Iterable[Any], allowed
 
 
 def _refuse_unordered_sessions(cal: Sequence[Any], psess: Sequence[Any]) -> None:
-    """Raise ``HoldoutRefusedError`` unless ``cal`` (calendar sessions) is strictly increasing and ``psess`` (price
-    sessions, one sequence shared by all symbols) has no duplicate date. Day0 and the outcome window are located by
-    binary search over the calendar, so an unsorted or duplicated session could move day0 and let an in-window
-    session escape the outcome guards. Call only after the fail-closed date checks: every value is a strict date."""
-    cd = [_strict_session_date(v) for v in cal]
-    for i in range(1, len(cd)):
-        a, b = cd[i - 1], cd[i]
-        if a is None or b is None or not a < b:
-            raise HoldoutRefusedError(
-                f"{SPENT_WINDOW_REFUSED_MSG} (calendar_sessions: not strictly increasing at index {i}:"
-                f" {cal[i - 1]!r} then {cal[i]!r}; unsorted or duplicate sessions are refused)"
-            )
-    seen: dict[dt.date | None, Any] = {}
-    for v in psess:
-        d = _strict_session_date(v)
-        if d is None or d in seen:
-            raise HoldoutRefusedError(
-                f"{SPENT_WINDOW_REFUSED_MSG} (price_sessions: duplicate session {v!r}; duplicate sessions are refused)"
-            )
-        seen[d] = v
+    """Raise ``HoldoutRefusedError`` unless ``cal`` (calendar sessions) and ``psess`` (price sessions, one sequence
+    shared by all symbols) are each strictly increasing, compared as parsed dates; an unsorted or duplicated sequence
+    is refused. Day0 and the outcome window are located by binary search over the calendar, and beta windows are read
+    by position in the price panel, so a misplaced session could move day0 and let an in-window session escape the
+    outcome guards, or carry an in-window warm-up price into a scored beta. Call only after the fail-closed date
+    checks: every value is a strict date."""
+    for what, seq in (("calendar_sessions", cal), ("price_sessions", psess)):
+        ds = [_strict_session_date(v) for v in seq]
+        for i in range(1, len(ds)):
+            a, b = ds[i - 1], ds[i]
+            if a is None or b is None or not a < b:
+                raise HoldoutRefusedError(
+                    f"{SPENT_WINDOW_REFUSED_MSG} ({what}: not strictly increasing at index {i}:"
+                    f" {seq[i - 1]!r} then {seq[i]!r}; unsorted or duplicate sessions are refused)"
+                )
 
 
 def _refuse_outcome_window(what: str, sessions: Sequence[Any], i0: int, h1: int) -> None:
@@ -182,9 +177,10 @@ def run_h2c(
       unless it is beta warm-up, i.e. before ``lo`` and among the last ``beta_n + 1`` sessions of that sequence
       before ``lo``; and (fail closed) any of those session/price dates that is not a ``datetime.date`` (a
       ``datetime.datetime`` is refused) or a strict ISO ``YYYY-MM-DD`` string;
-    - before any computation, after those date checks: ``calendar_sessions`` not strictly increasing (unsorted or
-      with a duplicate) or ``price_sessions`` with a duplicate date (day0 is found by binary search over the
-      calendar, so a misplaced session could otherwise shift day0 past the outcome guards);
+    - before any computation, after those date checks: ``calendar_sessions`` or ``price_sessions`` not strictly
+      increasing (unsorted or with a duplicate; day0 is found by binary search over the calendar and betas are read
+      by position in the price panel, so a misplaced session could otherwise shift day0 past the outcome guards or
+      feed an in-window warm-up price into a scored beta);
     - per transcript: before ``load_transcript``, an event whose ``reportedDate`` or ``day0`` is in the window; after
       loading, a transcript object carrying an in-window ``date`` / ``reportedDate``;
     - per target and score: any session from ``day0`` through ``day0 + h1`` (price panel and calendar) in the

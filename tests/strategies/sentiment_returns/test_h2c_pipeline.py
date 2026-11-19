@@ -276,7 +276,7 @@ def test_2013_price_date_outside_warmup_lookback_is_refused() -> None:
     assert extra in msg
 
 
-def test_2013_return_row_feeding_outcome_is_refused() -> None:
+def test_2013_return_row_feeding_outcome_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
     from quant_research.strategies.sentiment_returns.h2c import pipeline as pl
 
     # Helper: any session from day0 through day0 + h1 in the spent window is refused; in-window sessions before
@@ -295,13 +295,17 @@ def test_2013_return_row_feeding_outcome_is_refused() -> None:
 
     # Through run_h2c: a DEV-style call whose price panel carries a 2013 warm-up session (allowed by the input
     # guard: before the partition start and within the lookback) moved so that its return row sits inside a
-    # scored event's outcome window. The outcome guard must refuse it.
+    # scored event's outcome window. The outcome guard must refuse it. The moved price sessions are unsorted, so the
+    # sortedness check refuses them first; that check is switched off here to keep the outcome guard (defence in
+    # depth) covered on its own.
     p, kw = world(seed=3, dev=True)
     r = run_h2c(p, "T", **kw)
     d0 = min(ev["day0"] for ev in r["events"] if ev["status"] == "included")
     ps = list(kw["price_sessions"])
     moved = ps.pop(ps.index("2013-12-31"))
     ps.insert(ps.index(d0) + 2, moved)
+    assert "price_sessions: not strictly increasing" in _spent(run_h2c, p, "T", **dict(kw, price_sessions=ps))
+    monkeypatch.setattr(pl, "_refuse_unordered_sessions", lambda cal, ps: None)
     msg = _spent(run_h2c, p, "T", **dict(kw, price_sessions=ps))
     assert "outcome row: 2013-12-31" in msg
 
@@ -471,9 +475,15 @@ def test_duplicate_price_session_refused() -> None:
     p, kw = world(seed=3, dev=True)
     ps = list(kw["price_sessions"])
     i = ps.index("2015-06-01")
-    for bad in ([*ps[: i + 1], "2015-06-01", *ps[i + 1 :]], [*ps, dt.date(2015, 6, 1)], [*ps, "2013-12-31"]):
+    n = len(ps)
+    for bad, k, pair in (
+        ([*ps[: i + 1], "2015-06-01", *ps[i + 1 :]], i + 1, "'2015-06-01' then '2015-06-01'"),
+        ([*ps, dt.date(2015, 6, 1)], n, f"{ps[-1]!r} then datetime.date(2015, 6, 1)"),
+        ([*ps, "2013-12-31"], n, f"{ps[-1]!r} then '2013-12-31'"),
+    ):
         msg = _spent(run_h2c, p, "T", **dict(kw, price_sessions=bad))
-        assert "price_sessions: duplicate session" in msg
+        assert f"price_sessions: not strictly increasing at index {k}: {pair}" in msg
+        assert "unsorted or duplicate sessions are refused" in msg
     # One price sequence serves every symbol: a symbol's duplicate row is refused by the panel builder.
     rows = list(kw["price_rows"])
     _raises(errors.SchemaError, run_h2c, p, "T", **dict(kw, price_rows=[*rows, dict(rows[0])]))
@@ -489,4 +499,28 @@ def test_moved_in_window_session_refused_by_sortedness() -> None:
     cal.insert(cal.index("2015-08-03") + 1, moved)
     msg = _spent(run_h2c, p, "T", **dict(kw, calendar_sessions=cal))
     assert "calendar_sessions: not strictly increasing" in msg and "'2015-08-03' then '2013-12-31'" in msg
+    assert "outcome row" not in msg
+
+
+def test_unsorted_price_sessions_refused() -> None:
+    p, kw = world(seed=3, dev=True)
+    ps = list(kw["price_sessions"])
+    i = ps.index("2015-06-01")
+    ps[i], ps[i + 1] = ps[i + 1], ps[i]  # two in-partition sessions swapped; no in-window date involved
+    msg = _spent(run_h2c, p, "T", **dict(kw, price_sessions=ps))
+    assert f"price_sessions: not strictly increasing at index {i + 1}: '{ps[i]}' then '{ps[i + 1]}'" in msg
+
+
+def test_moved_in_window_price_session_refused_by_sortedness() -> None:
+    # Bypass found by review: the 2013-12-31 warm-up price session passes the input guard (warm-up allowance);
+    # moved to 5 places before 2015-04-21 its price feeds the positional beta window of the 2015-04-21 events, and
+    # without the price-order check run_h2c completes and S00's beta there changes (0.898 -> 1.410). It must be
+    # refused.
+    p, kw = world(seed=3, dev=True)
+    ps = list(kw["price_sessions"])
+    moved = ps.pop(ps.index("2013-12-31"))
+    j = ps.index("2015-04-21") - 5
+    ps.insert(j, moved)
+    msg = _spent(run_h2c, p, "T", **dict(kw, price_sessions=ps))
+    assert f"price_sessions: not strictly increasing at index {j}: '{ps[j - 1]}' then '2013-12-31'" in msg
     assert "outcome row" not in msg
