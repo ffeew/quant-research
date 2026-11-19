@@ -11,6 +11,7 @@ DEV then one sealed OOS run for H1b (433 periods).
 
 ## Method
 Pre-registered IC tests with Newey-West t, Holm correction, L/S net at 10 bps; UTC and ET readings.
+- H3 sector-IC (R-SECTOR) uses a current-snapshot sector map and is a diagnostic only, never a gate; read it as survivorship-suspect.
 
 ## Results
 - H1a: DEV FAIL (mean IC -0.0181 UTC); no OOS run.
