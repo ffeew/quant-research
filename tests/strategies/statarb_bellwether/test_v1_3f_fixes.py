@@ -86,11 +86,13 @@ def test_b3_borrow_accrues_calendar_days_over_a_weekend(mod: Any) -> None:
     cfg = mod.build_cost_config("unknown_borrow_required")
     out = mod.apply_costs_and_returns(b, W, cfg, idea="H1")["daily"]["borrow"]
     per_day = 0.5 * cfg.borrow_rate / 360.0
-    mon = [t for t in out.index[1:] if t.day_of_week == 0][0]
+    first = d[11]  # held from the first fill with ADV history (fill day d[10])
+    assert out.loc[: d[10]].eq(0).all()
+    mon = [t for t in out.index if t > first and t.day_of_week == 0][0]
     assert np.isclose(out.loc[mon], 3 * per_day)  # Fri close -> Mon close accrues 3 days
     assert np.isclose(out.loc[mon + pd.Timedelta(days=1)], per_day)
-    span = (out.index[-1] - out.index[0]).days
-    assert np.isclose(out.iloc[1:].sum(), span * per_day)  # = rate * span / 360 on the short
+    span = (out.index[-1] - d[10]).days
+    assert np.isclose(out.loc[first:].sum(), span * per_day)  # = rate * span / 360 on the short
 
 
 def test_b3_terminal_bound_borrow_overlay_accrues_calendar_days(mod: Any) -> None:
@@ -200,3 +202,28 @@ def test_round2_terminal_borrow_over_a_year_is_about_ten_percent(mod: Any) -> No
     days = (d[h_i] - d[19]).days  # tau close -> h close
     assert days >= 365 and np.isclose(borrow, 0.05 * 0.10 * days / 360)
     assert 0.10 <= borrow / 0.05 < 0.1025  # ~10% of the short over a year (360-day basis)
+
+
+def test_round2_adv20_excludes_fill_day_volume(mod: Any) -> None:
+    b = _flat(vol=1e4)  # ADV20 = $500k; 1% = $5k per session
+    d = b["R"].index
+    b["VOL"].iloc[15, 0] = 1e9  # huge volume on the fill day itself must not lift its cap
+    W = pd.DataFrame({"A": 0.0}, index=d)
+    W.iloc[15:, 0] = 0.01
+    held = mod.held_positions(b, W)["A"]
+    step = 5_000 / float(mod.AUM)
+    assert np.isclose(held.iloc[16], step)  # fill at close d[15] uses ADV20 ending d[14]
+    assert held.iloc[17] > 2 * step  # the next window (ending d[15]) includes the spike
+
+
+def test_round2_no_adv_history_means_no_trade(mod: Any) -> None:
+    b = _flat(vol=1e7)
+    d = b["R"].index
+    W = pd.DataFrame({"A": 0.0}, index=d)
+    W.iloc[2:, 0] = 0.1  # wants to trade before any ADV history exists
+    out = mod.apply_costs_and_returns(b, W, mod.build_cost_config("unknown_borrow_required"), idea="H1")
+    held = mod.held_positions(b, W)["A"]
+    assert held.iloc[:11].eq(0).all() and np.isclose(held.iloc[11], 0.1)  # 10 sessions of history first
+    assert out["daily"]["tc"].loc[: d[10]].eq(0).all() and out["n_sessions_adv_capped"] == 8  # rows 3-10
+    b["VOL"]["A"] = 0.0  # never any volume: no ADV, never filled
+    assert mod.held_positions(b, W)["A"].eq(0).all()
