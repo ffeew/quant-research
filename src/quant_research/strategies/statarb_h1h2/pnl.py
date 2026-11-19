@@ -25,6 +25,24 @@ from .splits import (
 )
 
 
+def has_print(px: float) -> bool:
+    """The one last-print definition: a price is a print when it is present (not NaN) and > 0."""
+    return bool(np.isfinite(px) and px > 0)
+
+
+def printed_mask(PX: pd.DataFrame) -> pd.DataFrame:
+    """Frame form of has_print: notna and price > 0."""
+    return PX.notna() & PX.gt(0)
+
+
+def last_print_index(PX: pd.DataFrame, s: str) -> int:
+    """Row of the last print of s (has_print), or -1 when it never printed."""
+    if s not in PX.columns:
+        return -1
+    idx = np.flatnonzero(printed_mask(PX[[s]])[s].to_numpy(dtype=bool))
+    return int(idx[-1]) if len(idx) else -1
+
+
 def _any(v: Any) -> Any:
     """pd.Timestamp(None) is NaT at runtime; the stubs reject None."""
     return v
@@ -151,7 +169,10 @@ def _fills(
     """Walk the book session by session from the position actually held.
 
     W row k is the weight filled at close k (signals put it at their fill session, never the
-    signal bar); it earns the next row's return, close k -> k+1. Each session trades at most 1%
+    signal bar); it earns the next row's return, close k -> k+1. A fill at close k is priced,
+    print-checked and ADV-capped on row k itself, never on the row whose return it then earns
+    (so an exit at a name's real last print pays its cost there, and nothing fills on a no-print
+    day). Each session trades at most 1%
     of ADV20 shares toward the target, where ADV20 is the trailing 20-session mean dollar volume
     ending the session before the fill day (the fill day's own volume is never in it); the
     unfilled remainder carries to later sessions. A name with no ADV history has cap 0 and can't
@@ -164,16 +185,13 @@ def _fills(
     W_exec = W.shift(1).fillna(0.0)
     DV = PX * VOL
     ADV20 = DV.rolling(20, min_periods=10).mean().shift(1)  # row k: window ending k-1; read at the fill day
-    printed = (PX > 0).to_numpy()
-    last_print = {
-        str(c): (int(np.flatnonzero(printed[:, k])[-1]) if printed[:, k].any() else -1)
-        for k, c in enumerate(PX.columns)
-    }
+    last_print = {str(c): last_print_index(PX, str(c)) for c in PX.columns}
     pos = {d: i for i, d in enumerate(PX.index)}
     held = pd.Series(0.0, index=W_exec.columns)
     dates = W_exec.index
     for j in range(1, len(dates)):
         d = dates[j]
+        fill_day = dates[j - 1]  # W_exec row j is the weight filled at close j-1: price, print and cap there
         target = W_exec.iloc[j]
         want = target - held
         fill = want.copy()
@@ -182,13 +200,12 @@ def _fills(
         for s, delta in want.items():
             if abs(delta) < 1e-15:
                 continue
-            px = at_float(PX, d, s) if s in PX.columns and d in pos else float("nan")
-            if not (px > 0):
-                gone = pos.get(d, len(PX.index)) > last_print.get(str(s), -1)
+            px = at_float(PX, fill_day, s) if s in PX.columns and fill_day in pos else float("nan")
+            if not has_print(px):
+                gone = pos.get(fill_day, len(PX.index)) > last_print.get(str(s), -1)
                 if not (gone and abs(float(target.loc[str(s)])) < 1e-15):
                     fill.loc[str(s)] = 0.0  # no print: can't trade, the position stays held
                 continue  # (or: past its last print with a flat target, settled at last close)
-            fill_day = dates[j - 1]  # W_exec row j is the weight filled at close j-1
             adv = at_float(ADV20, fill_day, s) if s in ADV20.columns and fill_day in pos else np.nan
             adv_sh = (adv / px) if (np.isfinite(adv) and adv > 0) else None
             if adv_sh is None:
@@ -271,14 +288,19 @@ class AcquirerCloses(Protocol):
     def accepted_acquirer_closes(self, acquirer_id: str, start: pd.Timestamp, end: pd.Timestamp) -> pd.Series: ...
 
 
-def trusted_tau(bars: dict[str, pd.DataFrame], s: str) -> int | None:
-    """tau = last trusted print: volume > 0, price present, not forward-filled."""
-    if s not in bars["PX"].columns:
-        return None
-    tr = (bars["VOL"][s] > 0) & bars["PX"][s].notna()
+def _trusted(bars: dict[str, pd.DataFrame], s: str) -> pd.Series:
+    """Trusted print: a print (has_print), volume > 0, not forward-filled."""
+    tr = printed_mask(bars["PX"][[s]])[s] & (bars["VOL"][s] > 0)
     if "FFILL" in bars:
         tr &= ~bars["FFILL"][s].fillna(True).astype(bool)
-    idx = np.flatnonzero(tr.to_numpy(dtype=bool))
+    return tr
+
+
+def trusted_tau(bars: dict[str, pd.DataFrame], s: str) -> int | None:
+    """tau = last trusted print: volume > 0, a print (has_print), not forward-filled."""
+    if s not in bars["PX"].columns:
+        return None
+    idx = np.flatnonzero(_trusted(bars, s).to_numpy(dtype=bool))
     return int(idx[-1]) if len(idx) else None
 
 
@@ -315,8 +337,8 @@ def h1_terminal_bound(
     path: str = "A",
     costs: CostModel | None = None,
 ) -> tuple[pd.DataFrame, pd.Series, list[dict[str, Any]]]:
-    """Positions stranded in unresolved terminal rows: zero the leg from tau (the execution lag
-    closes it at tau+1 with no exit-cost credit) and book an equity overlay at tau+1:
+    """Positions stranded in unresolved terminal rows: zero the leg from tau+1 (no print there, so
+    it can't fill: no exit-cost credit) and book an equity overlay at tau+1:
     long -100% of marked value; short max(P_tau, V_max) liability plus borrow from tau+1 to
     max(frozen exit, h). The bound applies to the position actually held into tau+1 (after the
     ADV cap), not the target: a capped exit still holding at delisting is bound on what is left.
@@ -347,15 +369,15 @@ def h1_terminal_bound(
         if row.get("economic_event_date") and pd.Timestamp(row["economic_event_date"]) < tau_d:
             raise Blocked(f"BLOCK H1: source-bound economic date < tau for {s}.")
         held_pre = W[s].iloc[:t].abs() > 0
-        trusted = (bars["VOL"][s] > 0) & bars["PX"][s].notna()
-        if "FFILL" in bars:
-            trusted &= ~bars["FFILL"][s].fillna(True).astype(bool)
+        trusted = _trusted(bars, s)
         if (held_pre & ~trusted.iloc[:t]).any():
             raise Blocked(f"BLOCK H1: suspension gap before tau for {s} (fail closed).")
         assert held is not None
-        # held after close tau's session; no print after tau, so this is what reaches tau+1
-        w = float(held[s].iloc[t])
-        if abs(w) < 1e-15 or t + 1 >= len(dates):
+        if t + 1 >= len(dates):
+            continue
+        # held after the fills at close tau (the last fill it can get); this is what reaches tau+1
+        w = float(held[s].iloc[t + 1])
+        if abs(w) < 1e-15:
             continue
         book_i = t + 1
         p_tau = float(bars["PX"][s].iloc[t])
@@ -395,7 +417,8 @@ def h1_terminal_bound(
             for j in range(book_i, end_i + 1):
                 overlay.iloc[j] -= per_day * (dates[j] - dates[j - 1]).days  # calendar days, weekends accrue
             rec.update({"h": str(h_d.date()), "V_max": vmax, "liability": liab, "borrow_rate": rate})
-        W_adj.iloc[t:, iloc_int(W_adj.columns, s)] = 0.0
+        # flat from tau+1: the stranded amount is never traded at tau (no exit-cost credit)
+        W_adj.iloc[t + 1 :, iloc_int(W_adj.columns, s)] = 0.0
         receipts.append(rec)
     return W_adj, overlay, receipts
 
@@ -414,10 +437,9 @@ def h2_delisting_receipts(bars: dict[str, pd.DataFrame], positions: list[dict[st
         s = p["sym"]
         if s not in PX.columns:
             continue
-        idx = np.flatnonzero(PX[s].notna().values)
-        if not len(idx):
+        last_i = last_print_index(PX, s)
+        if last_i < 0:
             continue
-        last_i = int(idx[-1])
         if p["entry_i"] <= last_i < p["exit_i"] - 1:
             out.append(
                 {
@@ -459,7 +481,7 @@ def h2_delisting_stress(
             continue
         if held is None:
             held = held_positions(bars, W)
-        w = float(held[s].iloc[li]) if s in held.columns else 0.0  # no print after li: carried into li+1
+        w = float(held[s].iloc[li + 1]) if s in held.columns else 0.0  # after the last fill (close li)
         shock = H2_DELISTING_STRESS_LONG if w > 0 else H2_DELISTING_STRESS_SHORT
         charge = w * shock if w > 0 else 0.0
         overlay.iloc[li + 1] += charge
