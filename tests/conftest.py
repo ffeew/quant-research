@@ -4,6 +4,7 @@ The research data store is private and not in this repo. Tests that need it are 
 automatically (reported as "needs research data") unless QR_REQUIRE_DATA=1, in which case
 missing data is a hard failure. Point QR_DATA_DIR at a data store to run them for real.
 """
+
 import os
 
 import pytest
@@ -27,7 +28,7 @@ DATA_TESTS = (
 
 def _have_data() -> bool:
     d = os.environ.get("QR_DATA_DIR")
-    return bool(d) and os.path.isdir(d)
+    return d is not None and d != "" and os.path.isdir(d)
 
 
 def pytest_collection_modifyitems(config, items):

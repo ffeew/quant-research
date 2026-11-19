@@ -1,11 +1,12 @@
 """`qr` command-line entry point.
 
-    qr list                      list trials with status and verdict
-    qr show <trial>              print a trial's config
-    qr run <trial> [args...]     run a trial's entry module (as `python -m <module> args...`)
-    qr datasets                  list dataset builders
-    qr build-data <dataset> [args...]   run a dataset builder module
+qr list                      list trials with status and verdict
+qr show <trial>              print a trial's config
+qr run <trial> [args...]     run a trial's entry module (as `python -m <module> args...`)
+qr datasets                  list dataset builders
+qr build-data <dataset> [args...]   run a dataset builder module
 """
+
 from __future__ import annotations
 
 import argparse
@@ -13,6 +14,7 @@ import json
 import runpy
 import sys
 import tomllib
+from typing import Any, cast
 
 from quant_research.utils import config
 
@@ -27,10 +29,11 @@ def _run_module(module: str, args: list[str]) -> int:
     return 0
 
 
-def _datasets() -> dict:
+def _datasets() -> dict[str, Any]:
     path = config.CONFIG_DIR / "datasets.toml"
     with path.open("rb") as fh:
-        return tomllib.load(fh)["datasets"]
+        loaded = tomllib.load(fh)
+    return cast(dict[str, Any], loaded["datasets"])
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -16,14 +16,22 @@ Run (ONLY after a future Victor AUTHORISE ONE RUN ruling — not now):
 Intended output (only): ./intended-output/pytest-output.txt
 (mechanics-results.json dropped — no writer; B6)
 """
+
 from __future__ import annotations
 
 import json
-import math
 import unittest
 from pathlib import Path
 
-from quant_research.strategies.carry.v1_mechanics import DomainError, apply_base_derisk, apply_restoration, apply_v1_clamp, is_v1_valid_close, run_fixture, validate_w_vix_domain
+from quant_research.strategies.carry.v1_mechanics import (
+    DomainError,
+    apply_base_derisk,
+    apply_restoration,
+    apply_v1_clamp,
+    is_v1_valid_close,
+    run_fixture,
+    validate_w_vix_domain,
+)
 
 HERE = Path(__file__).resolve().parent
 FIXTURES_PATH = HERE / "fixtures.json"
@@ -45,10 +53,7 @@ def _almost(a, b, tol=1e-9):
 
 
 def _weights_le(prior, after):
-    for k, v in after.items():
-        if float(v) > float(prior.get(k, 0.0)) + 1e-12:
-            return False
-    return True
+    return all(float(v) <= float(prior.get(k, 0.0)) + 1e-12 for k, v in after.items())
 
 
 class TestV1Mechanics(unittest.TestCase):
@@ -479,31 +484,21 @@ class TestV1Mechanics(unittest.TestCase):
         # Direct API: derisk cuts; restoration would preserve
         derisked = apply_base_derisk({"AAA": 0.12}, {"AAA": 0.10})
         self.assertTrue(_almost(derisked["AAA"], 0.10))
-        restored = apply_restoration(
-            {"AAA": 0.12}, {"AAA": 0.10}, mode="full_base", gross_cap_pct=60.0
-        )
+        restored = apply_restoration({"AAA": 0.12}, {"AAA": 0.10}, mode="full_base", gross_cap_pct=60.0)
         self.assertTrue(_almost(restored["AAA"], 0.12))
 
     def test_apply_restoration_unit_below_and_above_target(self):
         # below target -> restore up
-        out = apply_restoration(
-            {"AAA": 0.05}, {"AAA": 0.10}, mode="full_base", gross_cap_pct=60.0
-        )
+        out = apply_restoration({"AAA": 0.05}, {"AAA": 0.10}, mode="full_base", gross_cap_pct=60.0)
         self.assertTrue(_almost(out["AAA"], 0.10))
         # above target -> preserve (no cut)
-        out2 = apply_restoration(
-            {"AAA": 0.15}, {"AAA": 0.10}, mode="full_base", gross_cap_pct=60.0
-        )
+        out2 = apply_restoration({"AAA": 0.15}, {"AAA": 0.10}, mode="full_base", gross_cap_pct=60.0)
         self.assertTrue(_almost(out2["AAA"], 0.15))
         # path: prior above capped target -> preserve
-        out3 = apply_restoration(
-            {"AAA": 0.35}, {"AAA": 0.50}, mode="min_base_30", gross_cap_pct=30.0
-        )
+        out3 = apply_restoration({"AAA": 0.35}, {"AAA": 0.50}, mode="min_base_30", gross_cap_pct=30.0)
         self.assertTrue(_almost(out3["AAA"], 0.35))
         # path: prior below capped target -> restore to 0.30
-        out4 = apply_restoration(
-            {"AAA": 0.25}, {"AAA": 0.50}, mode="min_base_30", gross_cap_pct=30.0
-        )
+        out4 = apply_restoration({"AAA": 0.25}, {"AAA": 0.50}, mode="min_base_30", gross_cap_pct=30.0)
         self.assertTrue(_almost(out4["AAA"], 0.30))
 
 

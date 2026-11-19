@@ -7,38 +7,86 @@ Price source priority per ETF (recorded in the returned `sources` dict):
 Crypto: EXCLUDED by desk decision (30 Oct 2026); this sleeve is ETFs only.
 Risk-free: Ken French daily RF (ff3_daily), forward-filled past its last date (flagged).
 """
+
 from __future__ import annotations
-from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DATA_DIR, ...)
+
 import os
-import numpy as np
+from typing import Any, cast
+
 import pandas as pd
+
+from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DATA_DIR, ...)
 
 ROOT = f"{_QR.DATA_DIR}"
 BARS = f"{ROOT}/bars/daily"
 
 ASSET_CLASS = {
     # equity indices
-    **{s: "equity" for s in "SPY QQQ IWM DIA EFA EWJ EWG EWU EEM EWZ FXI INDA EWY EWT EWA EWC".split()},
+    **dict.fromkeys(
+        [
+            "SPY",
+            "QQQ",
+            "IWM",
+            "DIA",
+            "EFA",
+            "EWJ",
+            "EWG",
+            "EWU",
+            "EEM",
+            "EWZ",
+            "FXI",
+            "INDA",
+            "EWY",
+            "EWT",
+            "EWA",
+            "EWC",
+        ],
+        "equity",
+    ),
     # rates / credit
-    **{s: "rates" for s in "SHY IEF TLT BWX AGG BND TIP LQD HYG".split()},
+    **dict.fromkeys(["SHY", "IEF", "TLT", "BWX", "AGG", "BND", "TIP", "LQD", "HYG"], "rates"),
     # commodities
-    **{s: "commodity" for s in "GLD SLV USO UNG CPER DBA DBC".split()},
+    **dict.fromkeys(["GLD", "SLV", "USO", "UNG", "CPER", "DBA", "DBC"], "commodity"),
     # FX
-    **{s: "fx" for s in "UUP FXE FXY FXB FXA FXC FXF".split()},
+    **dict.fromkeys(["UUP", "FXE", "FXY", "FXB", "FXA", "FXC", "FXF"], "fx"),
 }
 
 # Universe from the TSMOM paper card (pre-specified before any backtest was run).
-CARD_UNIVERSE = ("SPY QQQ IWM EFA EWJ EWG EWU EEM SHY IEF TLT BWX GLD SLV USO UNG CPER DBA DBC "
-                 "UUP FXE FXY FXB FXA FXC").split()   # crypto (BTC/ETH) excluded by desk decision
+CARD_UNIVERSE = [
+    "SPY",
+    "QQQ",
+    "IWM",
+    "EFA",
+    "EWJ",
+    "EWG",
+    "EWU",
+    "EEM",
+    "SHY",
+    "IEF",
+    "TLT",
+    "BWX",
+    "GLD",
+    "SLV",
+    "USO",
+    "UNG",
+    "CPER",
+    "DBA",
+    "DBC",
+    "UUP",
+    "FXE",
+    "FXY",
+    "FXB",
+    "FXA",
+    "FXC",
+]  # crypto (BTC/ETH) excluded by desk decision
 # Extended (robustness): card + other liquid country/credit ETFs the Data Engineer loaded.
-EXT_EXTRA = "EWZ FXI INDA EWY EWT EWA EWC AGG BND TIP LQD HYG".split()
-CRYPTO: list[str] = []   # crypto excluded by desk decision (30 Oct 2026); kept empty for engine compatibility
+EXT_EXTRA = ["EWZ", "FXI", "INDA", "EWY", "EWT", "EWA", "EWC", "AGG", "BND", "TIP", "LQD", "HYG"]
+CRYPTO: list[str] = []  # crypto excluded by desk decision (30 Oct 2026); kept empty for engine compatibility
 
 
 def _tr_index() -> pd.DataFrame:
     p = f"{BARS}/total_return/daily_total_return.parquet"
-    d = pd.read_parquet(p, columns=["symbol", "session_date", "tr_index_best"])
-    return d
+    return pd.read_parquet(p, columns=["symbol", "session_date", "tr_index_best"])
 
 
 def load_etf(sym: str, tr: pd.DataFrame | None = None) -> tuple[pd.DataFrame | None, str]:
@@ -51,9 +99,11 @@ def load_etf(sym: str, tr: pd.DataFrame | None = None) -> tuple[pd.DataFrame | N
     raw = raw.set_index("session_date").rename(columns={"close": "close_raw", "volume": "volume_raw"})
     src = None
     if tr is not None:
-        t = tr[tr.symbol == sym]
-        if len(t):
-            t = t.assign(session_date=pd.to_datetime(t.session_date)).set_index("session_date")["tr_index_best"]
+        t_rows = tr[tr.symbol == sym]
+        if len(t_rows):
+            t = t_rows.assign(session_date=pd.to_datetime(t_rows.session_date)).set_index("session_date")[
+                "tr_index_best"
+            ]
             raw["px"] = t
             src = "total_return(tr_index_best)"
     if src is None:
@@ -84,15 +134,19 @@ def load_rf() -> tuple[pd.Series, str]:
 
 
 def load_shortable() -> dict[str, bool]:
-    a = pd.read_parquet(f"{ROOT}/assets/snapshots/assets_2026-10-29.parquet",
-                        columns=["symbol", "shortable", "easy_to_borrow"])
-    return {r.symbol: bool(r.shortable and r.easy_to_borrow) for r in a.itertuples()}
+    a = pd.read_parquet(
+        f"{ROOT}/assets/snapshots/assets_2026-10-29.parquet", columns=["symbol", "shortable", "easy_to_borrow"]
+    )
+    return {cast(str, r.symbol): bool(r.shortable and r.easy_to_borrow) for r in a.itertuples()}
 
 
-def build_panel(symbols: list[str]):
+def build_panel(symbols: list[str]) -> dict[str, Any]:
     """Return dict with daily session-indexed frames: px (return index), close_raw, volume_raw, rf, sources."""
     tr = _tr_index()
-    px, cl, vo, sources = {}, {}, {}, {}
+    px: dict[str, pd.Series] = {}
+    cl: dict[str, pd.Series] = {}
+    vo: dict[str, pd.Series] = {}
+    sources: dict[str, str] = {}
     for s in symbols:
         f, src = load_etf(s, tr)
         sources[s] = src

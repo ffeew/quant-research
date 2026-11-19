@@ -5,12 +5,23 @@ Hashing OOS files (decompress + hash raw payload) is allowed for integrity;
 do not inspect quote/IV/expiry/greeks fields on OOS.
 Outputs: DQ_REPORT.md, DQ_DEV_per_day.csv
 """
+
 from __future__ import annotations
-from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DATA_DIR, ...)
-import csv, gzip, json, hashlib, statistics, os
-from collections import defaultdict, Counter
-from datetime import datetime, timezone, timedelta
+
+import contextlib
+import csv
+import gzip
+import hashlib
+import json
+import os
+import statistics
+from collections import Counter, defaultdict
+from collections.abc import Collection, Sequence
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
+
+from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DATA_DIR, ...)
 
 ROOT = Path(f"{_QR.DATA_DIR}/alphavantage/options")
 MANIFEST = ROOT / "MANIFEST.csv"
@@ -25,8 +36,9 @@ QQQ_RENAME = "2011-03-23"
 QQQ_FLAG_DATE = "2011-03-23"
 
 
-def trading_days():
+def trading_days() -> list[str]:
     import pandas_market_calendars as mcal
+
     cal = mcal.get_calendar("NYSE")
     sched = cal.schedule(start_date=START, end_date=END)
     return [d.strftime("%Y-%m-%d") for d in sched.index]
@@ -40,14 +52,14 @@ def sha256_file_bytes(p: Path) -> str:
     return h.hexdigest()
 
 
-def sha256_gz_payload(p: Path) -> str:
+def sha256_gz_payload(p: Path) -> tuple[str, bytes]:
     """Hash uncompressed JSON payload (matches fetch MANIFEST sha)."""
     with gzip.open(p, "rb") as f:
         raw = f.read()
     return hashlib.sha256(raw).hexdigest(), raw
 
 
-def gap_ranges(missing, expected):
+def gap_ranges(missing: Collection[str], expected: Sequence[str]) -> list[tuple[str, str, int]]:
     if not missing:
         return []
     eidx = {d: i for i, d in enumerate(expected)}
@@ -68,15 +80,15 @@ def gap_ranges(missing, expected):
     return ranges
 
 
-def path_for(sym, d):
+def path_for(sym: str, d: str) -> Path:
     if d >= OOS_START:
         return ROOT / sym / "oos_holdout" / f"{d}.json.gz"
     return ROOT / sym / f"{d}.json.gz"
 
 
-def load_manifest_latest():
+def load_manifest_latest() -> dict[tuple[str, str], dict[str, str]]:
     """Last OK/EMPTY/FAIL row per (symbol, date)."""
-    latest = {}
+    latest: dict[tuple[str, str], dict[str, str]] = {}
     if not MANIFEST.exists():
         return latest
     with open(MANIFEST, newline="", encoding="utf-8") as f:
@@ -86,14 +98,29 @@ def load_manifest_latest():
     return latest
 
 
-def analyze_dev(path: Path, requested_date: str) -> dict:
-    stats = {
-        "rows": 0, "zero_bid": 0, "zero_ask": 0, "crossed": 0, "locked": 0,
-        "mark_mid_abs_sum": 0.0, "mark_mid_n": 0, "mark_mid_gt_0_01": 0,
-        "iv_le0": 0, "iv_gt3": 0, "iv_nan": 0, "greeks_missing": 0,
-        "n_expiries": 0, "nearest_dte": "", "farthest_dte": "",
-        "has_30_45_dte": 0, "n_weekly_like": 0, "n_monthly_like": 0,
-        "date_mismatch": 0, "dup_contractIDs": 0, "status": "MISSING",
+def analyze_dev(path: Path, requested_date: str) -> dict[str, Any]:
+    stats: dict[str, Any] = {
+        "rows": 0,
+        "zero_bid": 0,
+        "zero_ask": 0,
+        "crossed": 0,
+        "locked": 0,
+        "mark_mid_abs_sum": 0.0,
+        "mark_mid_n": 0,
+        "mark_mid_gt_0_01": 0,
+        "iv_le0": 0,
+        "iv_gt3": 0,
+        "iv_nan": 0,
+        "greeks_missing": 0,
+        "n_expiries": 0,
+        "nearest_dte": "",
+        "farthest_dte": "",
+        "has_30_45_dte": 0,
+        "n_weekly_like": 0,
+        "n_monthly_like": 0,
+        "date_mismatch": 0,
+        "dup_contractIDs": 0,
+        "status": "MISSING",
         "sha256": "",
     }
     if not path.exists():
@@ -117,7 +144,7 @@ def analyze_dev(path: Path, requested_date: str) -> dict:
     expiries = set()
     dtes = []
     req = datetime.strptime(requested_date, "%Y-%m-%d").date()
-    id_counts = Counter()
+    id_counts: Counter[str] = Counter()
     for r in rows:
         cid = r.get("contractID") or ""
         id_counts[cid] += 1
@@ -130,7 +157,7 @@ def analyze_dev(path: Path, requested_date: str) -> dict:
             stats["zero_bid"] += 1
         if ask == 0:
             stats["zero_ask"] += 1
-        if bid > ask and ask > 0:
+        if bid > ask > 0:
             stats["crossed"] += 1
         if bid == ask and bid > 0:
             stats["locked"] += 1
@@ -189,7 +216,7 @@ def analyze_dev(path: Path, requested_date: str) -> dict:
     return stats
 
 
-def verify_oos_integrity(path: Path, manifest_row: dict | None) -> dict:
+def verify_oos_integrity(path: Path, manifest_row: dict[str, Any] | None) -> dict[str, Any]:
     """existence + sha256 of payload + rows FROM MANIFEST. No field inspection."""
     out = {
         "rows": int(manifest_row["rows"]) if manifest_row and manifest_row.get("rows") not in (None, "") else "",
@@ -239,42 +266,64 @@ def verify_oos_integrity(path: Path, manifest_row: dict | None) -> dict:
         return out
 
 
-def main():
+def main() -> None:
     expected = trading_days()
     expected_dev = [d for d in expected if d < OOS_START]
     expected_oos = [d for d in expected if d >= OOS_START]
     manifest = load_manifest_latest()
 
     per_day_fields = [
-        "symbol", "date", "partition", "status", "rows",
-        "zero_bid", "zero_ask", "crossed", "locked",
-        "mark_mid_mean_abs", "mark_mid_gt_0_01",
-        "iv_le0", "iv_gt3", "iv_nan", "greeks_missing",
-        "n_expiries", "nearest_dte", "farthest_dte", "has_30_45_dte",
-        "n_weekly_like", "n_monthly_like", "date_mismatch", "dup_contractIDs",
-        "sha256", "sha_match",
+        "symbol",
+        "date",
+        "partition",
+        "status",
+        "rows",
+        "zero_bid",
+        "zero_ask",
+        "crossed",
+        "locked",
+        "mark_mid_mean_abs",
+        "mark_mid_gt_0_01",
+        "iv_le0",
+        "iv_gt3",
+        "iv_nan",
+        "greeks_missing",
+        "n_expiries",
+        "nearest_dte",
+        "farthest_dte",
+        "has_30_45_dte",
+        "n_weekly_like",
+        "n_monthly_like",
+        "date_mismatch",
+        "dup_contractIDs",
+        "sha256",
+        "sha_match",
     ]
     verify_fields = [
-        "symbol", "date", "partition", "path", "file_exists",
-        "manifest_status", "manifest_rows", "manifest_sha256",
-        "recomputed_sha256", "sha_match", "status",
+        "symbol",
+        "date",
+        "partition",
+        "path",
+        "file_exists",
+        "manifest_status",
+        "manifest_rows",
+        "manifest_sha256",
+        "recomputed_sha256",
+        "sha_match",
+        "status",
     ]
     all_rows_out = []
     verify_rows = []
     lines = []
-    sgt = datetime.now(timezone.utc) + timedelta(hours=8)
+    sgt = datetime.now(UTC) + timedelta(hours=8)
     lines.append("# Options DQ Report — SPY / QQQ (Victor 63d3073d partitions)")
     lines.append("")
     lines.append(
-        f"**Generated:** {datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')} UTC / "
+        f"**Generated:** {datetime.now(UTC).strftime('%Y-%m-%dT%H:%M:%SZ')} UTC / "
         f"{sgt.strftime('%Y-%m-%d %H:%M')} Asia/Singapore"
     )
-    lines.append(
-        f"**Window:** {START} → {END}. **DEV:** `< {OOS_START}`. **OOS holdout:** `>= {OOS_START}`."
-    )
-    lines.append(
-        f"**Expected sessions:** {len(expected)} (DEV {len(expected_dev)}, OOS {len(expected_oos)})"
-    )
+    lines.append(f"**Window:** {START} → {END}. **DEV:** `< {OOS_START}`. **OOS holdout:** `>= {OOS_START}`.")
+    lines.append(f"**Expected sessions:** {len(expected)} (DEV {len(expected_dev)}, OOS {len(expected_oos)})")
     lines.append("")
     lines.append(
         "Content checks (spreads/IV/expiry/mark/dups) = **DEV only**. "
@@ -290,13 +339,10 @@ def main():
     # Never print the key value.
     av_key = os.environ.get("ALPHAVANTAGE_API_KEY", "")
     scan_paths = []
-    for base in [ROOT, Path(f"{_QR.DATA_DIR}/alphavantage/logs"),
-                 Path(f"{_QR.DATA_DIR}/alphavantage/scripts")]:
+    for base in [ROOT, Path(f"{_QR.DATA_DIR}/alphavantage/logs"), Path(f"{_QR.DATA_DIR}/alphavantage/scripts")]:
         if base.exists():
             for p in base.rglob("*"):
-                if p.is_file() and p.suffix in (
-                    ".md", ".csv", ".json", ".log", ".py", ".txt", ".out"
-                ):
+                if p.is_file() and p.suffix in (".md", ".csv", ".json", ".log", ".py", ".txt", ".out"):
                     scan_paths.append(p)
     if av_key:
         for p in scan_paths:
@@ -317,11 +363,11 @@ def main():
         missing_dates = []
         empty_dates = []
         year_rows = defaultdict(list)
-        agg = defaultdict(int)
+        agg: defaultdict[str, int] = defaultdict(int)
         first_ok = last_ok = None
         dte30_days = 0
         n_ok = 0
-        weekly_by_year = defaultdict(lambda: {"days_with_weekly": 0, "ok": 0})
+        weekly_by_year: defaultdict[str, dict[str, int]] = defaultdict(lambda: {"days_with_weekly": 0, "ok": 0})
 
         for d in expected_dev:
             path = path_for(sym, d)
@@ -334,39 +380,50 @@ def main():
                     sha_mismatch_total += 1
             elif st["sha256"] and not (mrow and mrow.get("sha256")):
                 sha_match = "NO_MANIFEST"
-            mark_mid_mean = (
-                round(st["mark_mid_abs_sum"] / st["mark_mid_n"], 6)
-                if st["mark_mid_n"] else ""
-            )
+            mark_mid_mean = round(st["mark_mid_abs_sum"] / st["mark_mid_n"], 6) if st["mark_mid_n"] else ""
             row = {
-                "symbol": sym, "date": d, "partition": "DEV",
-                "status": st["status"], "rows": st["rows"],
-                "zero_bid": st["zero_bid"], "zero_ask": st["zero_ask"],
-                "crossed": st["crossed"], "locked": st["locked"],
+                "symbol": sym,
+                "date": d,
+                "partition": "DEV",
+                "status": st["status"],
+                "rows": st["rows"],
+                "zero_bid": st["zero_bid"],
+                "zero_ask": st["zero_ask"],
+                "crossed": st["crossed"],
+                "locked": st["locked"],
                 "mark_mid_mean_abs": mark_mid_mean,
                 "mark_mid_gt_0_01": st["mark_mid_gt_0_01"],
-                "iv_le0": st["iv_le0"], "iv_gt3": st["iv_gt3"],
-                "iv_nan": st["iv_nan"], "greeks_missing": st["greeks_missing"],
+                "iv_le0": st["iv_le0"],
+                "iv_gt3": st["iv_gt3"],
+                "iv_nan": st["iv_nan"],
+                "greeks_missing": st["greeks_missing"],
                 "n_expiries": st["n_expiries"],
-                "nearest_dte": st["nearest_dte"], "farthest_dte": st["farthest_dte"],
+                "nearest_dte": st["nearest_dte"],
+                "farthest_dte": st["farthest_dte"],
                 "has_30_45_dte": st["has_30_45_dte"],
                 "n_weekly_like": st["n_weekly_like"],
                 "n_monthly_like": st["n_monthly_like"],
                 "date_mismatch": st["date_mismatch"],
                 "dup_contractIDs": st["dup_contractIDs"],
-                "sha256": st["sha256"], "sha_match": sha_match,
+                "sha256": st["sha256"],
+                "sha_match": sha_match,
             }
             all_rows_out.append(row)
-            verify_rows.append({
-                "symbol": sym, "date": d, "partition": "DEV", "path": str(path),
-                "file_exists": int(path.exists()),
-                "manifest_status": (mrow or {}).get("status", ""),
-                "manifest_rows": (mrow or {}).get("rows", ""),
-                "manifest_sha256": (mrow or {}).get("sha256", ""),
-                "recomputed_sha256": st["sha256"],
-                "sha_match": sha_match,
-                "status": st["status"],
-            })
+            verify_rows.append(
+                {
+                    "symbol": sym,
+                    "date": d,
+                    "partition": "DEV",
+                    "path": str(path),
+                    "file_exists": int(path.exists()),
+                    "manifest_status": (mrow or {}).get("status", ""),
+                    "manifest_rows": (mrow or {}).get("rows", ""),
+                    "manifest_sha256": (mrow or {}).get("sha256", ""),
+                    "recomputed_sha256": st["sha256"],
+                    "sha_match": sha_match,
+                    "status": st["status"],
+                }
+            )
             status = st["status"]
             if status == "OK":
                 present += 1
@@ -375,9 +432,18 @@ def main():
                 last_ok = d
                 year_rows[d[:4]].append(st["rows"])
                 for k in (
-                    "rows", "zero_bid", "zero_ask", "crossed", "locked",
-                    "iv_le0", "iv_gt3", "iv_nan", "greeks_missing",
-                    "date_mismatch", "dup_contractIDs", "mark_mid_gt_0_01",
+                    "rows",
+                    "zero_bid",
+                    "zero_ask",
+                    "crossed",
+                    "locked",
+                    "iv_le0",
+                    "iv_gt3",
+                    "iv_nan",
+                    "greeks_missing",
+                    "date_mismatch",
+                    "dup_contractIDs",
+                    "mark_mid_gt_0_01",
                 ):
                     agg[k] += st[k]
                 agg["mark_mid_abs_sum"] += st["mark_mid_abs_sum"]
@@ -457,9 +523,7 @@ def main():
                 else:
                     lines.append(f"| {label} | {c} | {100 * c / tot:.2f}% |")
             if agg["mark_mid_n"]:
-                lines.append(
-                    f"| Mean |mark−mid| | {agg['mark_mid_abs_sum'] / agg['mark_mid_n']:.6f} | — |"
-                )
+                lines.append(f"| Mean |mark−mid| | {agg['mark_mid_abs_sum'] / agg['mark_mid_n']:.6f} | — |")
             lines.append("")
             lines.append(f"Mean expiries/day: {agg['n_expiries_sum'] / present:.1f}")
             lines.append("")
@@ -468,16 +532,11 @@ def main():
         if sym == "QQQ":
             lines.append("### QQQ rename / 2011-03-23 flag")
             lines.append("")
-            lines.append(
-                f"Source mapping: `QQQQ` for dates `< {QQQ_RENAME}`; `QQQ` from `{QQQ_RENAME}`."
-            )
+            lines.append(f"Source mapping: `QQQQ` for dates `< {QQQ_RENAME}`; `QQQ` from `{QQQ_RENAME}`.")
             # Find rows around rename in DEV csv buffer
             around = [r for r in all_rows_out if r["symbol"] == "QQQ" and "2011-03-1" <= r["date"] <= "2011-03-3"]
             # broader window
-            around = [
-                r for r in all_rows_out
-                if r["symbol"] == "QQQ" and "2011-03-18" <= r["date"] <= "2011-03-28"
-            ]
+            around = [r for r in all_rows_out if r["symbol"] == "QQQ" and "2011-03-18" <= r["date"] <= "2011-03-28"]
             lines.append("")
             lines.append("| Date | src expect | status | rows | note |")
             lines.append("|---|---|---|---|---|")
@@ -486,9 +545,7 @@ def main():
                 if r["date"] == QQQ_FLAG_DATE:
                     note = "FLAG: probe showed elevated rows vs next day (possible QQQQ/QQQ overlap)"
                 src = "QQQQ" if r["date"] < QQQ_RENAME else "QQQ"
-                lines.append(
-                    f"| {r['date']} | {src} | {r['status']} | {r['rows']} | {note} |"
-                )
+                lines.append(f"| {r['date']} | {src} | {r['status']} | {r['rows']} | {note} |")
             lines.append("")
 
         # ---- OOS ----
@@ -505,22 +562,25 @@ def main():
                 oos_sha_bad += 1
             # DEV-style content fields left blank for OOS in the DEV csv
             # (we still record OOS in verify csv only; DEV per-day csv = DEV only)
-            verify_rows.append({
-                "symbol": sym, "date": d, "partition": "OOS", "path": str(path),
-                "file_exists": st["file_exists"],
-                "manifest_status": st["manifest_status"],
-                "manifest_rows": (mrow or {}).get("rows", ""),
-                "manifest_sha256": (mrow or {}).get("sha256", ""),
-                "recomputed_sha256": st["sha256"],
-                "sha_match": st.get("sha_match", ""),
-                "status": st["status"],
-            })
+            verify_rows.append(
+                {
+                    "symbol": sym,
+                    "date": d,
+                    "partition": "OOS",
+                    "path": str(path),
+                    "file_exists": st["file_exists"],
+                    "manifest_status": st["manifest_status"],
+                    "manifest_rows": (mrow or {}).get("rows", ""),
+                    "manifest_sha256": (mrow or {}).get("sha256", ""),
+                    "recomputed_sha256": st["sha256"],
+                    "sha_match": st.get("sha_match", ""),
+                    "status": st["status"],
+                }
+            )
             if st["status"] == "OK":
                 oos_ok += 1
-                try:
+                with contextlib.suppress(Exception):
                     oos_rows_sum += int(st["rows"] or 0)
-                except Exception:
-                    pass
             elif st["status"] == "EMPTY":
                 oos_empty += 1
             elif st["status"] in ("BAD_PAYLOAD", "CORRUPT", "ROW_MISMATCH"):
@@ -539,14 +599,10 @@ def main():
         lines.append(f"| EMPTY | {oos_empty} |")
         lines.append(f"| Missing/bad | {oos_miss + oos_bad} |")
         lines.append(f"| Sha mismatches vs manifest | {oos_sha_bad} |")
-        lines.append(
-            f"| Total contract-rows (sum from manifest/len, no content stats) | {oos_rows_sum} |"
-        )
+        lines.append(f"| Total contract-rows (sum from manifest/len, no content stats) | {oos_rows_sum} |")
         lines.append("")
         if oos_missing:
-            lines.append(
-                f"Missing/bad count: {len(oos_missing)}; first={oos_missing[0]} last={oos_missing[-1]}"
-            )
+            lines.append(f"Missing/bad count: {len(oos_missing)}; first={oos_missing[0]} last={oos_missing[-1]}")
             omr = gap_ranges(oos_missing, expected_oos)
             for a, b, n in omr[:20]:
                 lines.append(f"- {a} → {b} ({n})")
@@ -554,8 +610,12 @@ def main():
 
         summary_json[sym] = {
             "dev": {
-                "expected": len(expected_dev), "ok": present, "empty": empty,
-                "missing": missing + corrupt, "first_ok": first_ok, "last_ok": last_ok,
+                "expected": len(expected_dev),
+                "ok": present,
+                "empty": empty,
+                "missing": missing + corrupt,
+                "first_ok": first_ok,
+                "last_ok": last_ok,
                 "total_contracts": agg.get("rows", 0),
                 "zero_bid_pct": round(100 * agg.get("zero_bid", 0) / max(agg.get("rows", 1), 1), 2),
                 "zero_ask_pct": round(100 * agg.get("zero_ask", 0) / max(agg.get("rows", 1), 1), 2),
@@ -566,24 +626,27 @@ def main():
                 "dup_contractID_days": agg.get("dup_contractIDs", 0),
             },
             "oos": {
-                "expected": len(expected_oos), "ok": oos_ok, "empty": oos_empty,
-                "missing": oos_miss + oos_bad, "rows_sum": oos_rows_sum,
+                "expected": len(expected_oos),
+                "ok": oos_ok,
+                "empty": oos_empty,
+                "missing": oos_miss + oos_bad,
+                "rows_sum": oos_rows_sum,
                 "sha_mismatches": oos_sha_bad,
             },
         }
 
     # Write DEV-only per-day CSV
     with open(OUT_CSV, "w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=per_day_fields)
-        w.writeheader()
+        writer = csv.DictWriter(f, fieldnames=per_day_fields)
+        writer.writeheader()
         for row in all_rows_out:
-            w.writerow(row)
+            writer.writerow(row)
 
     with open(OUT_VERIFY, "w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=verify_fields)
-        w.writeheader()
+        writer = csv.DictWriter(f, fieldnames=verify_fields)
+        writer.writeheader()
         for row in verify_rows:
-            w.writerow(row)
+            writer.writerow(row)
 
     man_sha = sha256_file_bytes(MANIFEST) if MANIFEST.exists() else "N/A"
     lines.append("## Integrity / process notes")
@@ -609,15 +672,20 @@ def main():
     # Recompute md sha after append
     md_sha_final = sha256_file_bytes(OUT_MD)
 
-    print(json.dumps({
-        "manifest_sha": man_sha,
-        "dq_report_sha": md_sha_final,
-        "dq_dev_csv_sha": csv_sha,
-        "sha_verify_csv_sha": ver_sha,
-        "sha_mismatches": sha_mismatch_total,
-        "key_leak_hits": key_leak_hits,
-        "summaries": summary_json,
-    }, indent=2))
+    print(
+        json.dumps(
+            {
+                "manifest_sha": man_sha,
+                "dq_report_sha": md_sha_final,
+                "dq_dev_csv_sha": csv_sha,
+                "sha_verify_csv_sha": ver_sha,
+                "sha_mismatches": sha_mismatch_total,
+                "key_leak_hits": key_leak_hits,
+                "summaries": summary_json,
+            },
+            indent=2,
+        )
+    )
 
 
 if __name__ == "__main__":

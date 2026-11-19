@@ -1,17 +1,34 @@
 """PREREG-v2 frozen specification (§2-§3 + amendments). Single source of truth for run_v2.py and tests."""
+
 from dataclasses import replace
+
 from .engine import Config
 
 EVAL_START = "2017-02-01"
 EVAL_END = "2026-10-28"
-CORE_L12 = "SPY QQQ IWM EFA EEM EWJ IEF TLT GLD SLV USO".split()
-CORE_L12_UUP = CORE_L12 + ["UUP"]
-BROAD_EXFX = CORE_L12 + "EWG EWU UNG DBA DBC".split()
+CORE_L12 = ["SPY", "QQQ", "IWM", "EFA", "EEM", "EWJ", "IEF", "TLT", "GLD", "SLV", "USO"]
+CORE_L12_UUP = [*CORE_L12, "UUP"]
+BROAD_EXFX = [*CORE_L12, "EWG", "EWU", "UNG", "DBA", "DBC"]
 
-V2_COMMON = Config(name="v2_common", lookbacks=(12,), rebalance="M", vol_com=60.0, sizing="pvt",
-                   port_vol_target=0.10, cov_window=252, gross_cap=1.0, gross_cap_hard=1.0,
-                   honour_shortable=True, lag=1, nav_usd=1_000_000.0, venue="continuous", impact_k=1.0,
-                   borrow_rate=0.0025, band_rel=0.25, band_abs=0.005)
+V2_COMMON = Config(
+    name="v2_common",
+    lookbacks=(12,),
+    rebalance="M",
+    vol_com=60.0,
+    sizing="pvt",
+    port_vol_target=0.10,
+    cov_window=252,
+    gross_cap=1.0,
+    gross_cap_hard=1.0,
+    honour_shortable=True,
+    lag=1,
+    nav_usd=1_000_000.0,
+    venue="continuous",
+    impact_k=1.0,
+    borrow_rate=0.0025,
+    band_rel=0.25,
+    band_abs=0.005,
+)
 
 VARIANTS = [  # (id, universe, cfg)  -- exactly PREREG-v2 §3
     ("V1_PRIMARY", CORE_L12, replace(V2_COMMON, name="V1_PRIMARY")),

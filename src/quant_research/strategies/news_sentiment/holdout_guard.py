@@ -12,67 +12,86 @@ Rules enforced in code:
 Call require_archive_access(first_session, who) before reading any raw/ or raw_alias/ month, and filter_months()
 to drop locked months. Metadata-only audits (counts, timestamps; no text/tone/returns) may pass metadata_only=True.
 """
-from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DATA_DIR, ...)
-import hashlib, json, os
+
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+from collections.abc import Sequence
+
 import pandas as pd
+
+from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DATA_DIR, ...)
 
 NS = f"{_QR.DESK_DIR}/equity/news_sentiment"
 PREREG = f"{NS}/PREREG_sector_lm_5d.md"
 PREREG_SHA = f"{NS}/PREREG_sector_lm_5d.sha256"
 RUNLOG = f"{NS}/PREREG_sector_lm_5d.RUNLOG.json"
 JOINT = f"{NS}/JOINT_UNSEAL.json"
-SEEN_START = pd.Timestamp("2025-06-02")       # first session of the already-seen sample
+SEEN_START = pd.Timestamp("2025-06-02")  # first session of the already-seen sample
 
 
 class HoldoutLocked(RuntimeError):
     pass
 
 
-def _sha(p):
+def _sha(p: str) -> str:
     return hashlib.sha256(open(p, "rb").read()).hexdigest()
 
 
-def prereg_frozen():
+def prereg_frozen() -> bool:
     return os.path.exists(PREREG_SHA) and open(PREREG_SHA).read().split()[0] == _sha(PREREG)
 
 
-def sector_lm_run_logged():
-    if not (prereg_frozen() and os.path.exists(RUNLOG)): return False
+def sector_lm_run_logged() -> bool:
+    if not (prereg_frozen() and os.path.exists(RUNLOG)):
+        return False
     log = json.load(open(RUNLOG))
-    return log.get("prereg_sha256") == _sha(PREREG) and log.get("status") == "complete"
+    return bool(log.get("prereg_sha256") == _sha(PREREG) and log.get("status") == "complete")
 
 
-def joint_unseal():
-    if not os.path.exists(JOINT): return False
+def joint_unseal() -> bool:
+    if not os.path.exists(JOINT):
+        return False
     j = json.load(open(JOINT))
     specs = j.get("specs", {})
     return len(specs) >= 4 and all(os.path.exists(p) and _sha(p) == h for p, h in specs.items())
 
 
-def unlocked():
+def unlocked() -> bool:
     return sector_lm_run_logged() or joint_unseal()
 
 
-def require_archive_access(first_session, who, metadata_only=False):
+def require_archive_access(first_session: str | pd.Timestamp, who: str, metadata_only: bool = False) -> bool:
     """Raise HoldoutLocked if `who` wants archive data before 2025-06-02 while the hold-out is sealed."""
     if metadata_only or pd.Timestamp(first_session) >= SEEN_START or unlocked():
         return True
-    raise HoldoutLocked(f"{who}: archive sessions before {SEEN_START.date()} are sealed (sector-LM hold-out). "
-                        f"Requires frozen PREREG ({PREREG_SHA}) + logged gating run ({RUNLOG}), or {JOINT}. "
-                        f"Requested start {pd.Timestamp(first_session).date()}.")
+    raise HoldoutLocked(
+        f"{who}: archive sessions before {SEEN_START.date()} are sealed (sector-LM hold-out). "
+        f"Requires frozen PREREG ({PREREG_SHA}) + logged gating run ({RUNLOG}), or {JOINT}. "
+        f"Requested start {pd.Timestamp(first_session).date()}."
+    )
 
 
-def filter_months(months, who):
+def filter_months(months: Sequence[str], who: str) -> list[str]:
     """Drop YYYY-MM month keys whose sessions precede SEEN_START unless unlocked. Prints what it skipped."""
-    if unlocked(): return list(months)
+    if unlocked():
+        return list(months)
     keep = [m for m in months if m >= SEEN_START.strftime("%Y-%m")]
     if len(keep) != len(months):
-        print(f"HOLDOUT GUARD ({who}): skipping {len(months) - len(keep)} sealed months < {SEEN_START.strftime('%Y-%m')}", flush=True)
+        print(
+            f"HOLDOUT GUARD ({who}): skipping {len(months) - len(keep)} sealed months < {SEEN_START.strftime('%Y-%m')}",
+            flush=True,
+        )
     return keep
 
 
 if __name__ == "__main__":
     print(dict(prereg_frozen=prereg_frozen(), sector_lm_run_logged=sector_lm_run_logged(), joint_unseal=joint_unseal()))
     for d in ("2016-01-05", "2021-01-04", "2025-06-02"):
-        try: require_archive_access(d, "selftest"); print(d, "allowed")
-        except HoldoutLocked as e: print(d, "LOCKED")
+        try:
+            require_archive_access(d, "selftest")
+            print(d, "allowed")
+        except HoldoutLocked:
+            print(d, "LOCKED")

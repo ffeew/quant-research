@@ -4,6 +4,7 @@
 Needs ALPHAVANTAGE_API_KEY (and, for some builders, ALPACA_* / FRED_API_KEY / SEC_USER_AGENT)
 in the environment, and writes under $QR_DATA_DIR. Run `qr datasets` for the list.
 """
+
 import sys
 
 from quant_research.cli import main

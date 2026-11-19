@@ -1,11 +1,15 @@
 """Build earnings_events_8k202 v2 under equity/earnings_events/v2/.
 Read-only on v1 artifacts and $QR_DESK_DIR/data. No returns/SUE. No edits under data/."""
+
 from __future__ import annotations
-from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DATA_DIR, ...)
-import os, json, hashlib, datetime as dt
+
+import hashlib
+import os
+
 import numpy as np
 import pandas as pd
-import exchange_calendars as xc
+
+from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DATA_DIR, ...)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 V2 = os.path.dirname(os.path.abspath(__file__))
@@ -16,12 +20,14 @@ VICTOR_PIT = "6eb132f1ee9e5fd65cb48e49828ed2e63b16fc54fe46dcc98b89406082e4474f"
 
 os.chdir(ROOT)
 
-def sha(path):
+
+def sha(path: str) -> str:
     h = hashlib.sha256()
     with open(path, "rb") as f:
         for chunk in iter(lambda: f.read(1 << 20), b""):
             h.update(chunk)
     return h.hexdigest()
+
 
 assert sha(f"{ROOT}/earnings_events_8k202.parquet") == V1_HASH
 
@@ -37,16 +43,23 @@ mem = pd.read_parquet(f"{_QR.DATA_DIR}/universe/sp500_membership.parquet")
 
 # ---------- dual-CIK / component identities ----------
 # All CIKs that ever listed each accession in all_202 + dropped
-comp = pd.concat([
-    core[["accession", "cik", "sec_name"]].assign(src="all_202"),
-    dropped[["accession", "cik", "sec_name"]].assign(src="finalize_dropped"),
-], ignore_index=True).drop_duplicates(["accession", "cik"])
-comp_agg = comp.groupby("accession").agg(
-    cik_components=("cik", lambda s: ",".join(str(int(x)) for x in sorted(set(s)))),
-    source_accession_ciks=("cik", lambda s: ",".join(str(int(x)) for x in sorted(set(s)))),
-    component_sec_names=("sec_name", lambda s: " | ".join(sorted(set(map(str, s))))),
-    n_component_ciks=("cik", "nunique"),
-).reset_index()
+comp = pd.concat(
+    [
+        core[["accession", "cik", "sec_name"]].assign(src="all_202"),
+        dropped[["accession", "cik", "sec_name"]].assign(src="finalize_dropped"),
+    ],
+    ignore_index=True,
+).drop_duplicates(["accession", "cik"])
+comp_agg = (
+    comp.groupby("accession")
+    .agg(
+        cik_components=("cik", lambda s: ",".join(str(int(x)) for x in sorted(set(s)))),
+        source_accession_ciks=("cik", lambda s: ",".join(str(int(x)) for x in sorted(set(s)))),
+        component_sec_names=("sec_name", lambda s: " | ".join(sorted(set(map(str, s))))),
+        n_component_ciks=("cik", "nunique"),
+    )
+    .reset_index()
+)
 
 v2 = v1.copy()
 v2 = v2.merge(comp_agg, on="accession", how="left", validate="one_to_one")
@@ -66,7 +79,7 @@ v2["canonical_cik_rule"] = np.where(
 # Add conservative EX-99 availability time when a sibling first supplies EX-99.1.
 multi = core[core.cluster_n_filings > 1].merge(ex_audit, on="accession", how="left")
 rows = []
-for cid, g in multi.groupby("cluster"):
+for _cid, g in multi.groupby("cluster"):
     g = g.sort_values("acceptance_utc")
     first = g.iloc[0]
     with_ex = g[g.ex99_url.notna()]
@@ -81,8 +94,10 @@ for cid, g in multi.groupby("cluster"):
         avail_rule = with_ex.iloc[0].ex99_rule
     else:
         avail_acc, avail_utc, avail_rule = first.accession, first.acceptance_utc, first.ex99_rule
-    deferred = (pd.isna(first.ex99_url)) and (avail_acc != first.accession) and pd.notna(
-        g.set_index("accession").loc[avail_acc].ex99_url if avail_acc in set(g.accession) else np.nan
+    deferred = (
+        (pd.isna(first.ex99_url))
+        and (avail_acc != first.accession)
+        and pd.notna(g.set_index("accession").loc[avail_acc].ex99_url if avail_acc in set(g.accession) else np.nan)
     )
     # clearer deferred flag from concern list
     deferred = first.accession in set(cluster_concern.first_acc.values)
@@ -94,22 +109,27 @@ for cid, g in multi.groupby("cluster"):
             avail_utc = sib991.iloc[0].acceptance_utc
             avail_rule = "EX-99.1"
     lag = (pd.Timestamp(avail_utc) - pd.Timestamp(first.acceptance_utc)).total_seconds() / 3600.0
-    rows.append(dict(
-        accession=first.accession,
-        ex99_available_accession=avail_acc,
-        ex99_available_utc=pd.Timestamp(avail_utc),
-        ex99_available_rule=avail_rule,
-        cluster_ex99_lag_hours=lag,
-        cluster_availability_flag=("ex99_deferred_to_sibling" if deferred else
-                                   ("ex99_on_first" if pd.notna(first.ex99_url) else "no_ex99_in_cluster")),
-        cluster_rule_pin="cluster_first_accession_retained; availability may lag to sibling EX-99",
-    ))
+    rows.append(
+        dict(
+            accession=first.accession,
+            ex99_available_accession=avail_acc,
+            ex99_available_utc=pd.Timestamp(avail_utc),
+            ex99_available_rule=avail_rule,
+            cluster_ex99_lag_hours=lag,
+            cluster_availability_flag=(
+                "ex99_deferred_to_sibling"
+                if deferred
+                else ("ex99_on_first" if pd.notna(first.ex99_url) else "no_ex99_in_cluster")
+            ),
+            cluster_rule_pin="cluster_first_accession_retained; availability may lag to sibling EX-99",
+        )
+    )
 avail = pd.DataFrame(rows)
 # dual-CIK: same accession can be cluster-first under two CIKs; one avail row per accession
 # prefer ex99_deferred_to_sibling if any
-rank={"ex99_deferred_to_sibling":0,"ex99_on_first":1,"no_ex99_in_cluster":2}
-avail["_r"]=avail.cluster_availability_flag.map(rank).fillna(9)
-avail=avail.sort_values(["accession","_r"]).drop_duplicates("accession", keep="first").drop(columns="_r")
+rank = {"ex99_deferred_to_sibling": 0, "ex99_on_first": 1, "no_ex99_in_cluster": 2}
+avail["_r"] = avail.cluster_availability_flag.map(rank).fillna(9)
+avail = avail.sort_values(["accession", "_r"]).drop_duplicates("accession", keep="first").drop(columns="_r")
 v2 = v2.merge(avail, on="accession", how="left", validate="one_to_one")
 # singles / non-multi: availability = own acceptance if has ex99 else null flag
 single_mask = v2.cluster_availability_flag.isna()
@@ -152,28 +172,48 @@ print("deferred EX99 clusters applied:", n_deferred)
 # EVHC: CIK1578318 Holdings filings are before membership start 2016-12-02; segment correctly
 # uses CIK1678531 Envision Healthcare Corp for the membership window.
 lineage_decisions = [
-    dict(symbol="AA", cik=1675149, n_old=44,
-         decision="do_not_restore",
-         status="excluded_outside_membership_aa_post_split",
-         evidence=("SEC CIK1675149=Alcoa Corp (ticker AA), former Alcoa Upstream Corp; "
-                   "sp500_changes 2016-11-01 removed AA/Alcoa added ARNC/Arconic; "
-                   "membership AA end_date=2016-11-01; AA not in sp500_current; "
-                   "v1 segment maps AA only to predecessor CIK4281 through 2016-11-01. "
-                   "Post-split Alcoa Corp 2.02 filings are real but outside S&P membership.")),
-    dict(symbol="AA", cik=4281, n_old=7,
-         decision="already_in_v1_via_segment",
-         status="kept_predecessor_segment",
-         evidence="Pre-split Alcoa Inc (now Howmet CIK4281) covered by v1 AA segment through 2016-11-01."),
-    dict(symbol="EVHC", cik=1578318, n_old=5,
-         decision="do_not_restore",
-         status="excluded_before_membership_evhc_holdings",
-         evidence=("SEC CIK1578318=Envision Healthcare Holdings, Inc.; 2.02 filings 2013-11..2016-11-01. "
-                   "EVHC membership starts 2016-12-02. Old table labeled these EVHC before add date. "
-                   "v1 correctly maps membership window to CIK1678531 Envision Healthcare Corp.")),
-    dict(symbol="EVHC", cik=1678531, n_old=9,
-         decision="already_in_v1_via_segment",
-         status="kept_membership_window_cik",
-         evidence="Envision Healthcare Corp filings during EVHC membership 2016-12-02..2018-10-11 are in v1."),
+    dict(
+        symbol="AA",
+        cik=1675149,
+        n_old=44,
+        decision="do_not_restore",
+        status="excluded_outside_membership_aa_post_split",
+        evidence=(
+            "SEC CIK1675149=Alcoa Corp (ticker AA), former Alcoa Upstream Corp; "
+            "sp500_changes 2016-11-01 removed AA/Alcoa added ARNC/Arconic; "
+            "membership AA end_date=2016-11-01; AA not in sp500_current; "
+            "v1 segment maps AA only to predecessor CIK4281 through 2016-11-01. "
+            "Post-split Alcoa Corp 2.02 filings are real but outside S&P membership."
+        ),
+    ),
+    dict(
+        symbol="AA",
+        cik=4281,
+        n_old=7,
+        decision="already_in_v1_via_segment",
+        status="kept_predecessor_segment",
+        evidence="Pre-split Alcoa Inc (now Howmet CIK4281) covered by v1 AA segment through 2016-11-01.",
+    ),
+    dict(
+        symbol="EVHC",
+        cik=1578318,
+        n_old=5,
+        decision="do_not_restore",
+        status="excluded_before_membership_evhc_holdings",
+        evidence=(
+            "SEC CIK1578318=Envision Healthcare Holdings, Inc.; 2.02 filings 2013-11..2016-11-01. "
+            "EVHC membership starts 2016-12-02. Old table labeled these EVHC before add date. "
+            "v1 correctly maps membership window to CIK1678531 Envision Healthcare Corp."
+        ),
+    ),
+    dict(
+        symbol="EVHC",
+        cik=1678531,
+        n_old=9,
+        decision="already_in_v1_via_segment",
+        status="kept_membership_window_cik",
+        evidence="Envision Healthcare Corp filings during EVHC membership 2016-12-02..2018-10-11 are in v1.",
+    ),
 ]
 pd.DataFrame(lineage_decisions).to_csv(f"{V2}/audit/lineage_decisions_aa_evhc.csv", index=False)
 
@@ -201,42 +241,88 @@ for _, r in old_u.iterrows():
     if a in v1_acc:
         v = v2.loc[v2.accession == a].iloc[0]
         if int(r.cik) != int(v.cik):
-            status, reason = "dual_cik_alias_other_canonical", (
-                f"old cik={int(r.cik)} ({r.sec_name}); v2 canonical cik={int(v.cik)}; "
-                f"components={v.cik_components}"
+            status, reason = (
+                "dual_cik_alias_other_canonical",
+                (f"old cik={int(r.cik)} ({r.sec_name}); v2 canonical cik={int(v.cik)}; components={v.cik_components}"),
             )
         else:
             status, reason = "kept_exact", "accession present with same CIK"
-        recs.append(dict(old_accession=a, old_cik=int(r.cik), old_symbol_example=r.symbol,
-                         old_sec_name=r.sec_name, new_accession=a, new_cik=int(v.cik),
-                         status=status, reason=reason,
-                         old_acceptance_utc=r.acceptance_datetime_utc,
-                         new_acceptance_utc=v.acceptance_utc))
+        recs.append(
+            dict(
+                old_accession=a,
+                old_cik=int(r.cik),
+                old_symbol_example=r.symbol,
+                old_sec_name=r.sec_name,
+                new_accession=a,
+                new_cik=int(v.cik),
+                status=status,
+                reason=reason,
+                old_acceptance_utc=r.acceptance_datetime_utc,
+                new_acceptance_utc=v.acceptance_utc,
+            )
+        )
     elif a in cluster_members:
         kept = member_to_kept[a]
         v = v2.loc[v2.accession == kept].iloc[0]
-        recs.append(dict(old_accession=a, old_cik=int(r.cik), old_symbol_example=r.symbol,
-                         old_sec_name=r.sec_name, new_accession=kept, new_cik=int(v.cik),
-                         status="cluster_member", reason=f"absorbed into cluster kept accession {kept}",
-                         old_acceptance_utc=r.acceptance_datetime_utc,
-                         new_acceptance_utc=v.acceptance_utc))
+        recs.append(
+            dict(
+                old_accession=a,
+                old_cik=int(r.cik),
+                old_symbol_example=r.symbol,
+                old_sec_name=r.sec_name,
+                new_accession=kept,
+                new_cik=int(v.cik),
+                status="cluster_member",
+                reason=f"absorbed into cluster kept accession {kept}",
+                old_acceptance_utc=r.acceptance_datetime_utc,
+                new_acceptance_utc=v.acceptance_utc,
+            )
+        )
     elif int(r.cik) == 1675149 and r.symbol == "AA":
-        recs.append(dict(old_accession=a, old_cik=int(r.cik), old_symbol_example=r.symbol,
-                         old_sec_name=r.sec_name, new_accession=None, new_cik=None,
-                         status="excluded_outside_membership_aa_post_split",
-                         reason=lineage_decisions[0]["evidence"],
-                         old_acceptance_utc=r.acceptance_datetime_utc, new_acceptance_utc=None))
+        recs.append(
+            dict(
+                old_accession=a,
+                old_cik=int(r.cik),
+                old_symbol_example=r.symbol,
+                old_sec_name=r.sec_name,
+                new_accession=None,
+                new_cik=None,
+                status="excluded_outside_membership_aa_post_split",
+                reason=lineage_decisions[0]["evidence"],
+                old_acceptance_utc=r.acceptance_datetime_utc,
+                new_acceptance_utc=None,
+            )
+        )
     elif int(r.cik) == 1578318 and r.symbol == "EVHC":
-        recs.append(dict(old_accession=a, old_cik=int(r.cik), old_symbol_example=r.symbol,
-                         old_sec_name=r.sec_name, new_accession=None, new_cik=None,
-                         status="excluded_before_membership_evhc_holdings",
-                         reason=lineage_decisions[2]["evidence"],
-                         old_acceptance_utc=r.acceptance_datetime_utc, new_acceptance_utc=None))
+        recs.append(
+            dict(
+                old_accession=a,
+                old_cik=int(r.cik),
+                old_symbol_example=r.symbol,
+                old_sec_name=r.sec_name,
+                new_accession=None,
+                new_cik=None,
+                status="excluded_before_membership_evhc_holdings",
+                reason=lineage_decisions[2]["evidence"],
+                old_acceptance_utc=r.acceptance_datetime_utc,
+                new_acceptance_utc=None,
+            )
+        )
     else:
-        recs.append(dict(old_accession=a, old_cik=int(r.cik), old_symbol_example=r.symbol,
-                         old_sec_name=r.sec_name, new_accession=None, new_cik=None,
-                         status="unresolved_absent", reason="absent from v2 and not in documented lineage/cluster",
-                         old_acceptance_utc=r.acceptance_datetime_utc, new_acceptance_utc=None))
+        recs.append(
+            dict(
+                old_accession=a,
+                old_cik=int(r.cik),
+                old_symbol_example=r.symbol,
+                old_sec_name=r.sec_name,
+                new_accession=None,
+                new_cik=None,
+                status="unresolved_absent",
+                reason="absent from v2 and not in documented lineage/cluster",
+                old_acceptance_utc=r.acceptance_datetime_utc,
+                new_acceptance_utc=None,
+            )
+        )
 
 recon = pd.DataFrame(recs)
 assert recon.old_accession.is_unique
@@ -262,37 +348,81 @@ key_rows = []
 for _, r in old.iterrows():
     k = r.key
     if k in v2_keys:
-        key_rows.append(dict(old_key=k, old_symbol=r.symbol, old_accession=r.accession, old_cik=int(r.cik),
-                             category="exact_symbol_accession_match", detail="key present in v2 expanded index_symbols/ticker"))
+        key_rows.append(
+            dict(
+                old_key=k,
+                old_symbol=r.symbol,
+                old_accession=r.accession,
+                old_cik=int(r.cik),
+                category="exact_symbol_accession_match",
+                detail="key present in v2 expanded index_symbols/ticker",
+            )
+        )
         continue
     a = r.accession
     if a in v1_acc:
         v = v2.loc[v2.accession == a].iloc[0]
         if int(r.cik) != int(v.cik):
-            cat, detail = "dual_cik_display_other_canonical", (
-                f"old symbol {r.symbol} cik {int(r.cik)}; v2 canonical {v.ticker_at_event} cik {int(v.cik)}; "
-                f"components={v.cik_components}"
+            cat, detail = (
+                "dual_cik_display_other_canonical",
+                (
+                    f"old symbol {r.symbol} cik {int(r.cik)}; v2 canonical {v.ticker_at_event} cik {int(v.cik)}; "
+                    f"components={v.cik_components}"
+                ),
             )
         else:
-            cat, detail = "ticker_rename_or_period_label", (
-                f"old symbol {r.symbol}; v2 ticker_at_event={v.ticker_at_event} index_symbols={v.index_symbols}"
+            cat, detail = (
+                "ticker_rename_or_period_label",
+                (f"old symbol {r.symbol}; v2 ticker_at_event={v.ticker_at_event} index_symbols={v.index_symbols}"),
             )
-        key_rows.append(dict(old_key=k, old_symbol=r.symbol, old_accession=a, old_cik=int(r.cik),
-                             category=cat, detail=detail))
+        key_rows.append(
+            dict(old_key=k, old_symbol=r.symbol, old_accession=a, old_cik=int(r.cik), category=cat, detail=detail)
+        )
     elif a in cluster_members:
         kept = member_to_kept[a]
-        key_rows.append(dict(old_key=k, old_symbol=r.symbol, old_accession=a, old_cik=int(r.cik),
-                             category="cluster_member_symbol_key",
-                             detail=f"accession clustered into {kept}; symbol grain not exploded"))
+        key_rows.append(
+            dict(
+                old_key=k,
+                old_symbol=r.symbol,
+                old_accession=a,
+                old_cik=int(r.cik),
+                category="cluster_member_symbol_key",
+                detail=f"accession clustered into {kept}; symbol grain not exploded",
+            )
+        )
     elif int(r.cik) == 1675149:
-        key_rows.append(dict(old_key=k, old_symbol=r.symbol, old_accession=a, old_cik=int(r.cik),
-                             category="lineage_aa_post_split_excluded", detail="see lineage_decisions"))
+        key_rows.append(
+            dict(
+                old_key=k,
+                old_symbol=r.symbol,
+                old_accession=a,
+                old_cik=int(r.cik),
+                category="lineage_aa_post_split_excluded",
+                detail="see lineage_decisions",
+            )
+        )
     elif int(r.cik) == 1578318:
-        key_rows.append(dict(old_key=k, old_symbol=r.symbol, old_accession=a, old_cik=int(r.cik),
-                             category="lineage_evhc_pre_membership_excluded", detail="see lineage_decisions"))
+        key_rows.append(
+            dict(
+                old_key=k,
+                old_symbol=r.symbol,
+                old_accession=a,
+                old_cik=int(r.cik),
+                category="lineage_evhc_pre_membership_excluded",
+                detail="see lineage_decisions",
+            )
+        )
     else:
-        key_rows.append(dict(old_key=k, old_symbol=r.symbol, old_accession=a, old_cik=int(r.cik),
-                             category="unresolved_display_key", detail="needs review"))
+        key_rows.append(
+            dict(
+                old_key=k,
+                old_symbol=r.symbol,
+                old_accession=a,
+                old_cik=int(r.cik),
+                category="unresolved_display_key",
+                detail="needs review",
+            )
+        )
 
 key_recon = pd.DataFrame(key_rows)
 miss = key_recon[key_recon.category != "exact_symbol_accession_match"]
@@ -312,19 +442,27 @@ assert set(v1.accession).issubset(set(v2.accession))
 assert len(v2) == len(v1)  # no restores; all v1 kept exactly once
 
 # timestamp unchanged vs v1 for shared rows
-m = v2.set_index("accession")[["acceptance_utc"]].join(
-    v1.set_index("accession")[["acceptance_utc"]].rename(columns={"acceptance_utc": "v1"}))
-assert (m.acceptance_utc == m.v1).all()
+joined = v2.set_index("accession")[["acceptance_utc"]].join(
+    v1.set_index("accession")[["acceptance_utc"]].rename(columns={"acceptance_utc": "v1"})
+)
+assert (joined.acceptance_utc == joined.v1).all()
 
 # in_sp500 covered by segments
 seg_ok = seg[seg.identity_ok]
-def covered(r):
-    d = pd.Timestamp(r.acceptance_et.tz_localize(None).date() if hasattr(r.acceptance_et, 'tz_localize')
-                     else pd.Timestamp(r.acceptance_et).date())
+
+
+def covered(r: pd.Series) -> bool:
+    d = pd.Timestamp(
+        r.acceptance_et.tz_localize(None).date()
+        if hasattr(r.acceptance_et, "tz_localize")
+        else pd.Timestamp(r.acceptance_et).date()
+    )
     # acceptance_et is tz-aware in v1
     d = pd.Timestamp(pd.Timestamp(r.acceptance_utc).tz_convert("America/New_York").date())
     s = seg_ok[(seg_ok.cik == r.cik) & (seg_ok.seg_start <= d) & (seg_ok.seg_end > d)]
     return len(s) > 0
+
+
 ins = v2[v2.in_sp500]
 # sample check all
 cov_ok = sum(covered(r) for _, r in ins.iterrows())

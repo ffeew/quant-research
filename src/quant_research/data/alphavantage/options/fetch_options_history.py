@@ -3,8 +3,8 @@
 Victor 63d3073d: OOS (>=2016-06-01) -> oos_holdout/; no content inspect/print.
 Rate <=40/min. Never print/log API key.
 """
+
 from __future__ import annotations
-from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DATA_DIR, ...)
 
 import csv
 import gzip
@@ -17,8 +17,11 @@ import time
 import traceback
 import urllib.error
 import urllib.request
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
+
+from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DATA_DIR, ...)
 
 ROOT = Path(f"{_QR.DATA_DIR}/alphavantage")
 OPTIONS_ROOT = ROOT / "options"
@@ -36,8 +39,15 @@ BASE_BACKOFF = 2.0
 USER_AGENT = "EthanDeskOptions/1.0"
 
 MANIFEST_FIELDS = [
-    "symbol", "date", "source_symbol", "partition", "path", "sha256",
-    "rows", "status", "fetched_at_utc",
+    "symbol",
+    "date",
+    "source_symbol",
+    "partition",
+    "path",
+    "sha256",
+    "rows",
+    "status",
+    "fetched_at_utc",
 ]
 
 
@@ -46,7 +56,7 @@ def redact(s: str, key: str) -> str:
 
 
 def log(msg: str, key: str) -> None:
-    ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    ts = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     line = f"{ts} {redact(str(msg), key)}\n"
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     with open(RUN_LOG, "a", encoding="utf-8") as f:
@@ -69,6 +79,7 @@ class TokenBucket:
 
 def trading_days(start: str, end: str) -> list[str]:
     import pandas_market_calendars as mcal
+
     cal = mcal.get_calendar("NYSE")
     sched = cal.schedule(start_date=start, end_date=end)
     return [d.strftime("%Y-%m-%d") for d in sched.index]
@@ -91,7 +102,7 @@ def out_path(logical: str, date: str) -> Path:
 
 
 def load_manifest_done() -> set[tuple[str, str]]:
-    done = set()
+    done: set[tuple[str, str]] = set()
     if not MANIFEST.exists():
         return done
     with open(MANIFEST, newline="", encoding="utf-8") as f:
@@ -120,12 +131,12 @@ def ensure_manifest_header() -> None:
                 w.writerow({k: r.get(k, "") for k in MANIFEST_FIELDS})
 
 
-def append_manifest(row: dict) -> None:
+def append_manifest(row: dict[str, Any]) -> None:
     with open(MANIFEST, "a", newline="", encoding="utf-8") as f:
         csv.DictWriter(f, fieldnames=MANIFEST_FIELDS).writerow(row)
 
 
-def classify_payload(data: dict) -> tuple[str, str]:
+def classify_payload(data: Any) -> tuple[str, str]:
     if not isinstance(data, dict):
         return "ERROR", "non-dict"
     if "Error Message" in data:
@@ -153,14 +164,11 @@ def classify_payload(data: dict) -> tuple[str, str]:
     return "UNKNOWN", "no data key"
 
 
-def fetch_one(src_sym: str, date: str, key: str, bucket: TokenBucket, oos: bool):
+def fetch_one(src_sym: str, date: str, key: str, bucket: TokenBucket, oos: bool) -> tuple[str, Any, bytes | None]:
     """Returns (status, data_or_none, raw_or_none).
     For OOS: never log/print row content — status and len only.
     """
-    params = (
-        f"function=HISTORICAL_OPTIONS&symbol={src_sym}&date={date}"
-        f"&datatype=json&apikey={key}"
-    )
+    params = f"function=HISTORICAL_OPTIONS&symbol={src_sym}&date={date}&datatype=json&apikey={key}"
     url = f"https://www.alphavantage.co/query?{params}"
     url_safe = redact(url, key)
 
@@ -174,7 +182,7 @@ def fetch_one(src_sym: str, date: str, key: str, bucket: TokenBucket, oos: bool)
                 data = json.loads(raw)
             except json.JSONDecodeError as e:
                 log(f"JSON_ERR src={src_sym} {date} attempt={attempt} {e} url={url_safe}", key)
-                time.sleep(BASE_BACKOFF * (2 ** attempt))
+                time.sleep(BASE_BACKOFF * (2**attempt))
                 continue
             kind, detail = classify_payload(data)
             # OOS: redact detail that might contain payload snippets
@@ -185,7 +193,7 @@ def fetch_one(src_sym: str, date: str, key: str, bucket: TokenBucket, oos: bool)
                 log(f"FATAL {kind} src={src_sym} {date} {safe_detail}", key)
                 return "FATAL", data, None
             if kind == "THROTTLE":
-                wait = BASE_BACKOFF * (2 ** attempt) + 5
+                wait = BASE_BACKOFF * (2**attempt) + 5
                 log(f"THROTTLE src={src_sym} {date} attempt={attempt} wait={wait:.1f}s", key)
                 time.sleep(wait)
                 continue
@@ -194,15 +202,15 @@ def fetch_one(src_sym: str, date: str, key: str, bucket: TokenBucket, oos: bool)
             if kind == "EMPTY":
                 return "EMPTY", data, raw
             log(f"RETRY {kind} src={src_sym} {date} attempt={attempt} {safe_detail[:160]}", key)
-            time.sleep(BASE_BACKOFF * (2 ** attempt))
+            time.sleep(BASE_BACKOFF * (2**attempt))
         except urllib.error.HTTPError as e:
             log(f"HTTP {e.code} src={src_sym} {date} attempt={attempt}", key)
             if e.code in (401, 403):
                 return "FATAL", {"Error Message": f"HTTP {e.code}"}, None
-            time.sleep(BASE_BACKOFF * (2 ** attempt) + 2)
+            time.sleep(BASE_BACKOFF * (2**attempt) + 2)
         except Exception as e:
             log(f"EXC src={src_sym} {date} attempt={attempt} {redact(str(e), key)}", key)
-            time.sleep(BASE_BACKOFF * (2 ** attempt) + 2)
+            time.sleep(BASE_BACKOFF * (2**attempt) + 2)
     return "FAIL", None, None
 
 
@@ -240,10 +248,17 @@ def file_valid_minimal(path: Path) -> tuple[bool, int]:
 
 
 def write_progress(done: int, total: int, last: str) -> None:
-    PROGRESS.write_text(json.dumps({
-        "done": done, "total": total, "last": last,
-        "updated_utc": datetime.now(timezone.utc).isoformat(),
-    }), encoding="utf-8")
+    PROGRESS.write_text(
+        json.dumps(
+            {
+                "done": done,
+                "total": total,
+                "last": last,
+                "updated_utc": datetime.now(UTC).isoformat(),
+            }
+        ),
+        encoding="utf-8",
+    )
 
 
 def main() -> int:
@@ -276,14 +291,19 @@ def main() -> int:
                     raw = f.read()
                 sha = hashlib.sha256(raw).hexdigest()
                 status = "OK" if nrows > 0 else "EMPTY"
-                append_manifest({
-                    "symbol": sym, "date": d,
-                    "source_symbol": source_symbol(sym, d),
-                    "partition": partition_for(d),
-                    "path": str(p), "sha256": sha, "rows": nrows,
-                    "status": status,
-                    "fetched_at_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                })
+                append_manifest(
+                    {
+                        "symbol": sym,
+                        "date": d,
+                        "source_symbol": source_symbol(sym, d),
+                        "partition": partition_for(d),
+                        "path": str(p),
+                        "sha256": sha,
+                        "rows": nrows,
+                        "status": status,
+                        "fetched_at_utc": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    }
+                )
                 done_set.add((sym, d))
                 skip_existing += 1
 
@@ -301,19 +321,26 @@ def main() -> int:
         src = source_symbol(sym, d)
         oos = d >= OOS_START
         out = out_path(sym, d)
-        status, data, raw = fetch_one(src, d, key, bucket, oos=oos)
+        status, data, raw = fetch_one(src, d, key, bucket, oos=oos)  # type: ignore[assignment]  # earlier raw in main is file bytes
         if status == "FATAL":
             log(f"STOP_FATAL after {sym} src={src} {d}", key)
             write_progress(completed, total, f"FATAL {sym} {d}")
             return 3
         if status == "FAIL":
             log(f"FAIL_GIVE_UP {sym} src={src} {d}", key)
-            append_manifest({
-                "symbol": sym, "date": d, "source_symbol": src,
-                "partition": partition_for(d), "path": "", "sha256": "",
-                "rows": 0, "status": "FAIL",
-                "fetched_at_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            })
+            append_manifest(
+                {
+                    "symbol": sym,
+                    "date": d,
+                    "source_symbol": src,
+                    "partition": partition_for(d),
+                    "path": "",
+                    "sha256": "",
+                    "rows": 0,
+                    "status": "FAIL",
+                    "fetched_at_utc": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                }
+            )
             completed += 1
             write_progress(completed, total, f"FAIL {sym} {d}")
             continue
@@ -324,12 +351,19 @@ def main() -> int:
         # Never print a row; log status/len only
         sha = atomic_write_gz(out, raw)
         mstatus = "OK" if status == "OK" else "EMPTY"
-        append_manifest({
-            "symbol": sym, "date": d, "source_symbol": src,
-            "partition": partition_for(d), "path": str(out), "sha256": sha,
-            "rows": nrows, "status": mstatus,
-            "fetched_at_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        })
+        append_manifest(
+            {
+                "symbol": sym,
+                "date": d,
+                "source_symbol": src,
+                "partition": partition_for(d),
+                "path": str(out),
+                "sha256": sha,
+                "rows": nrows,
+                "status": mstatus,
+                "fetched_at_utc": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            }
+        )
         completed += 1
         if completed % 25 == 0 or i < 3:
             log(

@@ -5,42 +5,46 @@ close of t+`lag` sessions (default lag=1, MOC-style); new weights earn returns f
 Weights drift with prices between rebalances. P&L is an EXCESS return over the risk-free rate (positions are
 treated as financed / collateralised at RF, as in the paper). Margin interest above RF is NOT modelled.
 """
+
 from __future__ import annotations
-from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DATA_DIR, ...)
+
 import sys
-from dataclasses import dataclass, field, asdict
+from collections.abc import Iterable
+from dataclasses import asdict, dataclass
+from typing import Any, cast
+
 import numpy as np
 import pandas as pd
 
+from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DATA_DIR, ...)
+
 sys.path.insert(0, f"{_QR.COSTS_DIR}")
 from quant_research.backtest.costs import cost_model as tca  # Tomas's model (v1.1). Equities/ETFs only.
-
 from quant_research.strategies.trend_tsmom.tsmom.data import ASSET_CLASS
 
 ANN = 252
 
 
-
 @dataclass
 class Config:
     name: str = "baseline"
-    lookbacks: tuple = (12,)          # months; signal = mean(sign(excess ret over each lookback))
-    rebalance: str = "M"              # "M" month-end, "W" week-end
-    vol_com: float = 60.0             # EWMA centre of mass (days), paper = 60
-    asset_vol_target: float = 0.40    # per-asset ex-ante vol (paper = 40%)
-    sizing: str = "pvt"               # "pvt": scale book to port_vol_target; "mop": equal-weight 40%-vol positions / N
+    lookbacks: tuple[int, ...] = (12,)  # months; signal = mean(sign(excess ret over each lookback))
+    rebalance: str = "M"  # "M" month-end, "W" week-end
+    vol_com: float = 60.0  # EWMA centre of mass (days), paper = 60
+    asset_vol_target: float = 0.40  # per-asset ex-ante vol (paper = 40%)
+    sizing: str = "pvt"  # "pvt": scale book to port_vol_target; "mop": equal-weight 40%-vol positions / N
     port_vol_target: float = 0.10
-    cov_window: int = 252             # sessions for portfolio covariance (pvt)
-    class_balanced: bool = False      # equal risk budget per asset class instead of per instrument
-    gross_cap: float | None = None    # e.g. 2.0 for Reg-T-ish feasibility
-    honour_shortable: bool = False    # long/flat for ETFs not shortable+ETB in today's Alpaca snapshot
+    cov_window: int = 252  # sessions for portfolio covariance (pvt)
+    class_balanced: bool = False  # equal risk budget per asset class instead of per instrument
+    gross_cap: float | None = None  # e.g. 2.0 for Reg-T-ish feasibility
+    honour_shortable: bool = False  # long/flat for ETFs not shortable+ETB in today's Alpaca snapshot
     lag: int = 1
-    nav_usd: float = 1_000_000.0      # book size for cost model (impact/fees)
+    nav_usd: float = 1_000_000.0  # book size for cost model (impact/fees)
     cost_mult: float = 1.0
     venue: str = "continuous"
     impact_k: float = 1.0
     borrow_rate: float = tca.BORROW_RATE_ETB_DEFAULT
-    long_only_benchmark: bool = False # signal forced to +1 (vol-scaled long-only benchmark)
+    long_only_benchmark: bool = False  # signal forced to +1 (vol-scaled long-only benchmark)
 
 
 def _rebalance_dates(idx: pd.DatetimeIndex, freq: str) -> pd.DatetimeIndex:
@@ -49,15 +53,17 @@ def _rebalance_dates(idx: pd.DatetimeIndex, freq: str) -> pd.DatetimeIndex:
     return pd.DatetimeIndex(s.groupby(key).max().values)
 
 
-def run(panel: dict, symbols: list[str], cfg: Config, shortable: dict | None = None) -> dict:
+def run(
+    panel: dict[str, Any], symbols: list[str], cfg: Config, shortable: dict[str, bool] | None = None
+) -> dict[str, Any]:
     syms = [s for s in symbols if s in panel["px"].columns]
     P = panel["px"][syms]
     C = panel["close_raw"][syms]
     V = panel["volume_raw"][syms]
     rf = panel["rf"]
     idx = P.index
-    R = P.pct_change(fill_method=None)                      # total (or price) return
-    RX = R.sub(rf, axis=0)                                  # excess return
+    R = P.pct_change(fill_method=None)  # total (or price) return
+    RX = R.sub(rf, axis=0)  # excess return
     # ex-ante vol (annualised) known at close t
     vol = np.sqrt(RX.ewm(com=cfg.vol_com, min_periods=60).var() * ANN)
     # lagged liquidity inputs for the cost model
@@ -84,7 +90,7 @@ def run(panel: dict, symbols: list[str], cfg: Config, shortable: dict | None = N
         if cfg.long_only_benchmark:
             sig[:] = 1.0
         for s in syms:  # long/flat constraint for ETFs not shortable/ETB (optional)
-            if (cfg.honour_shortable and shortable is not None and not shortable.get(s, False)):
+            if cfg.honour_shortable and shortable is not None and not shortable.get(s, False):
                 sig[s] = max(sig[s], 0.0)
         sig = sig.where(ok, 0.0)
         live = ok[ok].index
@@ -100,7 +106,7 @@ def run(panel: dict, symbols: list[str], cfg: Config, shortable: dict | None = N
         else:
             w = raw / len(live)
         if cfg.sizing == "pvt":
-            win = RX.iloc[max(0, i - cfg.cov_window + 1): i + 1][list(live)]
+            win = RX.iloc[max(0, i - cfg.cov_window + 1) : i + 1][list(live)]
             cov = win.cov(min_periods=60).fillna(0.0).values * ANN
             wl = w[list(live)].values
             pv = float(np.sqrt(max(wl @ cov @ wl, 0.0)))
@@ -110,10 +116,10 @@ def run(panel: dict, symbols: list[str], cfg: Config, shortable: dict | None = N
             g = w.abs().sum()
             if g > cfg.gross_cap:
                 w = w * (cfg.gross_cap / g)
-        return w
+        return cast(pd.Series, w)
 
     # pending trades: fill date -> target
-    fills = {}
+    fills: dict[pd.Timestamp, pd.Series] = {}
     for t in rdates:
         i = pos[t]
         j = i + cfg.lag
@@ -121,14 +127,23 @@ def run(panel: dict, symbols: list[str], cfg: Config, shortable: dict | None = N
             fills[idx[j]] = target_weights(t)
 
     n = len(idx)
-    W = np.zeros((n, len(syms)))     # weights held at close of day (after any fill)
-    pnl = np.zeros(n); cost = np.zeros(n); borrow = np.zeros(n); turn = np.zeros(n)
-    contrib = np.zeros((n, len(syms))); costa = np.zeros((n, len(syms))); turna = np.zeros((n, len(syms)))
-    buckets = {}
+    W = np.zeros((n, len(syms)))  # weights held at close of day (after any fill)
+    pnl = np.zeros(n)
+    cost = np.zeros(n)
+    borrow = np.zeros(n)
+    turn = np.zeros(n)
+    contrib = np.zeros((n, len(syms)))
+    costa = np.zeros((n, len(syms)))
+    turna = np.zeros((n, len(syms)))
+    buckets: dict[str, list[Any]] = {}
     w = np.zeros(len(syms))
-    Rv = R.fillna(0.0).values; RXv = RX.fillna(0.0).values; rfv = rf.fillna(0.0).values
-    Cv = C.values; ADVv = adv_sh.shift(1).values; SIGv = sig_d.shift(1).values
-    
+    Rv = R.fillna(0.0).values
+    RXv = RX.fillna(0.0).values
+    rfv = rf.fillna(0.0).values
+    Cv = C.values
+    ADVv = adv_sh.shift(1).values
+    SIGv = sig_d.shift(1).values
+
     for k in range(n):
         if k > 0:
             c = w * RXv[k]
@@ -143,10 +158,10 @@ def run(panel: dict, symbols: list[str], cfg: Config, shortable: dict | None = N
             w = w * (1 + Rv[k]) / (1 + rfv[k] + rp)
         t = idx[k]
         if t in fills:
-            tgt = fills[t].values
+            tgt = cast(np.ndarray, fills[t].values)
             dw = tgt - w
             cst = 0.0
-            for a in np.nonzero(np.abs(dw) > 1e-10)[0]:
+            for a in cast(Iterable[int], np.nonzero(np.abs(dw) > 1e-10)[0]):
                 notional = abs(dw[a]) * cfg.nav_usd
                 if True:
                     price = Cv[k, a]
@@ -155,8 +170,17 @@ def run(panel: dict, symbols: list[str], cfg: Config, shortable: dict | None = N
                     adv = ADVv[k, a] if np.isfinite(ADVv[k, a]) and ADVv[k, a] > 0 else None
                     sd = SIGv[k, a] if np.isfinite(SIGv[k, a]) else None
                     side = "buy" if dw[a] > 0 else "sell"
-                    tc = tca.trade_cost(side, price, notional / price, adv, sd, None, k=cfg.impact_k,
-                                        venue=cfg.venue, trade_date=t.date())
+                    tc = tca.trade_cost(
+                        side,
+                        price,
+                        notional / price,
+                        adv,
+                        sd,
+                        None,
+                        k=cfg.impact_k,
+                        venue=cfg.venue,
+                        trade_date=t.date(),
+                    )
                     bps = tc["total_bps"]
                     buckets.setdefault(syms[a], []).append(tc["bucket"])
                 cst += abs(dw[a]) * bps / 1e4
@@ -172,9 +196,13 @@ def run(panel: dict, symbols: list[str], cfg: Config, shortable: dict | None = N
     out["net_lev"] = W.sum(1)
     first = next((d for d in sorted(fills) if np.abs(fills[d].values).sum() > 0), None)
     out = out.loc[first:] if first is not None else out.iloc[0:0]
-    return {"daily": out, "weights": pd.DataFrame(W, index=idx, columns=syms).loc[out.index],
-            "contrib": pd.DataFrame(contrib, index=idx, columns=syms).loc[out.index],
-            "cost_by_asset": pd.DataFrame(costa, index=idx, columns=syms).loc[out.index],
-            "turn_by_asset": pd.DataFrame(turna, index=idx, columns=syms).loc[out.index],
-            "buckets": {k: max(set(v), key=v.count) for k, v in buckets.items()},
-            "cfg": asdict(cfg), "symbols": syms}
+    return {
+        "daily": out,
+        "weights": pd.DataFrame(W, index=idx, columns=syms).loc[out.index],
+        "contrib": pd.DataFrame(contrib, index=idx, columns=syms).loc[out.index],
+        "cost_by_asset": pd.DataFrame(costa, index=idx, columns=syms).loc[out.index],
+        "turn_by_asset": pd.DataFrame(turna, index=idx, columns=syms).loc[out.index],
+        "buckets": {k: max(set(v), key=v.count) for k, v in buckets.items()},
+        "cfg": asdict(cfg),
+        "symbols": syms,
+    }

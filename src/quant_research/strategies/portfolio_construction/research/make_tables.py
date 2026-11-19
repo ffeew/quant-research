@@ -8,12 +8,14 @@ names = {"wf_statarb_L120_w": "A. statarb bars, L120, weekly", "wf_statarb_L120_
          "wf_statarb_L252_m": "C. statarb bars, L252, monthly", "wf_datajson_L120_w": "D. data.json, L120, weekly",
          "wf_datajson_L120_m": "E. data.json, L120, monthly", "wf_datajson_L60_w": "F. data.json, L60, weekly"}
 for key, title in names.items():
-    d = json.load(open(f"out/{key}.json")); m = d["meta"]
+    d = json.load(open(f"out/{key}.json"))
+    m = d["meta"]
     L.append(f"\n#### {title}: N={m['universe_n']}, OOS {m['oos_start']}..{m['oos_end']} ({m['oos_days']} days, {m['n_rebal']} rebalances)\n")
     L.append("| Method | Ret % | Vol % [95% CI] | Sharpe [95% CI] | MaxDD % | Turnover %/yr | Cost bp/yr (10bp) | Sharpe (TCA cost) | Fcst vol % | Real/Fcst | Bias stat [95% CI] | mean LW δ* |")
     L.append("|---|---|---|---|---|---|---|---|---|---|---|---|")
     for k, v in d["table"].items():
-        c = d["ci95"][k]; dl = "" if v["lw_delta_mean"] is None else f"{v['lw_delta_mean']:.3f}"
+        c = d["ci95"][k]
+        dl = "" if v["lw_delta_mean"] is None else f"{v['lw_delta_mean']:.3f}"
         L.append(f"| {k} | {v['ann_ret']*100:.2f} | {v['ann_vol']*100:.2f} [{c['vol'][0]*100:.2f}, {c['vol'][1]*100:.2f}] | {v['sharpe']:.2f} [{c['sharpe'][0]:.2f}, {c['sharpe'][1]:.2f}] | {v['max_dd']*100:.2f} | {v['turnover_ann_oneway']*100:.0f} | {v['cost_drag_ann']*1e4:.1f} | {v['tca_sharpe']:.2f} | {v['fc_vol']*100:.2f} | {v['real_over_fc']:.2f} | {v['bias_stat']:.2f} [{c['bias'][0]:.2f}, {c['bias'][1]:.2f}] | {dl} |")
     L.append("\nDifferences vs MV-LW (stationary block bootstrap 95% CI; p = share of draws > 0):\n")
     for k, v in d["diff_vs_MV_LW_ci95_pgt0"].items():

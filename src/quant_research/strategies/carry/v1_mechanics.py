@@ -13,11 +13,13 @@ production construct V1 (absent), live risk_state I/O, or stop price/gap/intrada
 
 Reference-only (hash pins elsewhere): portfolio/construct.py, portfolio/risk_state.py.
 """
+
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping, Sequence
 from copy import deepcopy
-from typing import Any, Dict, Mapping, Optional, Sequence, Tuple
+from typing import Any, SupportsFloat
 
 BREAKER_CAPS = {
     "NORMAL": 60.0,
@@ -33,7 +35,7 @@ class DomainError(ValueError):
     """V1 domain violation (e.g. negative w_vix differing from w_base)."""
 
 
-def _f(x: Any) -> float:
+def _f(x: SupportsFloat | str) -> float:
     return float(x)
 
 
@@ -41,9 +43,9 @@ def apply_v1_clamp(
     w_base: Mapping[str, float],
     *,
     v1_on_or_failsafe_reduced: bool,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """Erratum E1: V1 only on w_base>0; ON/fail-safe => w_vix=0.5*w_base; shorts/flat unchanged."""
-    out: Dict[str, float] = {}
+    out: dict[str, float] = {}
     for name, wb in w_base.items():
         wb = _f(wb)
         if v1_on_or_failsafe_reduced and wb > 0.0:
@@ -74,26 +76,24 @@ def assert_no_redeployment(
             continue
         wb = _f(w_before.get(name, 0.0))
         if abs(_f(wa)) > abs(wb) + 1e-12:
-            raise AssertionError(
-                f"redeployment forbidden: {name} |w| rose from {wb} to {wa} while longs halved"
-            )
+            raise AssertionError(f"redeployment forbidden: {name} |w| rose from {wb} to {wa} while longs halved")
 
 
 def hard_cap_tighten_only(
     w_vix: Mapping[str, float],
     *,
     name_cap: float = 0.10,
-    risk_cap: Optional[Mapping[str, float]] = None,
+    risk_cap: Mapping[str, float] | None = None,
     gross_cap_pct: float = 60.0,
-    h7_blocked: Optional[Sequence[str]] = None,
-) -> Dict[str, float]:
+    h7_blocked: Sequence[str] | None = None,
+) -> dict[str, float]:
     """Tighten-only hard caps. Long-only gross simplification (positive longs only)."""
-    h7_blocked = set(h7_blocked or ())
+    blocked = set(h7_blocked or ())
     risk_cap = risk_cap or {}
-    capped: Dict[str, float] = {}
+    capped: dict[str, float] = {}
     for name, wv in w_vix.items():
         wv = _f(wv)
-        if name in h7_blocked and wv > 0.0:
+        if name in blocked and wv > 0.0:
             wv = 0.0
         lim = name_cap
         if name in risk_cap:
@@ -112,7 +112,7 @@ def hard_cap_tighten_only(
     return capped
 
 
-def breaker_effective(breaker: Mapping[str, Any]) -> Dict[str, Any]:
+def breaker_effective(breaker: Mapping[str, Any]) -> dict[str, Any]:
     """Mirror risk_state.read_breaker essentials (synthetic only)."""
     raw_state = breaker.get("state", "NORMAL")
     fail_safe = bool(breaker.get("fail_safe", False))
@@ -163,9 +163,7 @@ def breaker_effective(breaker: Mapping[str, Any]) -> Dict[str, Any]:
         nta = False
         cap = BREAKER_CAPS["HALTED"]
         reason = "backstop breach treated as HALTED"
-    if st == "RESUMED_DISARMED" and not (
-        isinstance(bs, (int, float)) and not isinstance(bs, bool) and bs > 0
-    ):
+    if st == "RESUMED_DISARMED" and not (isinstance(bs, (int, float)) and not isinstance(bs, bool) and bs > 0):
         return {
             "state": "HALVED",
             "state_in_file": "RESUMED_DISARMED",
@@ -192,7 +190,7 @@ def breaker_effective(breaker: Mapping[str, Any]) -> Dict[str, Any]:
     }
 
 
-def panic_effective(panic: Mapping[str, Any]) -> Dict[str, Any]:
+def panic_effective(panic: Mapping[str, Any]) -> dict[str, Any]:
     """Synthetic panic aligned with risk_state.read_panic labels."""
     stale = bool(panic.get("stale", False))
     fail_closed = bool(panic.get("fail_closed", False))
@@ -255,13 +253,12 @@ def panic_effective(panic: Mapping[str, Any]) -> Dict[str, Any]:
         "multiplier_momentum_trend": factor,
         "momentum_short_notional_multiplier": mom_short_mult,
         "loser_short_ban": loser_short_ban,
-        "new_loser_shorts_allowed": (False if (fail_safe or (binding and loser_short_ban)) else True),
+        "new_loser_shorts_allowed": (not (fail_safe or (binding and loser_short_ban))),
         "beta_floor": beta_floor,
         "net_beta_floor": beta_floor,
         "momentum_trend_mult": factor,
         "reason": reason,
     }
-
 
 
 def _resolve_session_R(session: Mapping[str, Any]) -> Mapping[str, Any]:
@@ -297,14 +294,10 @@ def is_v1_valid_close(session: Mapping[str, Any]) -> bool:
     if isinstance(r, bool) or not isinstance(r, (int, float)):
         return False
     rf = float(r)
-    if not math.isfinite(rf) or rf < 0.0:
-        return False
-    return True
+    return not (not math.isfinite(rf) or rf < 0.0)
 
 
-def v1_should_be_on(
-    session: Mapping[str, Any], prior_state: str, streak_valid_le1: int
-) -> Tuple[str, int, bool]:
+def v1_should_be_on(session: Mapping[str, Any], prior_state: str, streak_valid_le1: int) -> tuple[str, int, bool]:
     """Return (vix_state, new_streak, block_new). Invalid => FAILSAFE_REDUCED, streak frozen."""
     if not is_v1_valid_close(session):
         return "FAILSAFE_REDUCED", streak_valid_le1, True
@@ -357,7 +350,7 @@ def independent_increase_blocked(
     *,
     panic_binding: bool,
     v1_reduced_or_block_new: bool,
-) -> Dict[str, bool]:
+) -> dict[str, bool]:
     flags = {
         "halted": brkr["state"] == "HALTED",
         "cio_or_ops_hold": bool(
@@ -374,7 +367,7 @@ def _path_capped_targets(
     ideal: Mapping[str, float],
     *,
     path_cap: float,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """Scale positive ideal long targets to fit path_cap. Does not touch non-positive."""
     longs = {k: _f(v) for k, v in ideal.items() if _f(v) > 0.0}
     s = sum(longs.values())
@@ -393,7 +386,7 @@ def apply_restoration(
     *,
     mode: str,
     gross_cap_pct: float,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """ON→OFF restoration only (V3a/d). Does NOT perform independent base de-risk cuts.
 
     Semantics (union of prior+base names) — deliberately NOT
@@ -420,7 +413,7 @@ def apply_restoration(
         return dict(prior)
 
     # Ideal targets only for eligible existing prior longs with base>0.
-    ideal: Dict[str, float] = {}
+    ideal: dict[str, float] = {}
     eligible = []
     for name in names:
         if prior[name] > 0.0 and base[name] > 0.0:
@@ -454,15 +447,15 @@ def apply_base_derisk(
     current_weights: Mapping[str, float],
     w_base: Mapping[str, float],
     *,
-    path_cap_pct: Optional[float] = None,
-) -> Dict[str, float]:
+    path_cap_pct: float | None = None,
+) -> dict[str, float]:
     """Separate from V1 ON→OFF restoration: cut longs to min(prior, base[, path]).
 
     Used only when a fixture explicitly sets apply_base_derisk=true to represent
     independent book de-risk / hard-cap path enforcement — NOT by restoration.
     """
     names = set(current_weights) | set(w_base)
-    out: Dict[str, float] = {}
+    out: dict[str, float] = {}
     for name in names:
         cur = _f(current_weights.get(name, 0.0))
         wb = _f(w_base.get(name, 0.0))
@@ -484,7 +477,7 @@ def stop_quantity_coverage(shares: float, stop_covers_shares: float) -> bool:
     return abs(stop_covers_shares - shares) <= 1e-12 and shares >= 0.0
 
 
-def run_step(fixture: Mapping[str, Any]) -> Dict[str, Any]:
+def run_step(fixture: Mapping[str, Any]) -> dict[str, Any]:
     """Execute one synthetic mechanics step from a fixture dict. Pure / deterministic."""
     fx = deepcopy(dict(fixture))
     m = _f(fx.get("m", 1.0))
@@ -509,9 +502,7 @@ def run_step(fixture: Mapping[str, Any]) -> Dict[str, Any]:
     else:
         w_post_panic = dict(w_after_m)
 
-    brkr = breaker_effective(
-        fx.get("breaker", {"state": "NORMAL", "new_trades_allowed": True, "gross_cap_pct": 60.0})
-    )
+    brkr = breaker_effective(fx.get("breaker", {"state": "NORMAL", "new_trades_allowed": True, "gross_cap_pct": 60.0}))
 
     session = _resolve_session_R(fx.get("session", {"R": 1.0, "available": True, "hash_ok": True}))
     prior_state = fx.get("prior_vix_state", "OFF")
@@ -535,9 +526,7 @@ def run_step(fixture: Mapping[str, Any]) -> Dict[str, Any]:
     transition = fx.get("transition")
 
     if "restoration_mode" in fx:
-        raise ValueError(
-            "fixture must not set restoration_mode; mode is derived from restoration_allowed only"
-        )
+        raise ValueError("fixture must not set restoration_mode; mode is derived from restoration_allowed only")
 
     blockers = independent_increase_blocked(
         brkr,
@@ -562,9 +551,7 @@ def run_step(fixture: Mapping[str, Any]) -> Dict[str, Any]:
         )
         if transition == "ON→OFF":
             if mode != "none":
-                w_vix = apply_restoration(
-                    prior_weights, w_post_panic, mode=mode, gross_cap_pct=brkr["gross_cap_pct"]
-                )
+                w_vix = apply_restoration(prior_weights, w_post_panic, mode=mode, gross_cap_pct=brkr["gross_cap_pct"])
             else:
                 names = set(prior_weights) | set(w_post_panic)
                 w_vix = {k: _f(prior_weights.get(k, 0.0)) for k in names}
@@ -661,5 +648,5 @@ def run_step(fixture: Mapping[str, Any]) -> Dict[str, Any]:
     }
 
 
-def run_fixture(fixture: Mapping[str, Any]) -> Dict[str, Any]:
+def run_fixture(fixture: Mapping[str, Any]) -> dict[str, Any]:
     return run_step(fixture)
