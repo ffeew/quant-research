@@ -188,3 +188,50 @@ def test_h2_delisting_base_and_stress():
     short = [dict(pos[0], w_sym=-0.005)]
     ov3, _ = pnl.h2_delisting_stress(b, -W, short)
     assert ov3.sum() == 0  # 0% for shorts
+
+
+def _thin_terminal_bars():
+    b = _terminal_bars()  # A's last print is session 19
+    b["VOL"].loc[b["VOL"].index[:20], "A"] = 1e4  # ADV20 = $500k; 1% = $5k = 5e-4 of AUM per session
+    return b
+
+
+def test_h1_terminal_bound_applies_to_capped_exit_still_held_at_delisting():
+    b = _thin_terminal_bars()
+    d = b["R"].index
+    W = pd.DataFrame(0.0, index=d, columns=["A"])
+    W.iloc[12:17, 0] = 0.0012  # entry fills 5e-4, 5e-4, 2e-4; the exit from row 17 is capped too
+    held = pnl.held_positions(b, W)
+    assert np.isclose(held["A"].iloc[15], 0.0012) and np.isclose(held["A"].iloc[19], 0.0002)
+    roster = [{"symbol": "A", "identity_ok": True}]
+    Wa, ov, rec = pnl.h1_terminal_bound(b, W, roster, pnl.build_cost_config("unknown_borrow_required"))
+    assert W["A"].iloc[19] == 0  # target already flat at tau, but 2e-4 is still held
+    assert len(rec) == 1 and np.isclose(rec[0]["weight"], 0.0002) and rec[0]["target_weight"] == 0
+    assert np.isclose(ov.iloc[20], -0.0002) and np.isclose(ov.sum(), -0.0002)  # -100% of what is held
+    after = pnl.held_positions(b, Wa)["A"]
+    assert np.isclose(after.iloc[19], 0.0002) and after.iloc[20:].eq(0).all()  # settled once bound
+    out = pnl.apply_costs_and_returns(b, Wa, pnl.build_cost_config("unknown_borrow_required"), idea="H1")
+    assert out["daily"]["gross"].iloc[19:].eq(0).all()  # no return earned past the last print
+
+
+def test_no_print_name_cannot_trade_and_stays_held():
+    b = _bars()
+    d = b["R"].index
+    b["PX"].iloc[14:17, 0] = np.nan  # suspended for three sessions, then prints again
+    W = pd.DataFrame(0.0, index=d, columns=["A", "B"])
+    W.iloc[11:13, 0] = 0.1
+    held = pnl.held_positions(b, W)["A"]
+    assert np.isclose(held.iloc[13], 0.1)
+    assert np.isclose(held.iloc[14:17], 0.1).all()  # no print: the exit can't fill
+    assert held.iloc[17] == 0  # exits once it prints again
+
+
+def test_h2_delisting_stress_applies_to_held_position():
+    b = _thin_terminal_bars()
+    d = b["R"].index
+    W = pd.DataFrame(0.0, index=d, columns=["A", "XLK"])
+    W.iloc[17:25, 0] = 0.0012  # capped entry: 5e-4 then 1e-3 held when A stops printing at 19
+    pos = [{"sym": "A", "etf": "XLK", "w_sym": 0.0012, "w_etf": 0.0, "entry_i": 17, "exit_i": 25, "N": 2.0}]
+    ov, srec = pnl.h2_delisting_stress(b, W, pos)
+    assert np.isclose(srec[0]["stress_weight"], 0.001)
+    assert np.isclose(ov.iloc[20], 0.001 * -0.30) and np.isclose(ov.sum(), ov.iloc[20])

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Any, Protocol
 
@@ -132,39 +133,55 @@ def build_cost_config(path: str) -> CostConfig:
     return paths[path]
 
 
-def apply_costs_and_returns(
-    bars: dict[str, pd.DataFrame], W: pd.DataFrame, cfg: CostConfig, *, idea: str, costs: CostModel | None = None
-) -> dict[str, Any]:
-    """One-session execution lag, 1% ADV participation cap, trading cost, borrow, daily net.
+@dataclass(frozen=True)
+class Fill:
+    symbol: str
+    side: str
+    px: float
+    shares: float
+    adv_shares: float | None
 
-    The cap limits the trade itself: each session trades at most 1% of ADV20 shares toward the
-    target weight; the unfilled remainder carries to the next session. Gross, cost and borrow are
-    all on the position actually held."""
-    if cfg.is_pass_bar and cfg.borrow_rate < BORROW_UNKNOWN_REQUIRED:
-        raise RuntimeError("pass-bar config must have borrow_rate >= 10%/yr")
-    costs = costs or SharedCostModel()
-    R, PX, VOL = bars["R"], bars["PX"], bars["VOL"]
-    # W row k is the weight filled at close k (signals put it at their fill session, never the
-    # signal bar); it earns the next row's return, close k -> k+1.
+
+def _fills(
+    bars: dict[str, pd.DataFrame], W: pd.DataFrame
+) -> Iterator[tuple[pd.Timestamp, pd.Timestamp, pd.Series, list[Fill], bool]]:
+    """Walk the book session by session from the position actually held.
+
+    W row k is the weight filled at close k (signals put it at their fill session, never the
+    signal bar); it earns the next row's return, close k -> k+1. Each session trades at most 1%
+    of ADV20 shares toward the target; the unfilled remainder carries to later sessions. A name
+    with no print can't trade, so it stays held. Once a name is past its last print and its
+    target is flat, the held position is settled at its last close at no cost (null delisting
+    return); the terminal bound and the delisting stress book their loss on that held amount.
+    Yields (session, previous session, held after the session's fills, trades, capped)."""
+    PX, VOL = bars["PX"], bars["VOL"]
     W_exec = W.shift(1).fillna(0.0)
     DV = PX * VOL
     ADV20 = DV.rolling(20, min_periods=10).mean().shift(1)
+    printed = (PX > 0).to_numpy()
+    last_print = {
+        str(c): (int(np.flatnonzero(printed[:, k])[-1]) if printed[:, k].any() else -1)
+        for k, c in enumerate(PX.columns)
+    }
+    pos = {d: i for i, d in enumerate(PX.index)}
     held = pd.Series(0.0, index=W_exec.columns)
-    rets = []
     dates = W_exec.index
-    capped_sessions = 0
     for j in range(1, len(dates)):
         d = dates[j]
-        want = W_exec.iloc[j] - held
+        target = W_exec.iloc[j]
+        want = target - held
         fill = want.copy()
-        trade_cost_frac = 0.0
+        trades: list[Fill] = []
         capped = False
         for s, delta in want.items():
-            if abs(delta) < 1e-15 or s not in PX.columns:
+            if abs(delta) < 1e-15:
                 continue
-            px = at_float(PX, d, s)
+            px = at_float(PX, d, s) if s in PX.columns and d in pos else float("nan")
             if not (px > 0):
-                continue
+                gone = pos.get(d, len(PX.index)) > last_print.get(str(s), -1)
+                if not (gone and abs(float(target.loc[str(s)])) < 1e-15):
+                    fill.loc[str(s)] = 0.0  # no print: can't trade, the position stays held
+                continue  # (or: past its last print with a flat target, settled at last close)
             adv = at_float(ADV20, d, s) if s in ADV20.columns else np.nan
             adv_sh = (adv / px) if (np.isfinite(adv) and adv > 0) else None
             sh = abs(delta) * AUM / px
@@ -172,15 +189,44 @@ def apply_costs_and_returns(
                 sh = PARTICIPATION_CAP * adv_sh
                 fill.loc[str(s)] = math.copysign(sh * px / AUM, delta)  # remainder carries to the next session
                 capped = True
-            side = "buy" if delta > 0 else "sell"
-            bps = costs.one_way_bps(side, float(px), float(sh), adv_sh, symbol=str(s), is_etf=s in ETFS, cfg=cfg)
-            trade_cost_frac += (sh * px / AUM) * bps / 1e4
-        capped_sessions += capped
+            trades.append(Fill(str(s), "buy" if delta > 0 else "sell", float(px), float(sh), adv_sh))
         held = held + fill
-        rrow = R.loc[d].reindex(held.index).fillna(0.0) if d in R.index else None
+        yield d, dates[j - 1], held, trades, capped
+
+
+def held_positions(bars: dict[str, pd.DataFrame], W: pd.DataFrame) -> pd.DataFrame:
+    """Position actually held after each session's fills (row k earns row k's return); row 0 is flat."""
+    rows = {W.index[0]: pd.Series(0.0, index=W.columns)} if len(W.index) else {}
+    rows.update({d: held for d, _prev, held, _trades, _capped in _fills(bars, W)})
+    return pd.DataFrame(rows, columns=W.index).T.reindex(columns=W.columns).astype(float)
+
+
+def apply_costs_and_returns(
+    bars: dict[str, pd.DataFrame], W: pd.DataFrame, cfg: CostConfig, *, idea: str, costs: CostModel | None = None
+) -> dict[str, Any]:
+    """One-session execution lag, 1% ADV participation cap, trading cost, borrow, daily net.
+
+    The cap limits the trade itself: each session trades at most 1% of ADV20 shares toward the
+    target weight; the unfilled remainder carries to the next session. Gross, cost and borrow are
+    all on the position actually held (see _fills)."""
+    if cfg.is_pass_bar and cfg.borrow_rate < BORROW_UNKNOWN_REQUIRED:
+        raise RuntimeError("pass-bar config must have borrow_rate >= 10%/yr")
+    costs = costs or SharedCostModel()
+    R = bars["R"]
+    rets = []
+    capped_sessions = 0
+    for d, prev, held, trades, capped in _fills(bars, W):
+        trade_cost_frac = 0.0
+        for t in trades:
+            bps = costs.one_way_bps(
+                t.side, t.px, t.shares, t.adv_shares, symbol=t.symbol, is_etf=t.symbol in ETFS, cfg=cfg
+            )
+            trade_cost_frac += (t.shares * t.px / AUM) * bps / 1e4
+        capped_sessions += capped
+        rrow = R.loc[[d]].iloc[0].reindex(held.index).fillna(0.0) if d in R.index else None
         gross = float((held * rrow).sum()) if rrow is not None else 0.0
         short_mv = float((-held.clip(upper=0)).sum() * AUM)
-        days = float((d - dates[j - 1]).days)  # calendar days since the last close (weekends accrue)
+        days = float((d - prev).days)  # calendar days since the last close (weekends accrue)
         b = costs.borrow_usd(short_mv, days, cfg) / AUM
         rets.append((d, gross - trade_cost_frac - b, gross, trade_cost_frac, b))
     df = pd.DataFrame(rets, columns=["session_date", "net", "gross", "tc", "borrow"]).set_index("session_date")
@@ -261,7 +307,9 @@ def h1_terminal_bound(
     """Positions stranded in unresolved terminal rows: zero the leg from tau (the execution lag
     closes it at tau+1 with no exit-cost credit) and book an equity overlay at tau+1:
     long -100% of marked value; short max(P_tau, V_max) liability plus borrow from tau+1 to
-    max(frozen exit, h). Fails closed (Blocked). Paths A and B coincide in this harness."""
+    max(frozen exit, h). The bound applies to the position actually held into tau+1 (after the
+    ADV cap), not the target: a capped exit still holding at delisting is bound on what is left.
+    Fails closed (Blocked). Paths A and B coincide in this harness."""
     if path not in H1_TERMINAL_PATHS:
         raise ValueError(path)
     costs = costs or SharedCostModel()
@@ -269,6 +317,7 @@ def h1_terminal_bound(
     W_adj = W.copy()
     overlay = pd.Series(0.0, index=dates)
     receipts = []
+    held = held_positions(bars, W) if roster else None
     for row in roster:
         s = row["symbol"]
         if s not in W.columns or not (W[s].abs() > 0).any():
@@ -292,8 +341,10 @@ def h1_terminal_bound(
             trusted &= ~bars["FFILL"][s].fillna(True).astype(bool)
         if (held_pre & ~trusted.iloc[:t]).any():
             raise Blocked(f"BLOCK H1: suspension gap before tau for {s} (fail closed).")
-        w = float(W[s].iloc[t])
-        if w == 0.0 or t + 1 >= len(dates):
+        assert held is not None
+        # held after close tau's session; no print after tau, so this is what reaches tau+1
+        w = float(held[s].iloc[t])
+        if abs(w) < 1e-15 or t + 1 >= len(dates):
             continue
         book_i = t + 1
         p_tau = float(bars["PX"][s].iloc[t])
@@ -303,6 +354,7 @@ def h1_terminal_bound(
             "instrument_id": row.get("instrument_id"),
             "side": "long" if w > 0 else "short",
             "weight": w,
+            "target_weight": float(W[s].iloc[t]),
             "entry_session": str(dates[int(np.flatnonzero((W[s].abs() > 0).values)[0])].date()),
             "tau": str(tau_d.date()),
             "booking_session": str(dates[book_i].date()),
@@ -379,9 +431,11 @@ def h2_delisting_stress(
     supplied_delist_returns: dict[str, Any] | None = None,
 ) -> tuple[pd.Series, list[dict[str, Any]]]:
     """Counted stress: on a null delisting return, -30% for longs and 0% for shorts, booked at
-    last+1 on the weight held over that session. A supplied delisting return gets no stress."""
+    last+1 on the position actually held over that session (after the ADV cap), not the target.
+    A supplied delisting return gets no stress."""
     sup = supplied_delist_returns or {}
     dates = W.index
+    held: pd.DataFrame | None = None
     overlay = pd.Series(0.0, index=dates)
     out = []
     for r in h2_delisting_receipts(bars, positions):
@@ -392,7 +446,9 @@ def h2_delisting_stress(
         li = iloc_int(dates, pd.Timestamp(r["last_close_session"]))
         if li + 1 >= len(dates):
             continue
-        w = float(W[s].iloc[li]) if s in W.columns else 0.0
+        if held is None:
+            held = held_positions(bars, W)
+        w = float(held[s].iloc[li]) if s in held.columns else 0.0  # no print after li: carried into li+1
         shock = H2_DELISTING_STRESS_LONG if w > 0 else H2_DELISTING_STRESS_SHORT
         charge = w * shock if w > 0 else 0.0
         overlay.iloc[li + 1] += charge
