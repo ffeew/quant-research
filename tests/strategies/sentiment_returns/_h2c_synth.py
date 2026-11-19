@@ -2,10 +2,11 @@
 from __future__ import annotations
 
 import datetime as dt
+from typing import Any
 
 import numpy as np
 
-from quant_research.strategies.sentiment_returns.h2c.config import params_from_dict
+from quant_research.strategies.sentiment_returns.h2c.config import H2CParams, params_from_dict
 
 SYMS = [f"S{i:02d}" for i in range(8)]
 
@@ -19,7 +20,7 @@ def weekdays(lo: str, hi: str) -> list[str]:
     return out
 
 
-def params(**over):
+def params(**over: object) -> H2CParams:
     d = dict(universe=SYMS, hedge="HEDGE", beta_n=20, h0=1, h1=5, lag=100, nprior_max=4, nprior_min=2, tone_min=3,
              q_min_events=4, quantile_div=4, partitions=dict(
                  T=dict(lo="2018-01-01", hi="2020-12-31", score_lo="2019-01-01", scored_years=[2019, 2020],
@@ -28,7 +29,7 @@ def params(**over):
     return params_from_dict(d)
 
 
-def world(seed: int = 7, planted: float = 0.0):
+def world(seed: int = 7, planted: float = 0.0) -> tuple[H2CParams, dict[str, Any]]:
     """Returns kwargs for run_h2c plus the planted tones. ``planted`` adds planted * surprise to each event's
     post-day0 cumulative return (spread over h1 sessions)."""
     rng = np.random.default_rng(seed)

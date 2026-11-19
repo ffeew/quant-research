@@ -1,4 +1,5 @@
 import math
+from collections.abc import Callable
 
 from quant_research.strategies.sentiment_returns.h2c import errors, run_h2c
 from quant_research.strategies.sentiment_returns.h2c.config import HoldoutExpectations
@@ -6,7 +7,7 @@ from quant_research.strategies.sentiment_returns.h2c.config import HoldoutExpect
 from ._h2c_synth import SYMS, world
 
 
-def _raises(exc, fn, *a, **k):
+def _raises(exc: type[BaseException], fn: Callable[..., object], *a: object, **k: object) -> None:
     try:
         fn(*a, **k)
     except exc:
@@ -14,7 +15,7 @@ def _raises(exc, fn, *a, **k):
     raise AssertionError(f"{exc.__name__} not raised")
 
 
-def test_pipeline_runs_and_is_deterministic():
+def test_pipeline_runs_and_is_deterministic() -> None:
     p, kw = world(seed=3)
     a = run_h2c(p, "T", **kw)
     b = run_h2c(p, "T", **world(seed=3)[1])
@@ -31,7 +32,7 @@ def test_pipeline_runs_and_is_deterministic():
     assert {ev["status"] for ev in a["events"] if ev["quarter"] in ("2019Q1", "2019Q2")} <= {"included"}
 
 
-def test_planted_signal_is_recovered():
+def test_planted_signal_is_recovered() -> None:
     p, kw = world(seed=11, planted=0.05)
     r = run_h2c(p, "T", **kw)
     assert r["stats"]["mean_ic"] > 0.5 and r["stats"]["G0_pass"]
@@ -39,7 +40,7 @@ def test_planted_signal_is_recovered():
     assert run_h2c(p0, "T", **kw0)["stats"]["mean_ic"] < r["stats"]["mean_ic"]
 
 
-def test_holdout_gate_needs_runtime_expectations():
+def test_holdout_gate_needs_runtime_expectations() -> None:
     p, kw = world(seed=3)
     pc = run_h2c(p, "T", **kw)["counts"]["purge"]
     _raises(errors.ConfigError, run_h2c, p, "T", purge_reference=pc, **kw)
@@ -49,7 +50,7 @@ def test_holdout_gate_needs_runtime_expectations():
     assert "G2" in r["stats"] and r["stats"]["dev_mean_ic_frozen"] == 0.0
 
 
-def test_partition_violations_stop():
+def test_partition_violations_stop() -> None:
     p, kw = world(seed=3)
     bad = list(kw["earnings_rows"]) + [dict(kw["earnings_rows"][0], reportedDate="2021-02-01", fiscalDateEnding="2020-12-31")]
     _raises(errors.PartitionError, run_h2c, p, "T", **dict(kw, earnings_rows=bad))
@@ -58,7 +59,7 @@ def test_partition_violations_stop():
     _raises(errors.MappingError, run_h2c, p, "T", **dict(kw, transcript_keys=list(kw["transcript_keys"]) + [(SYMS[0], "2016Q1")]))
 
 
-def test_exclude_mapped_before_counts_and_occupies():
+def test_exclude_mapped_before_counts_and_occupies() -> None:
     from quant_research.strategies.sentiment_returns.h2c.config import params_from_dict
     from ._h2c_synth import params
 

@@ -5,14 +5,15 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
-from scipy import stats as _st
+from scipy import stats as _st  # type: ignore[import-untyped]  # scipy ships no py.typed; scipy-stubs not in qr-venv
 
 from ..h2c.stats import nw_t
 from .config import H3Params
 
 
-def one_sided(x: Sequence[float], lag: int) -> dict[str, Any]:
+def one_sided(x: Sequence[float] | npt.NDArray[np.float64], lag: int) -> dict[str, Any]:
     """NW t of the mean and one-sided Student-t p with ``df = T - 1``; None values when T < 3 or x is constant."""
     a = np.asarray(x, float)
     T = len(a)
@@ -43,7 +44,7 @@ def summarise(weeks: Sequence[Mapping[str, Any]], book: Sequence[Mapping[str, An
     """Summary of one variant: IC stats over scored weeks, net L/S stats, turnover, breakeven and holding period.
     ``weeks`` rows carry ``scored``, ``ic`` and optional ``ic_sec``."""
     ics = [w["ic"] for w in weeks if w["scored"]]
-    secs = [w.get("ic_sec") for w in weeks if w["scored"] and w.get("ic_sec") is not None]
+    secs: list[float] = [s for w in weeks if w["scored"] and (s := w.get("ic_sec")) is not None]
     B = pd.DataFrame(list(book))
     net = B["net"].to_numpy(float)
     ic_st = one_sided(ics, p.nw_lag) if ics else {}

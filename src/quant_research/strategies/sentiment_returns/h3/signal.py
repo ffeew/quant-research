@@ -6,7 +6,7 @@ from collections.abc import Iterable, Mapping
 from typing import Any
 
 import numpy as np
-from scipy import stats as _st
+from scipy import stats as _st  # type: ignore[import-untyped]  # scipy ships no py.typed; scipy-stubs not in qr-venv
 
 from .config import H3Params
 from .weeks import NY

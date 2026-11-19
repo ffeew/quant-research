@@ -14,7 +14,10 @@ def call_tone(entries: Sequence[dict[str, Any]], tone_min: int) -> tuple[int, fl
     v: list[float] = []
     for ent in entries:
         try:
-            f = float(ent.get("sentiment"))
+            raw = ent.get("sentiment")
+            if raw is None:  # float(None) raises TypeError; same skip as below
+                continue
+            f = float(raw)
         except (TypeError, ValueError):
             continue
         if math.isfinite(f):

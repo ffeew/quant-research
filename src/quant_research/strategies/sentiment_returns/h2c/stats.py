@@ -6,12 +6,13 @@ from collections.abc import Sequence
 from typing import Any
 
 import numpy as np
-from scipy import stats as _st
+import numpy.typing as npt
+from scipy import stats as _st  # type: ignore[import-untyped]  # scipy ships no py.typed; scipy-stubs not in qr-venv
 
 from .config import H2CParams, Partition
 
 
-def nw_t(x: Sequence[float], lag: int) -> float:
+def nw_t(x: Sequence[float] | npt.NDArray[np.float64], lag: int) -> float:
     """t-stat of the mean with a Bartlett-kernel Newey-West long-run variance."""
     a = np.asarray(x, float)
     T = len(a)
