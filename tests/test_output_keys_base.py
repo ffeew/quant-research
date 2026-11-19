@@ -20,11 +20,9 @@ ROOT = Path(__file__).resolve().parents[1]
 BASE = "f485f00"
 NAMES = re.compile(r"(?i)(sofia|ethan|dave|tomas|victor|maya|marcus|dmitri|rachel|daniel|jeremy)")
 IDENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
-# The only deliberate output-key renames since base: old name -> new name.
-RENAMED = {
-    "victor_pit_ruling_sha256": "validator_pit_ruling_sha256",
-    "victor_passed": "validator_passed",
-}
+# The only deliberate output-key renames since base (new names). Each replaced the base key that
+# differs only by the person's name in place of "validator"; the old name must be gone from src.
+RENAMED_TO = {"validator_pit_ruling_sha256", "validator_passed"}
 
 
 def _git(*args: str) -> str:
@@ -74,12 +72,13 @@ def test_named_output_keys_match_base() -> None:
     for path in (ROOT / "src").rglob("*.py"):
         head |= _keys(path.read_text())
     assert base, "expected named output keys in base src"
-    assert set(RENAMED) <= base
-    assert sorted(base - head) == sorted(RENAMED)
+    renamed_from = {k for k in base if NAMES.sub("validator", k) in RENAMED_TO}
+    assert len(renamed_from) == len(RENAMED_TO)
+    assert sorted(base - head) == sorted(renamed_from)
     head_all: set[str] = set()
     for path in (ROOT / "src").rglob("*.py"):
         head_all |= _all_keys(path.read_text())
-    assert set(RENAMED.values()) <= head_all
+    assert RENAMED_TO <= head_all
 
 
 def _json_keys(obj: Any, path: str = "") -> set[str]:
