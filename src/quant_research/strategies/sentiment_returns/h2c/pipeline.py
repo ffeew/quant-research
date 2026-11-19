@@ -1,4 +1,8 @@
-"""End-to-end H2-C over one partition, on in-memory inputs. No file, network or environment access."""
+"""End-to-end H2-C over one partition, on in-memory inputs. No file, network or environment access.
+
+The H2-C HOLDOUT partition is spent: ``run_h2c`` refuses it (``HoldoutRefusedError``) before touching any input.
+This library must not be used to run the holdout.
+"""
 
 from __future__ import annotations
 
@@ -9,12 +13,18 @@ from typing import Any
 from . import events as _ev
 from . import stats as _stats
 from .config import H2CParams, HoldoutExpectations
+from .errors import HoldoutRefusedError
 from .gating import assert_events_in_partition, check_purge
 from .schema import validate_transcript
 from .signal import call_tone, tone_surprise
 from .target import beta_adjusted_target, build_return_panel
 
 TranscriptLoader = Callable[[str, str], Any]
+
+HOLDOUT_PARTITION = "HOLDOUT"
+HOLDOUT_REFUSED_MSG = (
+    "H2-C HOLDOUT partition is spent (single confirmatory run already done); this library must not be used to run it"
+)
 
 
 def run_h2c(
@@ -37,9 +47,14 @@ def run_h2c(
     ``calendar_sessions``: exchange sessions covering the partition and at least ``h1`` sessions past it.
     ``price_sessions``: sessions of the price panel (partition plus beta warm-up). ``load_transcript(sym, label)``
     returns the parsed transcript object (the caller verifies integrity). When ``purge_reference`` is given, the
-    computed purge counts must equal it and ``expectations.purge``. When ``dev_mean_ic`` is given the holdout gate
-    (G2) is evaluated, else the DEV gate (G1).
+    computed purge counts must equal it and ``expectations.purge``. When ``dev_mean_ic`` is given the generic G2
+    gate is evaluated, else the DEV gate (G1).
+
+    The HOLDOUT partition is refused: a ``partition`` naming it (any case) raises ``HoldoutRefusedError`` before any
+    input is read. The holdout is spent and this library must not be used to run it.
     """
+    if partition.strip().upper() == HOLDOUT_PARTITION:
+        raise HoldoutRefusedError(HOLDOUT_REFUSED_MSG)
     part = p.partition(partition)
     allsess = list(calendar_sessions)
     syms = list(p.universe) + [p.hedge]

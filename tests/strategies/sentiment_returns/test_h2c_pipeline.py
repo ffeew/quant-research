@@ -2,7 +2,7 @@ import math
 from collections.abc import Callable
 
 from quant_research.strategies.sentiment_returns.h2c import errors, run_h2c
-from quant_research.strategies.sentiment_returns.h2c.config import HoldoutExpectations
+from quant_research.strategies.sentiment_returns.h2c.config import HoldoutExpectations, load_h2c_params
 
 from ._h2c_synth import SYMS, world
 
@@ -55,6 +55,44 @@ def test_holdout_gate_needs_runtime_expectations() -> None:
     )
     r = run_h2c(p, "T", purge_reference=pc, expectations=HoldoutExpectations(purge=dict(pc)), dev_mean_ic=0.0, **kw)
     assert "G2" in r["stats"] and r["stats"]["dev_mean_ic_frozen"] == 0.0
+
+
+class _Untouchable(dict[str, int]):
+    """Any read of this input fails the test: proves run_h2c refuses before touching inputs."""
+
+    def _boom(self, *a: object, **k: object) -> None:
+        raise AssertionError("input touched")
+
+    __iter__ = __len__ = __getitem__ = __contains__ = get = items = keys = values = _boom  # type: ignore[assignment]
+
+
+def _untouched_loader(sym: str, label: str) -> object:
+    raise AssertionError("transcript loader touched")
+
+
+def test_run_h2c_refuses_holdout() -> None:
+    p, _ = world(seed=3)
+    bomb = _Untouchable()
+    kw = dict(
+        calendar_sessions=bomb,
+        price_sessions=bomb,
+        price_rows=bomb,
+        earnings_rows=bomb,
+        transcript_keys=bomb,
+        load_transcript=_untouched_loader,
+        fye_months=bomb,
+    )
+    for name in ("HOLDOUT", "holdout", " Holdout "):
+        try:
+            run_h2c(p, name, **kw)  # type: ignore[arg-type]
+        except errors.HoldoutRefusedError as e:
+            assert isinstance(e, errors.PartitionError) and e.code == errors.PartitionError.code
+            assert "spent" in str(e) and "must not be used" in str(e)
+        else:
+            raise AssertionError("HOLDOUT not refused")
+    real = load_h2c_params()
+    assert "HOLDOUT" in real.partitions
+    _raises(errors.HoldoutRefusedError, run_h2c, real, "HOLDOUT", **kw)
 
 
 def test_partition_violations_stop() -> None:
