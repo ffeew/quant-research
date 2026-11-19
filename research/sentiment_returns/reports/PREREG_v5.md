@@ -1,19 +1,19 @@
 # PRE-REGISTRATION DRAFT v5 — Sentiment-to-returns test on AV news + earnings-call transcripts
-Author: the sentiment researcher (Equity & Sentiment). Drafted 2026-11-11 SGT for the validator (Signal Validation Lead) delta readback, via the fund manager.
+Author: Ethan (Equity & Sentiment). Drafted 2026-11-11 SGT for Victor (Signal Validation Lead) delta readback, via Jeremy.
 Supersedes: PREREG_DRAFT_v4.md (sha 4f6dce8b…621a, kept unchanged), v3 (5f531a75…667b), v2 (75b3736e…17f5) and
 v1 (e1f9ee2b…9d7e), all kept unchanged. Standalone document; changes listed item by item in CHANGES_v4_to_v5.md (A1–A6).
 Status: **DESIGN ONLY. DRAFT for delta readback, then seal. Not sent. No data analysed, no returns loaded, no backtest run,
 no results exist.**
-§0 carries the validator's sealed boundary decision incl. the Q15 straddle decision (binding). §0R carries the validator's full review of v4
-(verdict AMEND to v5; amendments A1–A6, binding). §4A adds data-handling notes from the data engineer's RELEASE_NOTES.md.
+§0 carries Victor's sealed boundary ruling incl. the Q15 straddle ruling (binding). §0R carries Victor's full review of v4
+(verdict AMEND to v5; amendments A1–A6, binding). §4A adds data-handling notes from Marcus's RELEASE_NOTES.md.
 No open questions remain (§9).
 
-## 0. HOLDOUT BOUNDARY — RULED (the validator, Q6)
-**Source:** the internal review record,
+## 0. HOLDOUT BOUNDARY — RULED (Victor, Q6)
+**Source:** `$QR_DESK_DIR/validation/prereg_rulings/2026-11-11-ethan-sentiment-returns-boundary-ruling.md`,
 sha256 `0f2713def385f754cf2393ff7608c9d9713214a0355a35d483c692f1c8cf8ee1` (verified 2026-11-11 SGT, read in full, 13 lines;
-ruled on v1 sha e1f9ee2b). Logged as row in `$QR_DESK_DIR/validation/verdicts-log.md`, per the validator (the log was
-not opened by the sentiment researcher; cited as validator stated it). Where a relay and the decision file differ, the file governs (see
-CHANGES_v2_to_v3.md §D). The Q15 straddle decision (B8) is cited to the same decision file and log row, per the validator.
+ruled on v1 sha e1f9ee2b). Logged as row **L286** in `$QR_DESK_DIR/validation/verdicts-log.md`, per Victor (the log was
+not opened by Ethan; cited as Victor stated it). Where a relay and the ruling file differ, the file governs (see
+CHANGES_v2_to_v3.md §D). The Q15 straddle ruling (B8) is cited to the same ruling file and log row, per Victor.
 - **B1 Boundary (one date for H1a, H1b, H2):** DEV = closes and events dated **≤ 2024-12-31**. HOLDOUT = dated
   **2025-01-01 .. 2026-10-31** (first HOLDOUT session 2025-01-02; last session in the returns pull 2026-10-30).
 - **B2 Returns rule:** a daily return belongs to the partition of its **END close**. close(2024-12-31)→close(2025-01-02) is
@@ -24,12 +24,12 @@ CHANGES_v2_to_v3.md §D). The Q15 straddle decision (B8) is cited to the same de
   not a desk-wide rule, and returns start 2021-03-01). H2 DEV = calls with full return windows inside 2021-03-01..2024-12-31
   **after a 252-session beta warm-up**.
 - **B5 Events** (EARNINGS reportedDate or any dated row) are partitioned by their own date on the same boundary.
-- **B6 Release:** data engineer partitions `$QR_DATA_DIR/av_returns_events_20261111/` on B1/B2. HOLDOUT is hashed and counted
-  from raw bytes only until the single pre-registered OOS run. **DEV release to the sentiment researcher is not before this prereg is sealed by
-  The validator.** data engineer reports per partition: SUMS sha, row counts, max DEV date, min HOLDOUT date.
+- **B6 Release:** Marcus partitions `$QR_DATA_DIR/av_returns_events_20261111/` on B1/B2. HOLDOUT is hashed and counted
+  from raw bytes only until the single pre-registered OOS run. **DEV release to Ethan is not before this prereg is sealed by
+  Victor.** Marcus reports per partition: SUMS sha, row counts, max DEV date, min HOLDOUT date.
 - **B7 Capped months:** all 22 capped_incomplete symbol-months fall in 2025-10..2026-08, inside HOLDOUT, and HOLDOUT carries
   heavier news coverage. Disclosed here and handled by §3; **not a reason to move the boundary.**
-- **B8 Straddling observations — RULED (the validator, Q15).** Observations whose signal is DEV-dated but whose target window runs
+- **B8 Straddling observations — RULED (Victor, Q15).** Observations whose signal is DEV-dated but whose target window runs
   past the 2024-12-31 close are **dropped from BOTH partitions**.
   - **OOS membership is defined by signal date, not return date:** H1a/H1b OOS = decision dates **≥ 2025-01-01** (first
     H1b decision 2025-01-02, first H1a decision 2025-01-03). H2 OOS = events whose **report date ≥ 2025-01-01**.
@@ -53,7 +53,7 @@ CHANGES_v2_to_v3.md §D). The Q15 straddle decision (B8) is cited to the same de
 | H1b daily | 714 decision sessions (2022-03-01..2024-12-31) | **1**: 2024-12-31 (return → close 2025-01-02) | **50** (1 × 50) | 2024-12-30 (return → close 2024-12-31) |
 | H2 events | day 0 2022-03-01..2024-12-31 | every DEV call with day 0 in 2024-12-02..2024-12-31 (21 sessions) | count fixed at EARNINGS release | day 0 2024-11-29 (+21 = 2024-12-31) |
 - Per B8, every "purged" row in this table is dropped from BOTH DEV and HOLDOUT.
-- The validator's "last H1b session 2024-12-30" is consistent with v2's "decision 2024-12-31 dropped": 2024-12-30's return ends at the
+- Victor's "last H1b session 2024-12-30" is consistent with v2's "decision 2024-12-31 dropped": 2024-12-30's return ends at the
   2024-12-31 close (kept); 2024-12-31's ends at the 2025-01-02 close (HOLDOUT under B2 → purged from DEV).
 - H1a: v2's dropped week (decision 2024-12-27) is confirmed. The last kept H1a decision is **2024-12-20**, whose return ends at
   the 2024-12-27 close (B3: "next decision session on or before 2024-12-31"). The week of 2024-12-30 has decision session
@@ -93,43 +93,43 @@ CHANGES_v2_to_v3.md §D). The Q15 straddle decision (B8) is cited to the same de
   DEV mean IC" comparison rests on ~11 DEV quarters. H2 is close to unpowered, so under A5 it can never PASS and is reported
   in full as exploratory only.
 
-**File-opening rule (until validator seals the prereg):** no HOLDOUT-period news, transcript or returns file is opened.
+**File-opening rule (until Victor seals the prereg):** no HOLDOUT-period news, transcript or returns file is opened.
 - News: no month file 2025-01 or later is opened. DEV signals never need one: the latest DEV cutoff is 15:30 ET 2024-12-30
   (H1b) / 2024-12-20 (H1a), earlier than any 2025-01 item under both the UTC and the ET reading (both are gate readings, A3).
 - Transcripts: labels are FISCAL quarters, so the label alone does not decide the side of the boundary. Each transcript is
   first mapped to its day 0 from EARNINGS metadata only (§2.H2); only transcripts mapped to DEV day 0 (≤ 2024-11-29 for
   scoring; earlier ones as baselines) may be opened before the OOS run. Unmatched transcripts with label ≥ 2024Q3 are not
   opened. Since EARNINGS is released only after sealing (B6), no transcript is opened before sealing (Q14).
-- Returns and EARNINGS: sentiment researcher receives only the DEV partition, after sealing (B6); HOLDOUT is not released before the OOS run.
+- Returns and EARNINGS: Ethan receives only the DEV partition, after sealing (B6); HOLDOUT is not released before the OOS run.
 - **DEV-stats freeze (A2):** before ANY HOLDOUT file (news ≥ 2025-01, OOS-mapped transcripts, HOLDOUT returns or EARNINGS)
   is opened, the DEV statistics — mean IC, NW t, Student-t p and number of scored periods, per hypothesis (H1a, H1b, and
   exploratory H2) and per timestamp reading (UTC and ET, A3) — are written to a file in this folder, chmod 0444, and its
-  sha256 is logged with the validator. That file is frozen; nothing in it is recomputed after HOLDOUT is opened.
+  sha256 is logged with Victor. That file is frozen; nothing in it is recomputed after HOLDOUT is opened.
 After sealing, HOLDOUT files are opened once, only for the single pre-registered OOS run. DEV may be used to check plumbing
 only; thresholds below are not tuned on DEV.
 
-## 0R. FULL REVIEW OF v4 — RULED (the validator)
-**Source:** the internal review record,
+## 0R. FULL REVIEW OF v4 — RULED (Victor)
+**Source:** `$QR_DESK_DIR/validation/prereg_rulings/2026-11-11-ethan-sentiment-returns-v4-full-review.md`,
 sha256 `2ef504b769f76e2670852ca3977e3bc85bc61ab7f08e1046b4c7b4de37dbdbaf` (verified 2026-11-11 SGT, read in full, 21 lines; reviewed v4 sha 4f6dce8b and
-CHANGES_v3_to_v4.md 9234b0c2). Logged as row in `$QR_DESK_DIR/validation/verdicts-log.md`, per the validator (the log was
-not opened by the sentiment researcher; cited as validator stated it). Where a relay and the decision file differ, the file governs.
+CHANGES_v3_to_v4.md 9234b0c2). Logged as row **L291** in `$QR_DESK_DIR/validation/verdicts-log.md`, per Victor (the log was
+not opened by Ethan; cited as Victor stated it). Where a relay and the ruling file differ, the file governs.
 - **Verdict:** AMEND to v5; seal after a delta readback of A1–A6. B6 holds: no DEV release before the seal.
-- **Accepted as written:** B8 straddle text (§0); §4A expected DEV counts (agree with the data engineer's attested split, row per
-  The validator); disclosure of the fund manager's data limits (§2, §4, §4A, §6, §7); adjusted_close ratios only, no winsorizing; Q10, Q12, Q14.
+- **Accepted as written:** B8 straddle text (§0); §4A expected DEV counts (agree with Marcus's attested split, row L290 per
+  Victor); disclosure of Jeremy's data limits (§2, §4, §4A, §6, §7); adjusted_close ratios only, no winsorizing; Q10, Q12, Q14.
 - **A1** long-short legs k = floor(n/5); p from Student t, df = scored periods − 1 (§5). Thresholds accepted (§2, §5).
-- **A2** DEV-sign gate: DEV mean IC ≤ 0 → FAIL; DEV stats frozen 0444 and sha-logged with validator before any HOLDOUT open (§0, §5).
+- **A2** DEV-sign gate: DEV mean IC ≤ 0 → FAIL; DEV stats frozen 0444 and sha-logged with Victor before any HOLDOUT open (§0, §5).
 - **A3** R-TZ promoted to a conjunctive gate: PASS requires every criterion under BOTH the UTC and ET readings; N unchanged (§2, §5, §6).
 - **A4** R-TZ materiality with an absolute floor 0.01 (§2, §6).
 - **A5** confirmatory N = 2 (H1a primary, H1b), Holm 0.05 one-sided; H2 pre-registered EXPLORATORY, never PASS (§0, §2, §5).
 - **A6** missing transcripts not assumed missing-at-random; metadata table in §3A and MISSING_TRANSCRIPTS_A6.tsv (§3, §3A, §5).
-- INFO carried: §8 "no results to Daniel until validator validates" stands; no trading; survivorship upper-bound caveat stands (§7).
+- INFO carried: §8 "no results to Daniel until Victor validates" stands; no trading; survivorship upper-bound caveat stands (§7).
 
 ## 1. Data under test (sealed, read-only)
 - Path: `$QR_DATA_DIR/av_sentiment_20261110/clean/` — SHA256SUMS `ed284d37…2834` (6,184 entries), CLEANING.md `c14ef3d5…dab9`.
   Verified 2026-11-11 SGT: both shas match; `sha256sum -c SHA256SUMS` from clean/ = 6,184 OK / 0 FAILED (see VERIFY_LOG.txt).
 - Universe: 52 symbols = 50 US large caps + SPY + QQQ (ETFs news-only). Survivorship-biased (picked 10 Nov 2026 with today's knowledge).
 - News: `news/<SYM>/<YYYY-MM>.json`, 2022-03..2026-10 (56 months), 2,912 symbol-months, 588,198 items. Flags: ok 2,859,
-  ok_repulled 1 (DIS 2025-07), **capped_incomplete 22** (all in 2025-10..2026-08, inside the HOLDOUT, decision B7;
+  ok_repulled 1 (DIS 2025-07), **capped_incomplete 22** (all in 2025-10..2026-08, inside the HOLDOUT, ruling B7;
   JPM 7, NVDA 5, ORCL 2, AMD/AMZN/BAC/C/GS/MS/MSFT/WFC 1 each), **coverage=0 30** (QQQ 22, SPY 7, CAT 2023-08).
   Stock symbol-months: median 37 items/month (~8–9/week), 698 of 2,800 have <20 items (metadata from coverage_news.tsv).
 - Transcripts: `transcripts/<SYM>/<YYYYQn>.json`, labels 2010Q1..2026Q3 (AV FISCAL quarters, "YYYYQM" per AV docs),
@@ -139,12 +139,12 @@ not opened by the sentiment researcher; cited as validator stated it). Where a r
   `relevance_score` (str), `ticker_sentiment_score` (str), `ticker_sentiment_label`}, plus `overall_sentiment_score`, `topics[]`,
   title/summary/source fields. Transcript: `symbol`, `quarter`, `transcript[]` {`speaker`, `title`, `content`, `sentiment` (str)}.
   **Transcript files carry no call date/time field** — only AV's fiscal-quarter label.
-- Pull dates: every news/transcript file was pulled 10–11 Nov 2026 (the data engineer, CALLS.log).
+- Pull dates: every news/transcript file was pulled 10–11 Nov 2026 (Marcus, CALLS.log).
 - Reads so far: CLEANING.md, README.md, SHA256SUMS, the three metadata TSVs, _counts.json, and key names of
   news/AAPL/2022-03.json and transcripts/AAPL/2022Q1.json. No scores, relevance values, text, prices or returns read.
-- Companion datasets (pulled by the data engineer, sealed, not yet released; pinned in §4): returns, EARNINGS, OVERVIEW.
+- Companion datasets (pulled by Marcus, sealed, not yet released; pinned in §4): returns, EARNINGS, OVERVIEW.
 
-## 2. Hypotheses (confirmatory N = 2, decision A5) and signal construction (fixed in advance)
+## 2. Hypotheses (confirmatory N = 2, ruling A5) and signal construction (fixed in advance)
 - **H1a (primary, confirmatory):** Weekly cross-sectional news sentiment predicts next-week beta-adjusted returns (positive rank IC).
 - **H1b (secondary, confirmatory):** Daily cross-sectional news sentiment predicts next-day beta-adjusted returns (positive rank IC).
 - **H2 (PRE-REGISTERED EXPLORATORY, A5):** Earnings-call tone surprise predicts post-event drift (sessions +2..+21) in
@@ -184,7 +184,7 @@ A cross-section is scored only if ≥ 20 stocks qualify; otherwise the period is
 Call tone T(i,q) = mean of float-parseable `sentiment` over all entries; require ≥ 10 parseable entries else missing.
 Tone surprise = T(i,q) − mean of the symbol's previous 4 available calls (needs ≥ 2 prior calls, else missing); "previous" is
 ordered by mapped day 0; unmatched or missing transcripts are not prior calls.
-**H2 event date — PROXY (resolved Q3).** Source: AV EARNINGS (pulled by the data engineer) `quarterlyEarnings` rows: `fiscalDateEnding`,
+**H2 event date — PROXY (resolved Q3).** Source: AV EARNINGS (pulled by Marcus) `quarterlyEarnings` rows: `fiscalDateEnding`,
 `reportedDate`, `reportTime`. **Disclosure: reportedDate + reportTime is a PROXY for the call time, not a verified call
 timestamp**; a call held on a different session than the report would be misdated. Stated on every H2 output.
 - **Day 0:** reportTime = pre-market → day 0 = the reportedDate session. reportTime = post-market → day 0 = the next XNYS
@@ -200,7 +200,7 @@ WMT, HD, NVDA, AAPL, MSFT, CSCO, ORCL and others, so label ≠ calendar quarter.
 1. Fiscal years per symbol from `annualEarnings.fiscalDateEnding` (point-in-time history, not the current OVERVIEW snapshot).
    Fiscal year Y = the fiscal year whose annual fiscalDateEnding falls in calendar year Y (end-year convention; see Q10).
    **Stated ASSUMPTION (Q10, resolved-as-assumption):** AV does not document its fiscal-year label convention (docs say only
-   "Fiscal quarter in YYYYQM format" for transcripts and define `fiscalDateEnding` as a date; the data engineer, 11 Nov). This prereg
+   "Fiscal quarter in YYYYQM format" for transcripts and define `fiscalDateEnding` as a date; Marcus, 11 Nov). This prereg
    ASSUMES the label year is the calendar year in which the fiscal year ENDS (e.g. NVDA FY2025 = year ending Jan 2025).
    The assumption is tested by the DEV-only diagnostic in step 4 before any OOS run; it is not silently corrected.
 2. Quarters Q1..Q4 of fiscal year Y = the `quarterlyEarnings` rows with fiscalDateEnding in (end of FY Y−1, end of FY Y],
@@ -216,8 +216,8 @@ WMT, HD, NVDA, AAPL, MSFT, CSCO, ORCL and others, so label ≠ calendar quarter.
       mapping yields a unique valid match (0..100-day report lag) where the end-year mapping does not, or yields more valid
       matches, that is an off-by-one-year finding;
    c. per-symbol match rate = uniquely, validly matched labels / present labels in the DEV window.
-   **Any symbol that fails (a) or (b), or has a match rate < 90%, is reported to validator before any OOS run**, with the
-   counts by reason. Nothing is re-mapped, re-labelled or fixed without the validator's decision; the OOS run waits for it.
+   **Any symbol that fails (a) or (b), or has a match rate < 90%, is reported to Victor before any OOS run**, with the
+   counts by reason. Nothing is re-mapped, re-labelled or fixed without Victor's ruling; the OOS run waits for it.
 
 ## 3. Missing-data rules
 - coverage=0 months: symbol excluded from every window overlapping that month. Never 0 or neutral.
@@ -264,7 +264,7 @@ By symbol (28 symbols with ≥ 1 missing; none in window):
 | LLY | 1 | error | 2012Q4 |
 | HD | 1 | unexplained | 2026Q2 |
 
-Reading of the table (description, not a decision):
+Reading of the table (description, not a ruling):
 - No missing label falls in the H2 DEV-eligible label window, so missingness does not reduce the H2 DEV sample. It can touch
   the tone-surprise baseline (previous 4 available calls, ≥ 2 required) only through earlier labels; the nearest are WMT
   2020Q1–Q3, which leave ≥ 2 prior present labels for every in-window WMT call (§0).
@@ -273,52 +273,52 @@ Reading of the table (description, not a decision):
   H2 OOS event and is counted on every H2 OOS output. Whether it maps to an OOS day 0 is decided only by the §2 mapping.
 - Handling: excluded (no imputation); exploratory H2 reported alongside this table with missing counts per window.
 
-## 4. Companion datasets (resolved Q2, Q3, Q5 — fund manager decisions 2026-11-11)
-**Returns.** Owner: the data engineer (Data Engineer). AV TIME_SERIES_DAILY_ADJUSTED, 50 stocks + SPY, 2021-03..2026-10, adjusted close
-(12 months pre-sample for beta warm-up). Root: `$QR_DATA_DIR/av_returns_events_20261111/`. Data engineer splits into DEV and
-HOLDOUT per decision B1/B2/B6 (§0). **Sentiment researcher receives only the DEV partition, not before validator seals this prereg (B6) and after
-The fund manager's inspection; shas are given on release. No returns are read before then.**
+## 4. Companion datasets (resolved Q2, Q3, Q5 — Jeremy decisions 2026-11-11)
+**Returns.** Owner: Marcus (Data Engineer). AV TIME_SERIES_DAILY_ADJUSTED, 50 stocks + SPY, 2021-03..2026-10, adjusted close
+(12 months pre-sample for beta warm-up). Root: `$QR_DATA_DIR/av_returns_events_20261111/`. Marcus splits into DEV and
+HOLDOUT per ruling B1/B2/B6 (§0). **Ethan receives only the DEV partition, not before Victor seals this prereg (B6) and after
+Jeremy's inspection; shas are given on release. No returns are read before then.**
 - RETURNS_DEV_PATH: TBD-on-release
 - RETURNS_DEV_SHA256SUMS sha256: TBD-on-release
 - RETURNS_HOLDOUT_PATH / sha256: TBD-on-release (released only for the single sealed OOS run)
 Note: holdout-period beta uses the trailing 252 sessions, which may include DEV-period returns (backward-looking; allowed).
-**Earnings events.** Owner: the data engineer. AV EARNINGS (reportedDate, reportTime, fiscalDateEnding; annual + quarterly), 50 stocks.
+**Earnings events.** Owner: Marcus. AV EARNINGS (reportedDate, reportTime, fiscalDateEnding; annual + quarterly), 50 stocks.
 Used for H2 day 0 and transcript mapping (§2) and the H1 earnings-exclusion robustness (§7). Metadata, not returns; still
 partitioned by row date (B5); opened only after release, which is after sealing (B6); DEV rows only before the OOS run.
 - EARNINGS_PATH: TBD-on-release
 - EARNINGS_sha256: TBD-on-release
-**Sector map.** Owner: the data engineer. AV OVERVIEW `Sector`, `Industry` — **current snapshot (Nov 2026), not point-in-time.**
+**Sector map.** Owner: Marcus. AV OVERVIEW `Sector`, `Industry` — **current snapshot (Nov 2026), not point-in-time.**
 Robustness only; never used in the primary test or any pass/fail gate. Look-ahead disclosed: today's classification applied
 to 2022–2026 (reclassifications and 2026 knowledge leak in).
 - OVERVIEW_PATH: TBD-on-release
 - OVERVIEW_sha256: TBD-on-release
-All three are validated and sealed as desk data by the data owner before use; sentiment researcher verifies shas on receipt and logs them.
+All three are validated and sealed as desk data by the data owner before use; Ethan verifies shas on receipt and logs them.
 
-## 4A. Data handling (from the data engineer's RELEASE_NOTES.md)
+## 4A. Data handling (from Marcus's RELEASE_NOTES.md)
 Source: `$QR_DATA_DIR/av_returns_events_20261111/RELEASE_NOTES.md`, sha256
 `cba5d7c326949bd04526150392b99aac2b89e2c8a0579c0b3c0f9e3af81a8f2c` (prefix cba5d7c3 verified 2026-11-11 SGT; read in full,
-10 lines). No other file under that root was opened. Where the data engineer's message and the file differ, the file governs.
+10 lines). No other file under that root was opened. Where Marcus's message and the file differ, the file governs.
 - **Returns from adjusted_close RATIOS only; price levels are never used.** On the last DEV day adjusted_close ≠ close for
   45 of 51 symbols (adjustment includes later corporate actions); return ratios are unaffected, levels are not.
   r(t) = adjusted_close(t) / adjusted_close(t−1) − 1. `close` and other level fields are not used anywhere in this study.
 - **Three non-split moves > 25% are real data and kept:** INTC 2024-08-02, META 2022-02-03, NFLX 2022-04-20 (all DEV-dated).
   **No winsorizing, clipping or trimming of returns** — v3 specifies none, and v4 keeps that. Rank IC (§5) is already robust
   to single extreme returns; the long-short gate uses raw returns.
-- **COST EARNINGS row** with reportedDate 2020-05-28 earlier than fiscalDateEnding 2020-05-31: kept and flagged by the data engineer;
+- **COST EARNINGS row** with reportedDate 2020-05-28 earlier than fiscalDateEnding 2020-05-31: kept and flagged by Marcus;
   it falls outside the 2021-03 DEV price window and the H2 day-0 window, so it never enters H2. It is still visible to the
   §2 mapping as history; a reportedDate before fiscalDateEnding fails the 0..100-day lag rule (step 3) and is counted.
 - **Sectors** (`meta/sectors.csv` per the notes): current snapshot with look-ahead; robustness only (R-SECTOR), never a gate.
 - **reportedDate is the earnings REPORT date, a proxy for the call date**, not a verified call timestamp (§2).
-- **Expected DEV release** (the data engineer, 11 Nov message): 51 symbols (50 stocks + SPY), **967 sessions 2021-03-01..2024-12-31**,
+- **Expected DEV release** (Marcus, 11 Nov message): 51 symbols (50 stocks + SPY), **967 sessions 2021-03-01..2024-12-31**,
   **5,279 DEV EARNINGS rows**, and the sector snapshot. Per the notes, DEV is `partitioned/dev/` (sub-SUMS prefix b835e488)
   and HOLDOUT `partitioned/holdout/` (prefix 483163a4) stays sealed, hashed-only. **Paths and full shas remain
-  TBD-on-release**; on receipt sentiment researcher verifies the release against these expected counts and reports any mismatch.
+  TBD-on-release**; on receipt Ethan verifies the release against these expected counts and reports any mismatch.
 - Note: the four sub-SUMS (raw, dev, holdout, meta) and RELEASE_NOTES.md itself are not listed in the top SHA256SUMS
-  (stated in the notes); verification on release uses the sub-SUMS shas the fund manager/data engineer provide.
+  (stated in the notes); verification on release uses the sub-SUMS shas Jeremy/Marcus provide.
 
 ## 5. Primary metric, test, thresholds (fixed in advance)
 - Target: beta-adjusted return r_i − β_i·r_SPY, β_i from OLS on exactly 252 daily returns ending t−1 (full window
-  required, per decision B4; never binds in H1 DEV, defines the H2 DEV start 2022-03-01).
+  required, per ruling B4; never binds in H1 DEV, defines the H2 DEV start 2022-03-01).
 - Metric: per-period Spearman rank IC between signal and next-period target; mean IC; Newey–West t (lags: H1a 4, H1b 5, H2 1).
 - **p-value distribution (A1b):** one-sided p (IC > 0) = 1 − F_t(NW t; df = number of scored periods − 1), Student t, per
   hypothesis, per partition, per timestamp reading.
@@ -332,7 +332,7 @@ Source: `$QR_DATA_DIR/av_returns_events_20261111/RELEASE_NOTES.md`, sha256
 - **DEV-sign gate (A2):** if a confirmatory hypothesis's DEV mean IC ≤ 0 (under either reading, A3), it FAILS outright,
   before and regardless of OOS. It keeps its place in the Holm family with p := 1 (N stays 2, so the other hypothesis is not
   given extra α). Its OOS confirmatory test is not run (no OOS p or gate computed for it). DEV stats are frozen per §0
-  (0444, sha-logged with the validator) before any HOLDOUT file is opened.
+  (0444, sha-logged with Victor) before any HOLDOUT file is opened.
 - **PASS (OOS, per confirmatory hypothesis), required under BOTH the UTC and ET readings (A3):** (i) DEV mean IC > 0 (A2);
   (ii) Holm-adjusted one-sided p < 0.05; (iii) OOS mean IC > 0 and ≥ 50% of the frozen DEV mean IC of the same reading;
   (iv) economic gate: long-short of the **top k and bottom k names, k = floor(n/5)** where n is the number of names in that
@@ -366,33 +366,33 @@ Source: `$QR_DATA_DIR/av_returns_events_20261111/RELEASE_NOTES.md`, sha256
 - Timestamp zone UNCONFIRMED (§2, R-TZ). Event time is a PROXY (§2). Sector map is a current snapshot (§4).
 
 ## 8. Statements
-- **No trading.** No orders, sizing or live use. Research/context only until validator validates and the fund manager approves next steps.
-- No results are reported to Daniel from this study until validator validates.
+- **No trading.** No orders, sizing or live use. Research/context only until Victor validates and Jeremy approves next steps.
+- No results are reported to Daniel from this study until Victor validates.
 - The existing sentiment pre-trade check (MANIFEST_v3 `c347c9a1…`) is separate: it never enters DEV/OOS, never counts toward N,
   and is not modified by this study. This study does not feed the check's news slot.
-- Sealed source files are read-only; outputs go only under this folder, sealed 0444 with a manifest. No new data pulls by the sentiment researcher.
+- Sealed source files are read-only; outputs go only under this folder, sealed 0444 with a manifest. No new data pulls by Ethan.
 
 ## 9. Open questions
-**None open.** All questions are resolved (the validator's full review, §0R, row per the validator; earlier decisions §0, row).
-- Q1 RESOLVED (as assumption) — timezone undocumented; UTC inferred (the data engineer, 11 Nov). Under A3 both the UTC and ET readings
+**None open.** All questions are resolved (Victor's full review, §0R, row L291 per Victor; earlier rulings §0, row L286).
+- Q1 RESOLVED (as assumption) — timezone undocumented; UTC inferred (Marcus, 11 Nov). Under A3 both the UTC and ET readings
   are gate readings (§2).
-- Q2 RESOLVED — returns: the data engineer, AV TIME_SERIES_DAILY_ADJUSTED, `$QR_DATA_DIR/av_returns_events_20261111/`; DEV-only
-  release after sealing (B6) and the fund manager's inspection. Paths/shas TBD-on-release (§4).
-- Q3 RESOLVED — H2 kept (now exploratory, A5); event = AV EARNINGS reportedDate + reportTime proxy (the fund manager, 11 Nov).
-- Q4 RESOLVED (as limitation) — point-in-time undocumented; disclosed §7 (the data engineer, 11 Nov).
-- Q5 RESOLVED — sector map: AV OVERVIEW current snapshot, robustness only (the fund manager, 11 Nov).
-- Q6 RESOLVED — boundary ruled by the validator (decision 0f2713de…8ee1, row): 2024-12-31 / 2025-01-01 (§0).
-- Q7 RESOLVED — validator A1: thresholds accepted (relevance ≥ 0.50, min items 3/2/10, ≥ 20 names, 15:30 ET cutoff,
+- Q2 RESOLVED — returns: Marcus, AV TIME_SERIES_DAILY_ADJUSTED, `$QR_DATA_DIR/av_returns_events_20261111/`; DEV-only
+  release after sealing (B6) and Jeremy's inspection. Paths/shas TBD-on-release (§4).
+- Q3 RESOLVED — H2 kept (now exploratory, A5); event = AV EARNINGS reportedDate + reportTime proxy (Jeremy, 11 Nov).
+- Q4 RESOLVED (as limitation) — point-in-time undocumented; disclosed §7 (Marcus, 11 Nov).
+- Q5 RESOLVED — sector map: AV OVERVIEW current snapshot, robustness only (Jeremy, 11 Nov).
+- Q6 RESOLVED — boundary ruled by Victor (ruling 0f2713de…8ee1, row L286): 2024-12-31 / 2025-01-01 (§0).
+- Q7 RESOLVED — Victor A1: thresholds accepted (relevance ≥ 0.50, min items 3/2/10, ≥ 20 names, 15:30 ET cutoff,
   10 bps/side); long-short legs k = floor(n/5); p from Student t, df = scored periods − 1 (§5).
-- Q8 RESOLVED — validator A5: confirmatory N = 2 (H1a primary, H1b), Holm 0.05 one-sided; H2 pre-registered exploratory (§2, §5).
-- Q9 RESOLVED — validator A6: not missing-at-random by assumption; metadata table §3A; excluded, H2 exploratory reported with
+- Q8 RESOLVED — Victor A5: confirmatory N = 2 (H1a primary, H1b), Holm 0.05 one-sided; H2 pre-registered exploratory (§2, §5).
+- Q9 RESOLVED — Victor A6: not missing-at-random by assumption; metadata table §3A; excluded, H2 exploratory reported with
   missing counts per window (§3).
-- Q10 RESOLVED (as assumption; validator ACCEPT) — end-year fiscal-label convention plus pre-OOS DEV diagnostic (§2 step 4).
+- Q10 RESOLVED (as assumption; Victor ACCEPT) — end-year fiscal-label convention plus pre-OOS DEV diagnostic (§2 step 4).
 - Q11 RESOLVED — no returns extension (B4).
-- Q12 RESOLVED — validator ACCEPT: missing/unknown reportTime → post-market; R-RT stays. Materiality definition amended by A4 (§2).
-- Q13 RESOLVED — declined: fund manager declined the data engineer's source-page timestamp fetch.
-- Q14 RESOLVED — validator ACCEPT: transcripts opened only when mapped to DEV day 0, none before sealing (§0).
-- Q15 RESOLVED — validator straddle decision B8 (row) (§0).
-- A2 (new) — DEV-sign gate and DEV-stats freeze (§0, §5). Decision-file note: the decision says the hypothesis "FAILS outright";
+- Q12 RESOLVED — Victor ACCEPT: missing/unknown reportTime → post-market; R-RT stays. Materiality definition amended by A4 (§2).
+- Q13 RESOLVED — declined: Jeremy declined Marcus's source-page timestamp fetch.
+- Q14 RESOLVED — Victor ACCEPT: transcripts opened only when mapped to DEV day 0, none before sealing (§0).
+- Q15 RESOLVED — Victor straddle ruling B8 (row L286) (§0).
+- A2 (new) — DEV-sign gate and DEV-stats freeze (§0, §5). Ruling-file note: the ruling says the hypothesis "FAILS outright";
   "no OOS confirmatory test for it" and "p := 1 in Holm" are this draft's implementation, for confirmation in the delta readback.
-Open — for the data engineer (data): none.
+Open — for Marcus (data): none.
