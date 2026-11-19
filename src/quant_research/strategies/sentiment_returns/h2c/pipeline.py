@@ -1,11 +1,14 @@
 """End-to-end H2-C over one partition, on in-memory inputs. No file, network or environment access.
 
 The H2-C HOLDOUT partition is spent: ``run_h2c`` refuses it (``HoldoutRefusedError``) before touching any input.
-This library must not be used to run the holdout.
+It also refuses, before computing anything, any input dated inside the spent holdout window 2011-01-01 to
+2013-12-31 (inclusive), whatever the partition label: partition bounds, calendar and price sessions, price rows,
+and earnings report/fiscal dates. This library must not be used to run the holdout.
 """
 
 from __future__ import annotations
 
+import datetime as dt
 import math
 from collections.abc import Callable, Iterable, Sequence
 from typing import Any
@@ -25,6 +28,39 @@ HOLDOUT_PARTITION = "HOLDOUT"
 HOLDOUT_REFUSED_MSG = (
     "H2-C HOLDOUT partition is spent (single confirmatory run already done); this library must not be used to run it"
 )
+SPENT_HOLDOUT_LO = dt.date(2011, 1, 1)
+SPENT_HOLDOUT_HI = dt.date(2013, 12, 31)
+SPENT_WINDOW_REFUSED_MSG = (
+    f"H2-C holdout window {SPENT_HOLDOUT_LO.isoformat()} to {SPENT_HOLDOUT_HI.isoformat()} is spent; "
+    "this library must not be used on inputs dated inside it"
+)
+EARNINGS_DATE_FIELDS = ("reportedDate", "fiscalDateEnding")
+
+
+def _as_date(v: Any) -> dt.date | None:
+    """ISO string (first 10 chars), ``date`` or ``datetime`` -> ``date``; anything else -> None."""
+    if isinstance(v, dt.datetime):
+        return v.date()
+    if isinstance(v, dt.date):
+        return v
+    if isinstance(v, str):
+        try:
+            return dt.date.fromisoformat(v.strip()[:10])
+        except ValueError:
+            return None
+    return None
+
+
+def _in_spent_window(v: Any) -> bool:
+    d = _as_date(v)
+    return d is not None and SPENT_HOLDOUT_LO <= d <= SPENT_HOLDOUT_HI
+
+
+def _refuse_spent_window(what: str, values: Iterable[Any]) -> None:
+    """Raise ``HoldoutRefusedError`` if any value is a date inside the spent holdout window."""
+    for v in values:
+        if _in_spent_window(v):
+            raise HoldoutRefusedError(f"{SPENT_WINDOW_REFUSED_MSG} ({what}: {v})")
 
 
 def run_h2c(
@@ -51,15 +87,29 @@ def run_h2c(
     gate is evaluated, else the DEV gate (G1).
 
     The HOLDOUT partition is refused: a ``partition`` naming it (any case) raises ``HoldoutRefusedError`` before any
-    input is read. The holdout is spent and this library must not be used to run it.
+    input is read. Whatever the label, ``HoldoutRefusedError`` is also raised before any computation when anything
+    is dated inside the spent window 2011-01-01 to 2013-12-31 (inclusive): the partition's ``lo``..``hi`` range
+    (any overlap), any ``calendar_sessions`` or ``price_sessions`` date, any ``price_rows`` ``date``, or any
+    ``earnings_rows`` ``reportedDate`` / ``fiscalDateEnding``. Dates may be ISO strings or ``date`` objects. As a
+    last guard, no transcript is loaded for an event dated inside that window. The holdout is spent and this
+    library must not be used to run it.
     """
     if partition.strip().upper() == HOLDOUT_PARTITION:
         raise HoldoutRefusedError(HOLDOUT_REFUSED_MSG)
     part = p.partition(partition)
+    if part.d_lo <= SPENT_HOLDOUT_HI and part.d_hi >= SPENT_HOLDOUT_LO:
+        raise HoldoutRefusedError(f"{SPENT_WINDOW_REFUSED_MSG} (partition {part.name}: {part.lo} to {part.hi})")
     allsess = list(calendar_sessions)
+    psess = list(price_sessions)
+    prows = list(price_rows)
+    erows = list(earnings_rows)
+    _refuse_spent_window("calendar_sessions", allsess)
+    _refuse_spent_window("price_sessions", psess)
+    _refuse_spent_window("price_rows date", (x.get("date") for x in prows))
+    _refuse_spent_window("earnings_rows", (x.get(k) for x in erows for k in EARNINGS_DATE_FIELDS))
     syms = list(p.universe) + [p.hedge]
-    panel = build_return_panel(price_rows, price_sessions, syms)
-    ER = _ev.prepare_earnings(earnings_rows, part, p.universe)
+    panel = build_return_panel(prows, psess, syms)
+    ER = _ev.prepare_earnings(erows, part, p.universe)
     tx_of, mdiag = _ev.map_transcripts(transcript_keys, ER, fye_months, part, p)
     EV = _ev.build_events(ER, tx_of, allsess, part, p)
     pc = _ev.purge_counts(EV, part, p)
@@ -75,6 +125,8 @@ def run_h2c(
             continue
         if ev["status"] == "excl_no_reporttime" and not window_ok(ev["info_i0"]):
             continue
+        if _in_spent_window(ev["reportedDate"]) or _in_spent_window(ev["day0"]):
+            raise HoldoutRefusedError(f"{SPENT_WINDOW_REFUSED_MSG} (event {ev['symbol']} {ev['reportedDate']})")
         entries = validate_transcript(load_transcript(ev["symbol"], ev["label"]), ev["symbol"], ev["label"])
         ev["n_parseable"], ev["tone"] = call_tone(entries, p.tone_min)
 

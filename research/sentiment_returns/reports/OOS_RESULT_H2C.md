@@ -13,7 +13,7 @@ Earnings-call tone surprise predicts post-call return drift. This was a confirma
 ## Results
 | Metric | Value | Gate | Outcome |
 |---|---|---|---|
-| Mean IC over 12 quarters (sd 0.145201) | 0.048020 | at least 0.5 x DEV mean IC (0.0274) | Pass. Below the full DEV mean of 0.0547. |
+| Mean IC over 12 quarters (sd 0.145201) | 0.048020 | IC ≥ 0.0274 (half the DEV-period IC) | Pass |
 | Newey-West (lag 1) t, one-sided p (df 11) | t 1.0848, p 0.1506 | p at most 0.01 | Fail |
 | Long/short, beta-adjusted, gross per quarter | 0.000540 | n/a | n/a |
 | Long/short net of 10 bp per quarter | -0.003688 | above 0 | Fail |
@@ -23,6 +23,5 @@ Earnings-call tone surprise predicts post-call return drift. This was a confirma
 The gate fails on significance and on net-of-cost return.
 
 ## Consequences
-- H2-C is closed. There will be no rerun and no variant, and this holdout will not be reused for any H2 descendant.
-- The 2011 to 2013 holdout partition is spent for every hypothesis that uses earnings-call transcripts.
+- Under the preregistered kill rule, this holdout is not reused for any H2 variant, and the 2011-2013 transcript holdout is treated as spent for all transcript-based hypotheses.
 - Holdout spent; no reruns.

@@ -155,3 +155,92 @@ def test_exclude_mapped_before_counts_and_occupies() -> None:
     m = r["counts"]["mapping"]
     assert m["excluded_mapped"] == len(SYMS)  # only 2018Q1 calls are reported before 2018-07-01
     assert m["mapped"] + m["excluded_mapped"] == m["listed"]
+
+
+def _spent(fn: Callable[..., object], *a: object, **k: object) -> str:
+    try:
+        fn(*a, **k)
+    except errors.HoldoutRefusedError as e:
+        assert isinstance(e, errors.PartitionError)
+        assert "2011-01-01 to 2013-12-31" in str(e) and "spent" in str(e)
+        return str(e)
+    raise AssertionError("spent-window input not refused")
+
+
+def _part(lo: str, hi: str, score_lo: str, y0: int, y1: int) -> dict[str, object]:
+    return dict(
+        lo=lo,
+        hi=hi,
+        score_lo=score_lo,
+        scored_years=[y0, y1],
+        g0_min_quarters=1,
+        purge_window=[hi[:4] + "-11-01", hi],
+        purge_boundary=hi[:4],
+    )
+
+
+def test_run_h2c_refuses_spent_window_dates() -> None:
+    from ._h2c_synth import params
+
+    bomb = _Untouchable()
+    kw = dict(
+        calendar_sessions=bomb,
+        price_sessions=bomb,
+        price_rows=bomb,
+        earnings_rows=bomb,
+        transcript_keys=bomb,
+        load_transcript=_untouched_loader,
+        fye_months=bomb,
+    )
+    windows = (
+        ("2010-01-01", "2014-12-31", "2011-01-01", 2011, 2014),  # covers the window
+        ("2013-12-31", "2016-12-31", "2015-01-01", 2015, 2016),  # touches only its last day
+        ("2009-01-01", "2011-01-01", "2010-01-01", 2010, 2010),  # touches only its first day
+        ("2012-01-01", "2012-12-31", "2012-04-01", 2012, 2012),  # inside it
+    )
+    for lo, hi, score_lo, y0, y1 in windows:
+        p = params(partitions=dict(T=_part(lo, hi, score_lo, y0, y1)))
+        assert "partition T" in _spent(run_h2c, p, "T", **kw)  # refused before any input is read
+
+
+def test_run_h2c_refuses_spent_window_input_dates_outside_partition() -> None:
+    import datetime as dt
+
+    p, kw = world(seed=3)
+    run_h2c(p, "T", **kw)  # partition bounds and all inputs outside 2011-2013: runs
+    ps = list(kw["price_sessions"])
+    cal = list(kw["calendar_sessions"])
+    prow = dict(kw["price_rows"][0], date="2012-06-01")
+    er = list(kw["earnings_rows"])
+    cases = (
+        dict(price_sessions=["2012-06-01", *ps]),
+        dict(price_sessions=[dt.date(2012, 6, 1), *ps]),
+        dict(calendar_sessions=["2013-12-31", *cal]),
+        dict(price_rows=[*kw["price_rows"], prow]),
+        dict(earnings_rows=[*er, dict(er[0], reportedDate="2012-02-01")]),
+        dict(earnings_rows=[*er, dict(er[0], fiscalDateEnding="2011-12-31")]),
+        dict(earnings_rows=[*er, dict(er[0], reportedDate=dt.date(2012, 2, 1))]),
+        dict(earnings_rows=iter([*er, dict(er[0], fiscalDateEnding=dt.date(2011, 1, 1))])),
+    )
+    for over in cases:
+        _spent(run_h2c, p, "T", **dict(kw, **over))
+
+
+def test_spent_window_bounds_are_inclusive() -> None:
+    import datetime as dt
+
+    from quant_research.strategies.sentiment_returns.h2c import pipeline as pl
+
+    assert dt.date(2011, 1, 1) == pl.SPENT_HOLDOUT_LO
+    assert dt.date(2013, 12, 31) == pl.SPENT_HOLDOUT_HI
+    for v in (
+        "2011-01-01",
+        "2013-12-31",
+        "2012-07-04T00:00:00",
+        dt.date(2012, 1, 1),
+        dt.datetime(2013, 5, 1, 9, tzinfo=dt.UTC),
+    ):
+        assert pl._in_spent_window(v)
+    outside: tuple[object, ...] = ("2010-12-31", "2014-01-01", dt.date(2015, 1, 1), "", None, "not a date", 2012)
+    for w in outside:
+        assert not pl._in_spent_window(w)
