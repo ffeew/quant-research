@@ -51,6 +51,27 @@ ratio (DSR) and purged cross-validation land in a later PR. No DEV run yet; no r
   name with no print can't trade. ADV20 is the trailing window ending the session before the fill
   day, and a name with no ADV history can't trade (cap 0). The cost-floor table cites its source,
   the desk validation STANDARD cost floor.
+- Third review:
+  - **Fill timing.** A fill at close j-1 used to be priced and print-checked on row j, so an
+    exit at a name's real last print was settled without its cost and a name could trade on a
+    no-print day. Every fill is now priced, print-checked and capped on its own fill row.
+  - **Held position everywhere.** The H2 delisting receipts and the counted stress fire on any
+    position still held past the last print (a capped exit remainder, or a last print the
+    session before the planned exit), not only when the planned window spans the delisting.
+    The H1 suspension-gap check tests the held position, not the target.
+  - **Settlement after the last print is no longer free.** A held remainder closed at the last
+    close pays the stress cost (2x the one-way cost at no ADV), gets an H2 receipt and is in the
+    H2 stress and the H1 terminal bound. For an H1 bound this is conservative: the stress exit
+    cost is charged on top of the -100% / liability bound.
+  - **Zero-ADV cuts.** A name with no usable ADV (no history, 0 or NaN) can never grow, but can
+    always be cut toward 0; those cuts pay the stress cost. Each run reports how many forced cuts
+    and post-last-print settlements happened and the notional traded
+    (`n_forced_cuts_zero_adv`, `forced_cut_notional_usd`, `n_post_last_print_settlements`,
+    `post_last_print_settlement_notional_usd`). No DEV run yet, so no counts to report.
+  - **Cost floor source.** The floor table is `backtest/engine.py:39-40`. One known difference:
+    a thin ETF (L4 bucket) gets the 20 bp floor here but 2 bp in the engine, which floors every
+    ETF at 2 bp.
+  - One last-print definition (price present and > 0) is used everywhere.
 - Not done yet: DSR and purged CV. Until they land there is no Stage A verdict, whatever a DEV
   Sharpe shows.
 

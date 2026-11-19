@@ -97,13 +97,14 @@ class SharedCostModel:
         return float(cm.borrow_cost(short_mv_usd, days=days, annual_rate=cfg.borrow_rate)["usd"])
 
 
-# Source: desk validation STANDARD cost floor (cost section): per-side minimum = asset-class floor
-# + half-spread. The repo's shared backtest cost model (quant_research.backtest.costs.cost_model)
-# has no floor table; its BUCKETS / liq_bucket give the L1-L4 buckets and half-spreads used here,
-# and quant_research.backtest.engine carries the same 5/5/10/20 bp + 2 bp ETF floor table.
-# US large-cap 5 bps, mid-cap 10 bps, small-cap / thin 20 bps; liquid ETFs 2 bps (thin ETFs use the
-# small-cap row). Cost-model buckets map L1/L2 -> large, L3 -> mid, L4 -> small; the half-spread is
-# the bucket default. A modelled cost below the floor is raised to it, never lowered.
+# Source: backtest/engine.py:39-40 (the 5/5/10/20 bp L1-L4 floor table and the 2 bp ETF floor),
+# i.e. the desk validation STANDARD cost floor: per-side minimum = asset-class floor + half-spread.
+# The shared cost model (quant_research.backtest.costs.cost_model) has no floor table; its
+# BUCKETS / liq_bucket give the L1-L4 buckets and the half-spread used here. Cost-model buckets map
+# L1/L2 -> large (5 bps), L3 -> mid (10 bps), L4 -> small / thin (20 bps); liquid ETFs 2 bps. A
+# modelled cost below the floor is raised to it, never lowered.
+# Known difference: a thin ETF (L4 bucket) gets the 20 bp small-cap floor here but 2 bp in
+# backtest/engine.py, which gives every ETF 2 bp whatever its bucket.
 STANDARD_FLOOR_BPS = {"L1": 5.0, "L2": 5.0, "L3": 10.0, "L4": 20.0}
 STANDARD_ETF_FLOOR_BPS = 2.0
 

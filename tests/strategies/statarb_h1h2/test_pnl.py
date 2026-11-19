@@ -103,6 +103,8 @@ def test_standard_cost_floor():
     assert np.isclose(fl.one_way_bps("buy", 100.0, 10.0, None, **kw), 20.0 + 30.0)
     assert np.isclose(fl.one_way_bps("buy", 100.0, 10.0, 2e7, symbol="XLK", is_etf=True, cfg=cfg), 2.0 + 2.75)
     assert fl.one_way_bps("buy", 100.0, 0.0, 2e7, **kw) == 0.0
+    thin_etf = fl.one_way_bps("buy", 100.0, 10.0, 1e3, symbol="XLK", is_etf=True, cfg=cfg)
+    assert np.isclose(thin_etf, 20.0 + 30.0)  # a thin (L4) ETF gets the 20 bp row here, not engine's 2 bp
     assert pnl.FlooredCostModel(FlatCost()).one_way_bps("buy", 100.0, 10.0, 2e7, **kw) == 10.0  # higher model kept
     b = _bars()
     W = pd.DataFrame(0.0, index=b["R"].index, columns=["A", "B"])
