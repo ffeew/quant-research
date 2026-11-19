@@ -187,7 +187,7 @@ The composite is Σ_k sw_k·m_s(k)·p_s(k)·Z_k, divided by the cross-sectional 
   - Once the proxy has ≥3 years (`--sigma_min_days` 756) of daily history, σ_target is the **median of the rolling 126d realised vol over the expanding window** up to the cutoff.
   - Before that, it is the proxy's full-sample realised vol.
   - The 1× cap (m ≤ 1) is unchanged.
-  - Code: `sigma_target_rule()`. `--sigma_target_rule fullsample` restores v0.5. `--sigma_target momentum=0.12...` still overrides.
+  - Code: `sigma_target_rule()`. `--sigma_target_rule fullsample` restores v0.5. `--sigma_target momentum=0.12,...` still overrides.
   - LIMITS says "own live/paper daily returns once ≥3 years exist". The sleeves have no live history (the pilot started 2026-10-30), so the **backtest proxy** is used, as LIMITS allows before 3 years.
   - The statarb proxy (pre-v0.7) ran 2020-07 → 2026-10-28, with 1,370–1,564 proxy days per sleeve. The store_pit proxy (v0.7) runs 2016-01..2016-10 → 2026-10-28, with 2,521–2,715 proxy days. Both are ≥756 for every sleeve, so every sleeve uses the median rule.
   - 2026-10-30 values (σ_target median vs the old full-sample value):

@@ -19,7 +19,7 @@ U23_PATH = f"{_QR.DESK_DIR}/validation/backtests/trend_sleeve/u23/trial_matrix_n
 U23_SHA = desk_pin("strategies.trend_tsmom.tsmom.v3spec", "U23_SHA")
 U23_COLS = ["costs_2x", "venue_close(MOC)", "impact_k0.5", "nav_10m", "borrow_50bps"]
 PBO_COLUMNS_EXPECTED = 40  # 24 logged + 5 v1 cost settings + v3 primary + 10 stability
-PBO_MISSING = "the review's 17 diagnostics (no daily series; not regenerated before the run)"
+PBO_MISSING = "the validator's 17 diagnostics (no daily series; not regenerated before the run)"
 SEGMENTS = [  # (label, start, end, status)  (§6, A2, quasi-OOS label)
     ("2005-2007 blind", "2005-01-01", "2007-12-31", "blind"),
     ("2008-2016 partly seen", "2008-01-01", "2016-12-31", "partly seen"),

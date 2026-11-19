@@ -180,7 +180,7 @@ def evaluate_h1b(oos: Mapping[str, Mapping[str, Any]], dev: Mapping[str, Mapping
             half_dev_mean_ic=0.5 * d["mean_ic"],
         )
     out["PASS_both_readings (A3 conjunctive gate)"] = bool(out["UTC"]["all_met"] and out["ET"]["all_met"])
-    out["note"] = "Runner-computed against v5 s5 bars; the review rules PASS/FAIL (d). A pass is evidence only (e)."
+    out["note"] = "Runner-computed against v5 s5 bars; the validator rules PASS/FAIL (d). A pass is evidence only (e)."
     return out
 
 
@@ -392,7 +392,7 @@ def main() -> None:
     O = dict(
         mode=a.mode,
         prereg=desk_pin("strategies.sentiment_returns.oos_runner", "O.prereg"),
-        conditions="one H1b OOS sitting; no reruns; the review rules",
+        conditions="one H1b OOS sitting; no reruns; the validator rules",
         oos_runner_sha256=me,
         dev_run_sha256=DEV_RUN_SHA,
         oos_config_sha256=cfg_sha,

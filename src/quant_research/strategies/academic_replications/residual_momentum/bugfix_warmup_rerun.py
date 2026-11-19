@@ -111,7 +111,7 @@ for book in ("resmom_ls", "resmom_long"):
             "universe": "PIT S&P 500 (stocks)",
             "data": "data owner SIP total_return (clean), same snapshot",
             "fill": "next open",
-            "costs": "TCA owner v1.1 max validation floor; borrow 1%/yr; book $100,000",
+            "costs": "TCA owner v1.1 max validator floor; borrow 1%/yr; book $100,000",
             "role": "bugfix_rerun",
             "has_daily_series": True,
             "sr_net_full": c["net"]["sharpe"],

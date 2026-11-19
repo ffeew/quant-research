@@ -184,7 +184,7 @@ def tca_costs(C: pd.DataFrame, V: pd.DataFrame, src: str, equity: float = 100_00
     sig = R.rolling(20).std().median()
     adv = ((C * V).rolling(20).mean().median() * 21.6) if V is not None else pd.Series(2e9, C.columns)
     bps = np.array([hs.get(s, hs_default) + k * sig[s] * math.sqrt(clip * equity / adv[s]) * 1e4 + haircut_bps for s in C.columns])
-    meta = dict(formula="HS + k*sigma*sqrt(Q/ADV) + H", k=k, Q=f"{clip:.0%} of ${equity:.0f}", H_bps=haircut_bps,
+    meta = dict(formula="HS + k*sigma*sqrt(Q/ADV) + H", k=k, Q=f"{clip:.0%} of ${equity:,.0f}", H_bps=haircut_bps,
                 hs_measured={s: round(hs[s], 2) for s in C.columns if s in hs}, hs_default=hs_default,
                 per_side_bps_min_med_max=[round(float(bps.min()), 2), round(float(np.median(bps)), 2), round(float(bps.max()), 2)])
     return bps / 1e4, meta

@@ -105,7 +105,7 @@ KILL_T = 0.10  # s7 A2: usable iff drop_rate <= 0.10; kill iff > 0.10
 N_MIN = 20  # s3 / s7 OQ-6
 MNY_EDGES = (-0.30, -0.15, -0.075, -0.025, 0.025, 0.075, 0.15, 0.30)  # s3
 MNY_MAX = 0.30
-DTE_EDGES = (3, 8, 22, 46, 91, 181, 366)  # s3 [3..,366)
+DTE_EDGES = (3, 8, 22, 46, 91, 181, 366)  # s3 [3,..,366)
 DTE_MIN, DTE_MAX = 3, 365
 MARK_TOL = 0.005  # s4a (iv)
 PARITY_TOL = 0.01  # s4b

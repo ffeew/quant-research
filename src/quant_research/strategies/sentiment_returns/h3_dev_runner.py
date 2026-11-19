@@ -933,7 +933,7 @@ def main() -> None:
     res["path_guard_denials"] = G.denials
     with open(f"{C['out']}/H3_DEV_RAW.json", "x") as f:
         json.dump(res, f, indent=1, default=float)
-    log("done; raw output to validation first (S6)")
+    log("done; raw output to validator first (S6)")
     LOG.close()
 
 

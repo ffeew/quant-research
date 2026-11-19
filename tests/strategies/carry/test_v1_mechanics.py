@@ -504,6 +504,6 @@ class TestV1Mechanics(unittest.TestCase):
 
 if __name__ == "__main__":
     raise SystemExit(
-        "Execution not authorised. Review preflight RETURN FOR AMENDMENT "
+        "Execution not authorised. Validator preflight RETURN FOR AMENDMENT "
         "(3bed621e…). No run until AUTHORISE ONE RUN decision after re-pin."
     )

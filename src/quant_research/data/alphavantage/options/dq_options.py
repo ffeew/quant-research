@@ -316,7 +316,7 @@ def main() -> None:
     verify_rows = []
     lines = []
     sgt = datetime.now(UTC) + timedelta(hours=8)
-    lines.append("# Options DQ Report — SPY / QQQ (validation 63d3073d partitions)")
+    lines.append("# Options DQ Report — SPY / QQQ (validator 63d3073d partitions)")
     lines.append("")
     lines.append(
         f"**Generated:** {datetime.now(UTC).strftime('%Y-%m-%dT%H:%M:%SZ')} UTC / "

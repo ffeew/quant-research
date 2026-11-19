@@ -1,6 +1,6 @@
 # Stat-arb research — v1, research only
 
-Owner: the stat-arb researcher (Stat Arb). Last run: 2026-10-30, about. **Paper/research only. Nothing here places or changes orders or positions.**
+Owner: the stat-arb researcher (Stat Arb). Last run: 2026-10-30. **Paper/research only. Nothing here places or changes orders or positions.**
 Judged against `$QR_DESK_DIR/validation/STANDARD.md` v1.0, not against "holdout t > 2".
 
 ## Bottom line
@@ -152,6 +152,6 @@ Source: `$QR_DESK_DIR/validation/backtests/pead_long_pit/data_issues.json` (read
 - **Sensitivity runs:** `results/v1_complete/`, `results/v1_delist_stress/`. Logs: `results/logs/`.
 - **Superseded v0 / preliminary outputs:** `results/_v0_superseded/`. These were run before the DE's final build and before the standard was adopted; do not cite them.
 
-## Correction (30 Oct 2026,, after the review's review)
+## Correction (30 Oct 2026, after review)
 - The best holdout net Sharpe (standard cost floor) across all 48 v1 trials is **-0.475**, from `AL_ETF_B2_1.75/0.00/0.00_buf0.5__close_t1`. That is the same AL sector-ETF setting, executed at the next close instead of the next open. The pre-registered pick (next open) scored -0.56. Both FAIL.
 - The DSR used the gross-trial variance (SR0 0.74, the less strict option). Future runs will use the net-trial variance. Cumulative stat-arb family N = 80, so new ideas pre-register at N >= 81.

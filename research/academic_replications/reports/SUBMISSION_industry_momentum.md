@@ -1,8 +1,8 @@
 # Validation submission: Industry momentum (Moskowitz & Grinblatt 1999), sector-ETF version
 
-> **Status: FAILED** (the review, 2026-10-30). Corrections applied 2026-10-30 after that check.
+> **Status: FAILED** (the validator, 2026-10-30). Corrections applied 2026-10-30 02:26 SGT after his check.
 
-Submitted for validation, 2026-10-30. Built against validation/STANDARD.md v1.0. Self-assessment only; the verdict is recorded separately.
+Submitted for validation, 2026-10-30 01:47 SGT. Built against validation/STANDARD.md v1.0. Self-assessment only; the verdict is recorded separately.
 
 **Scope: ETF version only.** This tests 11 SPDR sector ETFs, 3 per side (about 27% of the sectors on each side; XLC only from 2018-06, which also changed the other sectors' composition). The paper uses 20 value-weighted industries, 3 per side (15%). **The paper-faithful 20-industry (stock-level) result on desk data is unknown.** It cannot be built without point-in-time industry codes for former S&P 500 members (0% coverage). Using current GICS would add survivorship bias, so it was not run. The FAIL applies to the ETF implementation only. For context, the FF49 VW J6/K6 public check for 2016 onward is gross SR 0.28 (t 0.93). Book definitions: imom_etf_ls holds 6 overlapping monthly cohorts (J=6/K=6); **imom_etf_long and imom_etf_ls_1m are rebalanced fully each month (no overlapping cohorts)**. That is why their hold_months ±20% rows are identical to base.
 
@@ -11,7 +11,7 @@ Submitted for validation, 2026-10-30. Built against validation/STANDARD.md v1.0.
 $QR_DESK_DIR/research/replication/.venv/bin/python $QR_DESK_DIR/research/replication/run_all.py --only imom
 ```
 Code: `research/replication/moskowitz-grinblatt-1999-industry-momentum/pipeline.py`, `_common/engine.py` (fills, costs, borrow), `_common/validation.py` (DSR, PBO, NW, walk-forward), `run_all.py`. Env: `research/replication/.venv` (`requirements.lock.txt`).
-Data snapshot: data owner SIP total_return ret_total_best (clean), fingerprint; file mtimes {"daily_total_return.parquet": "2026-10-30", "sp500_membership.parquet": "2026-10-30", "ff3_daily.parquet": "2026-10-30"}. Trial log: `research/replication/TRIAL_LOG.csv`; T x N daily net matrix: `research/replication/results/trials_daily_net_*.parquet`.
+Data snapshot: data owner SIP total_return ret_total_best (clean), fingerprint; file mtimes {"daily_total_return.parquet": "2026-10-30 01:32:38 SGT", "sp500_membership.parquet": "2026-10-30 01:31:38 SGT", "ff3_daily.parquet": "2026-10-30 01:10:57 SGT"}. Trial log: `research/replication/TRIAL_LOG.csv`; T x N daily net matrix: `research/replication/results/trials_daily_net_*.parquet`.
 
 ## Codified rules
 See the docstring of `pipeline.py` (copied below). No discretion, no overrides.
@@ -31,7 +31,7 @@ Desk versions (same engine / costs / reporting as the other two replications):
   C) Public pre/post-2016 check: FF 49 industries (VW), J=6/K=6, top-5/bottom-5 (~10% each side), monthly from
      1926 -> splits pre-2016 vs 2016+ (the data owner's data starts 2016).
 ```
-Execution: signal at the close of the last session of each month; market-on-open fill at the next session's open; costs TCA owner v1.1 max validation floor; borrow 1.00%/yr; book $100,000; 2x stress doubles costs and borrow. Primary (pre-specified, paper-faithful) book: **imom_etf_ls**; secondary books: imom_etf_long, imom_etf_ls_1m.
+Execution: signal at the close of the last session of each month; market-on-open fill at the next session's open; costs TCA owner v1.1 max validator floor; borrow 1.00%/yr; book $100,000; 2x stress doubles costs and borrow. Primary (pre-specified, paper-faithful) book: **imom_etf_ls**; secondary books: imom_etf_long, imom_etf_ls_1m.
 
 ## Headline (base parameters, next-open fills, full desk sample)
 
@@ -59,12 +59,12 @@ Execution: signal at the close of the last session of each month; market-on-open
 | §4 DSR >= 0.95 | NOT MET | family N=48: DSR 0.012, SR0 0.74 ann; all-derivatives-researcher N=184: DSR 0.001, SR0 1.06; T=2448, skew -0.50, kurt 9.07 |
 | §4 t-stat >= 2.8 (replication of published anomaly; NW) | NOT MET | t_NW 0.05 (iid 0.05) |
 | §4 PBO < 0.20 (<= 0.05 for PASS) | NOT MET | book grid PBO 0.62 (N=9); whole family PBO 0.22 (N=27). N~11 per grid -> weakly informative |
-| §5 costs >= validation minimums; borrow >= 1%/yr; exclude unborrowable | MET (borrow caveat) | avg 6.5 bps/side (TCA-owner-only 6.0); borrow 1%/yr; no PIT borrow history exists, so unborrowable names cannot be excluded at signal time |
+| §5 costs >= validator minimums; borrow >= 1%/yr; exclude unborrowable | MET (borrow caveat) | avg 6.5 bps/side (TCA-owner-only 6.0); borrow 1%/yr; no PIT borrow history exists, so unborrowable names cannot be excluded at signal time |
 | §6 post-publication haircut | computed | expected SR for sizing = min(WF-OOS 0.22, 0.40 x 0.51) = 0.20 (set at run time: FF49 VW J6/K6 top5-bot5, 1963-07..1995-07 (MG's sample end), public proxy) |
 | §7 no year > 40% of PnL | NOT MET | max year share 924% (n/a if total PnL <= 0) |
 | §7 no regime Sharpe < -0.5 | MET | worst regime SR -0.30 |
 | §7 +/-20% neighbourhood: SR > 0 and >= 50% of base | NOT MET | 7/9 configs pass on full-sample net SR; 8/9 on 2022+ net SR |
-| §7 legs reported; correlation to book | MET (book history 1 day) | long leg gross SR 0.69, short leg gross SR -0.54; the live book has 1 day of history, so correlations are vs SPY/FF factors and the review's validation backtests |
+| §7 legs reported; correlation to book | MET (book history 1 day) | long leg gross SR 0.69, short leg gross SR -0.54; desk book has 1 day of history, so correlations are vs SPY/FF factors and the validator's validation backtests |
 | §8 trade size <= 1% of 20d ADV | MET | max 0.0190% at $100,000; at 10x book max 0.190% |
 | §8 break-even cost >= 2x assumed | MET | break-even 23.8 bps/side vs assumed 6.5 |
 
@@ -258,7 +258,7 @@ Stock-level version: **BLOCKED**: GICS codes cover 0% of former S&P 500 members 
 
 The data owner's `data/universe/delisting_returns.parquet` has terminal returns only for deals matched in Alpaca's corporate-action feed (which starts 2020-04). Of the 120 stocks whose bars end before the sample end, 47 have a terminal return and 73 do not (they cannot be told apart as merger vs performance delisting from the data available, so they are treated as performance-related in the stress). Base runs treat a held position whose bars stop as cash at the last close (0%). Sensitivity (base params, next-open fills, each logged as a data_alt trial):
 - **table**: matched terminal return where known, else 0%;
-- **conservative**: matched terminal return where known, else **-30% on both legs** (the review's suggested assumption; shorts gain);
+- **conservative**: matched terminal return where known, else **-30% on both legs** (the validator's suggested assumption; shorts gain);
 - **adverse**: matched where known, else -30% on longs and **+30% on shorts** (takeover-premium case; worst for every book).
 
 | book | delisting events while held (long / short) | net SR base | table | conservative | adverse | net ann base | ann conservative | ann adverse |
@@ -267,7 +267,7 @@ The data owner's `data/universe/delisting_returns.parquet` has terminal returns 
 | imom_etf_long | 0 (0 / 0) | 0.45 | 0.45 | 0.45 | 0.45 | 8.08% | 8.08% | 8.08% |
 | imom_etf_ls_1m | 0 (0 / 0) | -0.33 | -0.33 | -0.33 | -0.33 | -5.23% | -5.23% | -5.23% |
 
-Per-event detail (symbol, weight held, last bar, return applied in the base run = 0): `delisting_exits_<book>.csv`. The review's file lists 120 delisting rows (47 matched, 70 no deal, 3 acquirer price missing); pre-2020 delistings have no terminal return at all, so the 2016-2019 part of every book is the most exposed.
+Per-event detail (symbol, weight held, last bar, return applied in the base run = 0): `delisting_exits_<book>.csv`. The validator's file lists 120 delisting rows (47 matched, 70 no deal, 3 acquirer price missing); pre-2020 delistings have no terminal return at all, so the 2016-2019 part of every book is the most exposed.
 
 ### 2. Ticker reuse (SNDK and others)
 

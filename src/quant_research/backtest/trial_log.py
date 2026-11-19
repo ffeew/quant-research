@@ -194,7 +194,7 @@ def historical_rows() -> list[dict[str, Any]]:
                     "universe": "PIT S&P 500 (before SNDK/AA/Q interval exclusion)",
                     "data": "data owner store, v2 run killed mid-way",
                     "fill": fill,
-                    "costs": "max(the TCA owner, validation floor) + 1% borrow",
+                    "costs": "max(the TCA owner, validator floor) + 1% borrow",
                     "role": "superseded_rerun",
                     "has_daily_series": False,
                     "sr_net_full": float(n),

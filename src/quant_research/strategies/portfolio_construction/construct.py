@@ -48,7 +48,7 @@ Pipeline
       fixed 0.5 via --shrinkage fixed --shrink_delta 0.5. Risk-forecast inflation k (--risk_inflation, default 1.25)
       multiplies ex-ante vol in the 6% book vol cap only (walk-forward bias 1.15-1.37 for MV on the derivatives researcher's bars; MV-LW 1.20).
     * Hard asset exclusion: only US-listed equities/ETFs; crypto pairs can never enter any targets file.
-10. LIMITS.md alignment (current header read at run time, v0.3.7; risk decisions 01:58-02:28; FRAMEWORK v0.6/v0.7):
+10. LIMITS.md alignment (current header read at run time, v0.3.7 at 02:28 SGT; risk decisions 01:58-02:28; FRAMEWORK v0.6/v0.7):
     * EARNINGS (H7, earnings_gate.py, the data owner's data/earnings calendar, read-only): a name whose next release falls
       inside the holding horizon (execution session + --earn_horizon_sessions) may not be opened or increased on
       either side; a held position carries exit_by = last session before the release (AMC: the release day) and is
@@ -80,7 +80,7 @@ Pipeline
 11. Data-provenance rule (2026-10-30, FRAMEWORK v0.7): history only from the shared store, live data only through
     $QR_DATA_DIR/lib/desk_data_client.py. Book prices/vols/betas/cov/ADV: store (SIP, adjusted) for complete
     sessions + SIP 5-min intraday bars via the client for today's partial row. data.json is no longer read.
-    Sleeve proxy (--proxy_src store_pit): PIT S&P 500 members from the store, the review's defect names + SNDK excluded,
+    Sleeve proxy (--proxy_src store_pit): PIT S&P 500 members from the store, the validator's defect names + SNDK excluded,
     PROVISIONAL until the data owner's fixes land. Shadow book bumped to shadow_fallback_composite_v2; method_version "v2".
 """
 
@@ -130,7 +130,7 @@ SHADOW_DESCRIPTION = (
     "long/short by a mean-variance optimiser on a 120d Ledoit-Wolf constant-correlation covariance with a 6% ex-ante vol cap "
     "(forecast x1.25), |beta| <= 0.01 via an SPY hedge, sector, 9.5% position, 0.95% risk-to-stop and 58% (or breaker) gross "
     "caps, TCA cost model; 2xATR(14) stops. US equities/ETFs only. v2: sigma_target = expanding median of the 126d vol of a "
-    "PIT S&P 500 sleeve proxy from the data owner's SIP store (the review's defect names + SNDK excluded; PROVISIONAL), LIMITS H7 "
+    "PIT S&P 500 sleeve proxy from the data owner's SIP store (the validator's defect names + SNDK excluded; PROVISIONAL), LIMITS H7 "
     "earnings gate (default: the 2026-10-30 02:27 policy), the risk panic flag (binding when final; responses from the file), prices/volumes from the shared store "
     "+ SIP intraday via desk_data_client (desk rule #5)."
 )
@@ -144,7 +144,7 @@ TRADABLE_IDS = {
     "FULL": (
         "tradable_validated_composite_v1",
         "Tradable validated composite v1",
-        "Tradable book on validated signals, same construction as the shadow composite.",
+        "Tradable book on validator-validated signals, same construction as the shadow composite.",
     ),
 }
 
@@ -490,7 +490,7 @@ def defect_names() -> set[str]:
         return set(iss["members_without_bars_symbols"]) | {"SNDK"}
     except Exception as e:
         raise SystemExit(
-            f"cannot read the review's defect list {DATA_ISSUES} ({type(e).__name__}): store_pit proxy needs it; no targets written"
+            f"cannot read the validator's defect list {DATA_ISSUES} ({type(e).__name__}): store_pit proxy needs it; no targets written"
         )
 
 
@@ -669,7 +669,7 @@ def main() -> None:
     ap.add_argument(
         "--validator_passed",
         default="",
-        help="comma list of signal keys with validation PASS/COND PASS (none as of 2026-10-30)",
+        help="comma list of signal keys with validator PASS/COND PASS (none as of 2026-10-30)",
     )
     ap.add_argument(
         "--gp_ell",
@@ -742,7 +742,7 @@ def main() -> None:
         "--proxy_src",
         choices=["store_pit", "statarb"],
         default="store_pit",
-        help="sleeve backtest proxy: store_pit = PIT S&P 500 from the data owner's SIP store, the review's defect names + SNDK excluded (PROVISIONAL; production); statarb = the derivatives researcher's deprecated IEX file via --proxy_path (tests/audit only)",
+        help="sleeve backtest proxy: store_pit = PIT S&P 500 from the data owner's SIP store, the validator's defect names + SNDK excluded (PROVISIONAL; production); statarb = the derivatives researcher's deprecated IEX file via --proxy_path (tests/audit only)",
     )
     ap.add_argument("--proxy_path", default=None, help="bars file for --proxy_src statarb (tests/audit only)")
     ap.add_argument(
@@ -1379,8 +1379,8 @@ def main() -> None:
         mr = max(out, key=lambda r: r["est_risk_usd"], default=_z)
         chk(
             "Max risk per position (shares x stop dist)",
-            f"<=1% equity (${E * 0.01:.2f})",
-            f"${mr['est_risk_usd']:.2f} ({mr['symbol']})",
+            f"<=1% equity (${E * 0.01:,.2f})",
+            f"${mr['est_risk_usd']:,.2f} ({mr['symbol']})",
             mr["est_risk_usd"] <= 0.01 * E,
         )
         dg = diag(wf)
@@ -1663,7 +1663,7 @@ def main() -> None:
         reason=(
             "sleeve m / sigma_target come from the PIT S&P 500 proxy on the data owner's store (defect names + SNDK excluded; delisting returns and "
             "former-member gaps still pending the data owner's fixes) -> PROVISIONAL. Book prices/vols/betas use the store for the "
-            f"{len(univ)} current universe names only. Universe overlap with the review's defect symbols: {_ov or 'none'}"
+            f"{len(univ)} current desk names only. Desk-universe overlap with the validator's defect symbols: {_ov or 'none'}"
             + (
                 " (LIN: missing PRE-2018 Praxair history; the book uses <= 420 calendar days, so not affected)"
                 if "LIN" in _ov
@@ -1905,7 +1905,7 @@ def main() -> None:
                 book_type="DE-RISK ONLY",
                 tradable=True,
                 label=("BREAKER HALTED (H9) -> " if halted else "")
-                + "TRADABLE, DE-RISK ONLY: no validated signal (the review) or breaker halt -> may only trim/close/cover existing positions and tighten stops. "
+                + "TRADABLE, DE-RISK ONLY: no validated signal (the validator) or breaker halt -> may only trim/close/cover existing positions and tighten stops. "
                 f"Shadow book ({SHADOW_SLEEVE_ID}): {p_sh}",
                 portfolio=port,
                 compliance=checks,

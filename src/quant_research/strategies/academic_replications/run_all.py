@@ -203,7 +203,7 @@ def main() -> None:
         suspect_log.to_csv(OUT / "suspect_returns.csv", index=False)
     rf = ff["RF"]
     ctx = {"month_ends": mes, "members_at": members_at, "ff3": ff}
-    cost_label = f"TCA owner v1.1 max validation floor; borrow {engine.BORROW_RATE:.2%}/yr; book ${a.book:.0f}"
+    cost_label = f"TCA owner v1.1 max validator floor; borrow {engine.BORROW_RATE:.2%}/yr; book ${a.book:,.0f}"
     spy_ex = (R["SPY"] - rf.reindex(R.index).ffill()).rename("SPY_ex") if "SPY" in R.columns else None
     umd_d = (
         pd.read_parquet(dd.DATA / "factors/ken_french/mom_daily.parquet")
@@ -644,7 +644,7 @@ def data_caveats(fam: str, cfg: FamilyCfg, packs: dict[str, dict[str, Any]], ext
         "Base runs treat a held position whose bars stop as cash at the last close (0%). Sensitivity (base params, next-open fills, "
         "each logged as a data_alt trial):",
         "- **table**: matched terminal return where known, else 0%;",
-        "- **conservative**: matched terminal return where known, else **-30% on both legs** (the review's suggested assumption; shorts gain);",
+        "- **conservative**: matched terminal return where known, else **-30% on both legs** (the validator's suggested assumption; shorts gain);",
         "- **adverse**: matched where known, else -30% on longs and **+30% on shorts** (takeover-premium case; worst for every book).",
         "",
         "| book | delisting events while held (long / short) | net SR base | table | conservative | adverse | net ann base | ann conservative | ann adverse |",
@@ -661,7 +661,7 @@ def data_caveats(fam: str, cfg: FamilyCfg, packs: dict[str, dict[str, Any]], ext
     L += [
         "",
         "Per-event detail (symbol, weight held, last bar, return applied in the base run = 0): `delisting_exits_<book>.csv`. "
-        "the review's file lists 120 delisting rows (47 matched, 70 no deal, 3 acquirer price missing); pre-2020 delistings have no terminal "
+        "the validator's file lists 120 delisting rows (47 matched, 70 no deal, 3 acquirer price missing); pre-2020 delistings have no terminal "
         "return at all, so the 2016-2019 part of every book is the most exposed.",
         "",
     ]
@@ -779,8 +779,8 @@ def write_submission(
     L = [
         f"# Validation submission: {cfg['title']}",
         "",
-        f"Submitted for validation, {RUN_TS[:10]}. Built against validation/STANDARD.md v1.0. "
-        "Self-assessment only; the verdict is the review's.",
+        f"Submitted by the derivatives researcher (Quant Research) to the validator, {RUN_TS} SGT. Built against validation/STANDARD.md v1.0. "
+        "Self-assessment only; the verdict is the validator's.",
         "",
         "## Reproduce (one command)",
         "```",
@@ -894,7 +894,7 @@ def write_submission(
             f"book grid PBO {_f(P['pbo_book_grid'].get('PBO'))} (N={P['pbo_book_grid'].get('N')}); whole family PBO {_f(P['pbo_family'].get('PBO'))} (N={P['pbo_family'].get('N')}). N~11 per grid -> weakly informative",
         ),
         (
-            "§5 costs >= validation minimums; borrow >= 1%/yr; exclude unborrowable",
+            "§5 costs >= validator minimums; borrow >= 1%/yr; exclude unborrowable",
             "MET (borrow caveat)",
             f"avg {tr['assumed_avg_cost_bps_per_side']:.1f} bps/side (TCA-owner-only {tr['tomas_only_avg_cost_bps']:.1f}); borrow 1%/yr; no PIT borrow history exists, so unborrowable names cannot be excluded at signal time",
         ),
@@ -917,12 +917,12 @@ def write_submission(
         (
             "§7 legs reported; correlation to book",
             "MET (book history 1 day)",
-            f"long leg gross SR {_f(P['long_leg_gross'].get('sharpe'))}, short leg gross SR {_f(P['short_leg_gross'].get('sharpe'))}; the live book has 1 day of history, so correlations are vs SPY/FF factors and the review's validation backtests",
+            f"long leg gross SR {_f(P['long_leg_gross'].get('sharpe'))}, short leg gross SR {_f(P['short_leg_gross'].get('sharpe'))}; desk book has 1 day of history, so correlations are vs SPY/FF factors and the validator's validation backtests",
         ),
         (
             "§8 trade size <= 1% of 20d ADV",
             "MET" if cap["max_participation"] <= 0.01 else "NOT MET",
-            f"max {cap['max_participation']:.4%} at ${a.book:.0f}; at 10x book max {cap['max_participation_at_10x_book']:.3%}",
+            f"max {cap['max_participation']:.4%} at ${a.book:,.0f}; at 10x book max {cap['max_participation_at_10x_book']:.3%}",
         ),
         (
             "§8 break-even cost >= 2x assumed",
