@@ -1,4 +1,5 @@
 """Weekly long/short book: 80/60 band (or plain quintile), equal weights within legs, drift, turnover, costs."""
+
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Sequence
@@ -80,18 +81,31 @@ def run_book(weeks: Sequence[Mapping[str, Any]], p: H3Params, mode: str = "band"
             else:
                 o = sorted(q, key=lambda s: (q[s][0], s))
                 k = len(o) // p.quantile_div
-                state = {s: -1 for s in o[:k]}
-                state.update({s: 1 for s in o[len(o) - k:]})
+                state = dict.fromkeys(o[:k], -1)
+                state.update(dict.fromkeys(o[len(o) - k :], 1))
         w, flat = target_weights(state, p)
         if flat and clear:
             state = {}
         tw = traded_weight(w, w_d)
         g = leg_return(w, wk["r"]) if w else 0.0
         b = leg_return(w, wk["y"]) if w else 0.0
-        out.append(dict(dec=wk["dec"], scored=wk["scored"], flat=flat, forced_exits=len(forced),
-                        n_long=sum(1 for x in w.values() if x > 0), n_short=sum(1 for x in w.values() if x < 0),
-                        traded=tw, gross=g, betaadj=b, net=g - p.cost_side * tw, net_sens=g - p.cost_side_sens * tw,
-                        longs=sorted(s for s, x in w.items() if x > 0), shorts=sorted(s for s, x in w.items() if x < 0)))
+        out.append(
+            dict(
+                dec=wk["dec"],
+                scored=wk["scored"],
+                flat=flat,
+                forced_exits=len(forced),
+                n_long=sum(1 for x in w.values() if x > 0),
+                n_short=sum(1 for x in w.values() if x < 0),
+                traded=tw,
+                gross=g,
+                betaadj=b,
+                net=g - p.cost_side * tw,
+                net_sens=g - p.cost_side_sens * tw,
+                longs=sorted(s for s, x in w.items() if x > 0),
+                shorts=sorted(s for s, x in w.items() if x < 0),
+            )
+        )
         w_d = drift(w, wk["r"], p) if w else {}
     return out, float(sum(abs(x) for x in w_d.values()))
 

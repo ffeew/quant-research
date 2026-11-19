@@ -1,4 +1,5 @@
 """Fail-closed validators for the AV payload shapes H2-C consumes. Inputs are already-read bytes/objects."""
+
 from __future__ import annotations
 
 import hashlib
@@ -11,11 +12,22 @@ from typing import Any
 from .errors import IntegrityError, PathError, SchemaError
 
 ISO_DATE = re.compile(r"\d{4}-\d\d-\d\d")
-PRICE_KEYS = frozenset({"1. open", "2. high", "3. low", "4. close", "5. adjusted close", "6. volume",
-                        "7. dividend amount", "8. split coefficient"})
+PRICE_KEYS = frozenset(
+    {
+        "1. open",
+        "2. high",
+        "3. low",
+        "4. close",
+        "5. adjusted close",
+        "6. volume",
+        "7. dividend amount",
+        "8. split coefficient",
+    }
+)
 PRICE_ADJ_KEY = "5. adjusted close"
-EARN_KEYS = frozenset({"fiscalDateEnding", "reportedDate", "reportedEPS", "estimatedEPS", "surprise",
-                       "surprisePercentage", "reportTime"})
+EARN_KEYS = frozenset(
+    {"fiscalDateEnding", "reportedDate", "reportedEPS", "estimatedEPS", "surprise", "surprisePercentage", "reportTime"}
+)
 TX_KEYS = frozenset({"symbol", "quarter", "transcript"})
 TX_ENTRY_KEYS = frozenset({"content", "sentiment", "speaker", "title"})
 PURGE_HEADER = ("boundary", "in_window_rows", "purged", "kept", "excl_no_reporttime")
@@ -90,7 +102,9 @@ def parse_prices(obj: Any, symbols: Iterable[str]) -> list[dict[str, Any]]:
     return out
 
 
-def parse_earnings(obj: Any, symbols: Iterable[str], held: Iterable[str] = (), exact: bool = True) -> list[dict[str, Any]]:
+def parse_earnings(
+    obj: Any, symbols: Iterable[str], held: Iterable[str] = (), exact: bool = True
+) -> list[dict[str, Any]]:
     """``obj``: {symbol: [7-key dict of str]}. Symbols in ``held`` are checked as containers only and dropped.
     ``exact``: top-level keys must equal ``symbols``; otherwise they must be a subset (late-listed names may be absent)."""
     want, held_ = set(symbols), set(held)

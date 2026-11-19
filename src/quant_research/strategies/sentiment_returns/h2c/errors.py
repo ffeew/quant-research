@@ -1,4 +1,5 @@
 """Typed failures. ``code`` mirrors the frozen runner's coded STOPs so callers can map them to exit codes."""
+
 from __future__ import annotations
 
 

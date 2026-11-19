@@ -44,32 +44,73 @@ def test_holdout_gate_needs_runtime_expectations() -> None:
     p, kw = world(seed=3)
     pc = run_h2c(p, "T", **kw)["counts"]["purge"]
     _raises(errors.ConfigError, run_h2c, p, "T", purge_reference=pc, **kw)
-    _raises(errors.PurgeMismatch, run_h2c, p, "T", purge_reference=dict(pc, kept=0),
-            expectations=HoldoutExpectations(purge=pc), **kw)
+    _raises(
+        errors.PurgeMismatch,
+        run_h2c,
+        p,
+        "T",
+        purge_reference=dict(pc, kept=0),
+        expectations=HoldoutExpectations(purge=pc),
+        **kw,
+    )
     r = run_h2c(p, "T", purge_reference=pc, expectations=HoldoutExpectations(purge=dict(pc)), dev_mean_ic=0.0, **kw)
     assert "G2" in r["stats"] and r["stats"]["dev_mean_ic_frozen"] == 0.0
 
 
 def test_partition_violations_stop() -> None:
     p, kw = world(seed=3)
-    bad = list(kw["earnings_rows"]) + [dict(kw["earnings_rows"][0], reportedDate="2021-02-01", fiscalDateEnding="2020-12-31")]
+    bad = list(kw["earnings_rows"]) + [
+        dict(kw["earnings_rows"][0], reportedDate="2021-02-01", fiscalDateEnding="2020-12-31")
+    ]
     _raises(errors.PartitionError, run_h2c, p, "T", **dict(kw, earnings_rows=bad))
-    early = list(kw["earnings_rows"]) + [dict(kw["earnings_rows"][0], reportedDate="2017-11-01", fiscalDateEnding="2017-09-30")]
+    early = list(kw["earnings_rows"]) + [
+        dict(kw["earnings_rows"][0], reportedDate="2017-11-01", fiscalDateEnding="2017-09-30")
+    ]
     _raises(errors.PartitionError, run_h2c, p, "T", **dict(kw, earnings_rows=early))
-    _raises(errors.MappingError, run_h2c, p, "T", **dict(kw, transcript_keys=list(kw["transcript_keys"]) + [(SYMS[0], "2016Q1")]))
+    _raises(
+        errors.MappingError,
+        run_h2c,
+        p,
+        "T",
+        **dict(kw, transcript_keys=list(kw["transcript_keys"]) + [(SYMS[0], "2016Q1")]),
+    )
 
 
 def test_exclude_mapped_before_counts_and_occupies() -> None:
     from quant_research.strategies.sentiment_returns.h2c.config import params_from_dict
+
     from ._h2c_synth import params
 
     base = params()
     t = base.partition("T")
-    d = {k: getattr(base, k) for k in ("universe", "hedge", "beta_n", "h0", "h1", "lag", "nprior_max", "nprior_min",
-                                       "tone_min", "q_min_events", "quantile_div")}
-    d["partitions"] = dict(T=dict(lo="2018-01-01", hi=t.hi, score_lo=t.score_lo, scored_years=[2019, 2020],
-                                  g0_min_quarters=6, purge_window=list(t.purge_window), purge_boundary="2020",
-                                  exclude_mapped_before="2018-07-01"))
+    d = {
+        k: getattr(base, k)
+        for k in (
+            "universe",
+            "hedge",
+            "beta_n",
+            "h0",
+            "h1",
+            "lag",
+            "nprior_max",
+            "nprior_min",
+            "tone_min",
+            "q_min_events",
+            "quantile_div",
+        )
+    }
+    d["partitions"] = dict(
+        T=dict(
+            lo="2018-01-01",
+            hi=t.hi,
+            score_lo=t.score_lo,
+            scored_years=[2019, 2020],
+            g0_min_quarters=6,
+            purge_window=list(t.purge_window),
+            purge_boundary="2020",
+            exclude_mapped_before="2018-07-01",
+        )
+    )
     p = params_from_dict(d)
     _, kw = world(seed=3)
     r = run_h2c(p, "T", **kw)

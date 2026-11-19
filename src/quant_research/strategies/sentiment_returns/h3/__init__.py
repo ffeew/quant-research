@@ -11,6 +11,7 @@ Pure functions over in-memory inputs (no file or network IO here):
 
 The draft runner stays in ``sentiment_returns/h3_dev_runner.py``; this package is a refactor for reuse.
 """
+
 from .config import H3Params, load_h3_params
 from .errors import H3ConfigError
 

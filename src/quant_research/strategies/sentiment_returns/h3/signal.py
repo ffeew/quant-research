@@ -1,4 +1,5 @@
 """Per-name window scores and the weekly qualifying cross-section."""
+
 from __future__ import annotations
 
 import datetime as dt
@@ -6,15 +7,17 @@ from collections.abc import Iterable, Mapping
 from typing import Any
 
 import numpy as np
-from scipy import stats as _st  # type: ignore[import-untyped]  # scipy ships no py.typed; scipy-stubs not in qr-venv
+from scipy import stats as _st
 
 from .config import H3Params
 from .weeks import NY
 
-UTC = dt.timezone.utc
+UTC = dt.UTC
 
 
-def parse_item(item: Mapping[str, Any], symbol: str, rel_min: float) -> tuple[str, tuple[float, float, float, float] | None]:
+def parse_item(
+    item: Mapping[str, Any], symbol: str, rel_min: float
+) -> tuple[str, tuple[float, float, float, float] | None]:
     """Classify one AV news-feed item for ``symbol``. Returns ``(status, row)`` where row is
     ``(t_utc, t_et, score, relevance)``: the naive ``time_published`` read as UTC and as New York time.
     Status is one of ``kept``, ``unparseable``, ``no_entry``, ``low_rel``."""

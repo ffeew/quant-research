@@ -1,4 +1,5 @@
 """Synthetic H2-C world: weekday sessions, a small universe, quarterly earnings and transcripts. No real data."""
+
 from __future__ import annotations
 
 import datetime as dt
@@ -21,10 +22,30 @@ def weekdays(lo: str, hi: str) -> list[str]:
 
 
 def params(**over: object) -> H2CParams:
-    d = dict(universe=SYMS, hedge="HEDGE", beta_n=20, h0=1, h1=5, lag=100, nprior_max=4, nprior_min=2, tone_min=3,
-             q_min_events=4, quantile_div=4, partitions=dict(
-                 T=dict(lo="2018-01-01", hi="2020-12-31", score_lo="2019-01-01", scored_years=[2019, 2020],
-                        g0_min_quarters=6, purge_window=["2020-11-01", "2020-12-31"], purge_boundary="2020")))
+    d = dict(
+        universe=SYMS,
+        hedge="HEDGE",
+        beta_n=20,
+        h0=1,
+        h1=5,
+        lag=100,
+        nprior_max=4,
+        nprior_min=2,
+        tone_min=3,
+        q_min_events=4,
+        quantile_div=4,
+        partitions=dict(
+            T=dict(
+                lo="2018-01-01",
+                hi="2020-12-31",
+                score_lo="2019-01-01",
+                scored_years=[2019, 2020],
+                g0_min_quarters=6,
+                purge_window=["2020-11-01", "2020-12-31"],
+                purge_boundary="2020",
+            )
+        ),
+    )
     d.update(over)
     return params_from_dict(d)
 
@@ -53,15 +74,26 @@ def world(seed: int = 7, planted: float = 0.0) -> tuple[H2CParams, dict[str, Any
                     rd = dt.date(2020, 12, 1)  # in the purge window, no transcript (reported before quarter end)
                 rt = "post-market" if (j + q) % 2 else "pre-market"
                 tone = float(rng.normal(0, 1))
-                earnings.append(dict(symbol=s, fiscalDateEnding=fde.isoformat(), reportedDate=rd.isoformat(),
-                                     reportedEPS="1", estimatedEPS="1", surprise="0", surprisePercentage="0",
-                                     reportTime=rt))
+                earnings.append(
+                    dict(
+                        symbol=s,
+                        fiscalDateEnding=fde.isoformat(),
+                        reportedDate=rd.isoformat(),
+                        reportedEPS="1",
+                        estimatedEPS="1",
+                        surprise="0",
+                        surprisePercentage="0",
+                        reportTime=rt,
+                    )
+                )
                 lab = f"{y}Q{q}"
                 if late:
                     continue
                 keys.append((s, lab))
-                ents = [dict(content="x", sentiment=str(tone + rng.normal(0, 1e-3)), speaker="a", title="b")
-                        for _ in range(5)]
+                ents = [
+                    dict(content="x", sentiment=str(tone + rng.normal(0, 1e-3)), speaker="a", title="b")
+                    for _ in range(5)
+                ]
                 ents.append(dict(content="x", sentiment="n/a", speaker="a", title="b"))
                 tx[(s, lab)] = dict(symbol=s, quarter=lab, transcript=ents)
                 tones[(s, lab)] = tone
@@ -72,11 +104,22 @@ def world(seed: int = 7, planted: float = 0.0) -> tuple[H2CParams, dict[str, Any
                     d0 = (dt.date.fromisoformat(d0) + dt.timedelta(1)).isoformat()
                 if d0 in sidx:
                     i0 = sidx[d0]
-                    R[i0 + 2:i0 + 2 + p.h1 - 1, j] += planted * sur / (p.h1 - 1)
+                    R[i0 + 2 : i0 + 2 + p.h1 - 1, j] += planted * sur / (p.h1 - 1)
     hedge_px = 100 * np.cumprod(1 + mkt)
     PX = 100 * np.cumprod(1 + R, axis=0)
-    rows = [dict(symbol=s, date=d, adjusted_close=float(PX[i, j])) for j, s in enumerate(SYMS) for i, d in enumerate(px_sess)]
+    rows = [
+        dict(symbol=s, date=d, adjusted_close=float(PX[i, j]))
+        for j, s in enumerate(SYMS)
+        for i, d in enumerate(px_sess)
+    ]
     rows += [dict(symbol="HEDGE", date=d, adjusted_close=float(hedge_px[i])) for i, d in enumerate(px_sess)]
-    kw = dict(calendar_sessions=cal, price_sessions=px_sess, price_rows=rows, earnings_rows=earnings,
-              transcript_keys=keys, load_transcript=lambda s, lab: tx[(s, lab)], fye_months={s: 12 for s in SYMS})
+    kw = dict(
+        calendar_sessions=cal,
+        price_sessions=px_sess,
+        price_rows=rows,
+        earnings_rows=earnings,
+        transcript_keys=keys,
+        load_transcript=lambda s, lab: tx[(s, lab)],
+        fye_months=dict.fromkeys(SYMS, 12),
+    )
     return p, kw

@@ -6,8 +6,10 @@ D = dt.date
 
 
 def _rows(fy_end_month: int, year: int, lag_days: int = 25) -> list[Row]:
-    return [dict(f=quarter_end(year, fy_end_month, n), r=quarter_end(year, fy_end_month, n) + dt.timedelta(lag_days))
-            for n in range(1, 5)]
+    return [
+        dict(f=quarter_end(year, fy_end_month, n), r=quarter_end(year, fy_end_month, n) + dt.timedelta(lag_days))
+        for n in range(1, 5)
+    ]
 
 
 def test_month_and_quarter_end() -> None:
@@ -20,7 +22,8 @@ def test_month_and_quarter_end() -> None:
 def test_interior_year_maps_all_four() -> None:
     out, why = map_fiscal_year(_rows(6, 2017), 6, 2017, D(2014, 1, 1), D(2020, 12, 31))
     assert why == "" and [r["f"] for n in range(1, 5) if (r := out[n]) is not None] == [
-        quarter_end(2017, 6, n) for n in range(1, 5)]
+        quarter_end(2017, 6, n) for n in range(1, 5)
+    ]
 
 
 def test_interior_year_with_missing_row_maps_nothing() -> None:

@@ -9,6 +9,7 @@ They are supplied at run time from a JSON file named by the ``QR_H2C_HOLDOUT_EXP
 
 The ``exclude_mapped_before`` field (pre-2010 transcript exclusion) and the ``excl_before_partition`` status for pre-partition holdout earnings rows are unverified against main_holdout; not for holdout use.
 """
+
 from __future__ import annotations
 
 import datetime as dt

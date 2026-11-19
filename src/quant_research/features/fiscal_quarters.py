@@ -5,6 +5,7 @@ as ``datetime.date``. A fiscal year is "interior" when every quarter end lies in
 of reporting slack; interior years must have exactly four unique rows with Q4 within 7 days of the fiscal-year end.
 Edge years are binned per quarter (one row per bin).
 """
+
 from __future__ import annotations
 
 import calendar
@@ -37,7 +38,7 @@ def map_fiscal_year(
         and quarter_end(fiscal_year, fye_month, n) + dt.timedelta(lag) <= d_hi
         for n in range(1, 5)
     )
-    empty: dict[int, Row | None] = {n: None for n in range(1, 5)}
+    empty: dict[int, Row | None] = dict.fromkeys(range(1, 5))
     if interior:
         if len(q) != 4:
             return empty, f"closed_rows_{len(q)}"

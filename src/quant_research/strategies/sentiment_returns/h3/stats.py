@@ -1,4 +1,5 @@
 """One-sided Newey-West test, sector-demeaned IC, per-variant summary and the DEV gate."""
+
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
@@ -7,7 +8,7 @@ from typing import Any
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
-from scipy import stats as _st  # type: ignore[import-untyped]  # scipy ships no py.typed; scipy-stubs not in qr-venv
+from scipy import stats as _st
 
 from ..h2c.stats import nw_t
 from .config import H3Params
@@ -23,8 +24,9 @@ def one_sided(x: Sequence[float] | npt.NDArray[np.float64], lag: int) -> dict[st
     return dict(nw_t=float(t), p_one_sided=float(1 - _st.t.cdf(t, df=T - 1)), df=T - 1)
 
 
-def sector_ic(names: Sequence[str], S: Mapping[str, float], y: Mapping[str, float], sector: Mapping[str, str | None],
-              p: H3Params) -> float | None:
+def sector_ic(
+    names: Sequence[str], S: Mapping[str, float], y: Mapping[str, float], sector: Mapping[str, str | None], p: H3Params
+) -> float | None:
     """Sector-neutral IC. The method is the configurable ``sector_ic_method``; ``demeaned_spearman`` demeans score and
     target within sector and takes the Spearman correlation. None with fewer than ``min_names`` sectored names."""
     method = p.require("sector_ic_method")
@@ -39,8 +41,9 @@ def sector_ic(names: Sequence[str], S: Mapping[str, float], y: Mapping[str, floa
     return float(_st.spearmanr(df.S, df.y).statistic)
 
 
-def summarise(weeks: Sequence[Mapping[str, Any]], book: Sequence[Mapping[str, Any]], term: float,
-              p: H3Params) -> dict[str, Any]:
+def summarise(
+    weeks: Sequence[Mapping[str, Any]], book: Sequence[Mapping[str, Any]], term: float, p: H3Params
+) -> dict[str, Any]:
     """Summary of one variant: IC stats over scored weeks, net L/S stats, turnover, breakeven and holding period.
     ``weeks`` rows carry ``scored``, ``ic`` and optional ``ic_sec``."""
     ics = [w["ic"] for w in weeks if w["scored"]]
@@ -59,19 +62,33 @@ def summarise(weeks: Sequence[Mapping[str, Any]], book: Sequence[Mapping[str, An
         entries += len(cur - prev)
         held += len(cur)
         prev = cur
-    return dict(weeks_in_series=len(B), scored_weeks=len(ics), mean_ic=(float(np.mean(ics)) if ics else None),
-                ic_nw_t=ic_st.get("nw_t"), ic_p_one_sided=ic_st.get("p_one_sided"), ic_df=ic_st.get("df"),
-                ls_gross_mean=gm, ls_net_mean=float(B["net"].mean()), ls_net_sens_mean=float(B["net_sens"].mean()),
-                ls_net_nw_t=net_st["nw_t"], ls_net_p_one_sided=net_st["p_one_sided"],
-                ls_betaadj_gross_mean=float(B["betaadj"].mean()),
-                ls_betaadj_net_mean=float((B["betaadj"] - p.cost_side * B["traded"]).mean()),
-                ls_net_with_liquidation_mean=float(liq.mean()), terminal_liquidation_weight=term,
-                mean_traded_weight=tm, mean_one_way_turnover=tm / 2,
-                breakeven_cost_per_side_bps=(gm / tm * 1e4 if tm > 0 else None),
-                avg_holding_weeks=(held / entries if entries else None), flat_weeks=int(B["flat"].sum()),
-                forced_exits=int(B["forced_exits"].sum()), mean_n_long=float(B["n_long"].mean()),
-                mean_n_short=float(B["n_short"].mean()),
-                sector_ic_mean=(float(np.mean(secs)) if secs else None), sector_ic_weeks=len(secs))
+    return dict(
+        weeks_in_series=len(B),
+        scored_weeks=len(ics),
+        mean_ic=(float(np.mean(ics)) if ics else None),
+        ic_nw_t=ic_st.get("nw_t"),
+        ic_p_one_sided=ic_st.get("p_one_sided"),
+        ic_df=ic_st.get("df"),
+        ls_gross_mean=gm,
+        ls_net_mean=float(B["net"].mean()),
+        ls_net_sens_mean=float(B["net_sens"].mean()),
+        ls_net_nw_t=net_st["nw_t"],
+        ls_net_p_one_sided=net_st["p_one_sided"],
+        ls_betaadj_gross_mean=float(B["betaadj"].mean()),
+        ls_betaadj_net_mean=float((B["betaadj"] - p.cost_side * B["traded"]).mean()),
+        ls_net_with_liquidation_mean=float(liq.mean()),
+        terminal_liquidation_weight=term,
+        mean_traded_weight=tm,
+        mean_one_way_turnover=tm / 2,
+        breakeven_cost_per_side_bps=(gm / tm * 1e4 if tm > 0 else None),
+        avg_holding_weeks=(held / entries if entries else None),
+        flat_weeks=int(B["flat"].sum()),
+        forced_exits=int(B["forced_exits"].sum()),
+        mean_n_long=float(B["n_long"].mean()),
+        mean_n_short=float(B["n_short"].mean()),
+        sector_ic_mean=(float(np.mean(secs)) if secs else None),
+        sector_ic_weeks=len(secs),
+    )
 
 
 def dev_gate(summary: Mapping[str, Any]) -> str:

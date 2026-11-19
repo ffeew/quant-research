@@ -1,4 +1,5 @@
 """Return panel, rolling beta and beta-adjusted forward return."""
+
 from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
@@ -63,11 +64,11 @@ def beta_adjusted_target(
     c = panel.col
     j, m = c[sym], c[hedge]
     r = panel.returns
-    x, y = r[i0 - beta_n:i0, m], r[i0 - beta_n:i0, j]
+    x, y = r[i0 - beta_n : i0, m], r[i0 - beta_n : i0, j]
     if i0 + h1 >= len(panel.sessions) or not (np.isfinite(x).all() and np.isfinite(y).all()):
         return "excl_missing_target", nan, nan, nan
     bta = float(np.cov(y, x, ddof=1)[0, 1] / np.var(x, ddof=1))
-    g = np.prod(1 + r[i0 + h0 + 1:i0 + h1 + 1], axis=0) - 1
+    g = np.prod(1 + r[i0 + h0 + 1 : i0 + h1 + 1], axis=0) - 1
     if not (np.isfinite(g[j]) and np.isfinite(g[m])):
         return "excl_missing_target", nan, nan, nan
     return "", bta, float(g[j]), float(g[j] - bta * g[m])

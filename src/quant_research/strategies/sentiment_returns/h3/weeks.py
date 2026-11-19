@@ -1,4 +1,5 @@
 """Weekly decision calendar from a list of trading sessions (no calendar library needed)."""
+
 from __future__ import annotations
 
 import datetime as dt

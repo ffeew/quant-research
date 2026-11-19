@@ -1,4 +1,5 @@
 """Call tone and tone surprise."""
+
 from __future__ import annotations
 
 import math

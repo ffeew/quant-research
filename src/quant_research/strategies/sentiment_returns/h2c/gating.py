@@ -1,4 +1,5 @@
 """Generic partition and reference-count checks (holdout gating), driven by config/runtime inputs only."""
+
 from __future__ import annotations
 
 from collections.abc import Iterable

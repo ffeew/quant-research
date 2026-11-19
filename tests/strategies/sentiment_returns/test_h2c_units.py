@@ -6,7 +6,7 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 
 import numpy as np
-from scipy import stats as st  # type: ignore[import-untyped]  # scipy ships no py.typed; scipy-stubs not in qr-venv
+from scipy import stats as st
 
 from quant_research.strategies.sentiment_returns.h2c import config as cfg
 from quant_research.strategies.sentiment_returns.h2c import errors, gating, schema, signal, target
@@ -45,7 +45,9 @@ def test_holdout_expectations_runtime_only() -> None:
         with tempfile.TemporaryDirectory() as d:
             fp = os.path.join(d, "exp.json")
             with open(fp, "w", encoding="utf-8") as fh:
-                json.dump(dict(purge=dict(in_window_rows=3, purged=1, kept=2, excl_no_reporttime=0), excluded_mapped=1), fh)
+                json.dump(
+                    dict(purge=dict(in_window_rows=3, purged=1, kept=2, excl_no_reporttime=0), excluded_mapped=1), fh
+                )
             os.environ[cfg.HOLDOUT_EXPECTED_ENV] = fp
             e = cfg.load_holdout_expectations()
             assert e.purge is not None and e.purge["kept"] == 2 and e.excluded_mapped == 1
@@ -95,17 +97,19 @@ def test_beta_adjusted_target() -> None:
     assert math.isclose(raw, gj) and math.isclose(tg, gj - b * gm)
     assert target.beta_adjusted_target(panel, "A", "H", sess[10], 20, 1, 5)[0] == "excl_beta_warmup"
     assert target.beta_adjusted_target(panel, "A", "H", sess[57], 20, 1, 5)[0] == "excl_missing_target"
-    _raises(errors.PartitionError, target.build_return_panel, [dict(symbol="A", date="zz", adjusted_close=1.0)], sess, ["A"])
+    _raises(
+        errors.PartitionError, target.build_return_panel, [dict(symbol="A", date="zz", adjusted_close=1.0)], sess, ["A"]
+    )
     _raises(errors.SchemaError, target.build_return_panel, rows[:1] * 2, sess, ["A", "H"])
 
 
 def test_schema_validators() -> None:
-    ok = {k: "1.5" for k in schema.PRICE_KEYS}
+    ok = dict.fromkeys(schema.PRICE_KEYS, "1.5")
     rows = schema.parse_prices({"A": [["2020-01-03", ok], ["2020-01-02", ok]]}, ["A"])
     assert [r["date"] for r in rows] == ["2020-01-02", "2020-01-03"]
     _raises(errors.SchemaError, schema.parse_prices, {"A": [["2020-01-03", dict(ok, extra="1")]]}, ["A"])
     _raises(errors.SchemaError, schema.parse_prices, {"A": []}, ["A", "B"])
-    er = {k: "x" for k in schema.EARN_KEYS}
+    er = dict.fromkeys(schema.EARN_KEYS, "x")
     out = schema.parse_earnings({"A": [er], "H": [{"anything": 1}]}, ["A", "H"], held=["H"])
     assert len(out) == 1 and out[0]["symbol"] == "A"
     assert schema.parse_earnings({"A": [er]}, ["A", "B"], exact=False)
@@ -122,8 +126,20 @@ def test_schema_validators() -> None:
     _raises(errors.IntegrityError, schema.verify_sha, b, "0" * 64)
     ent = dict(content="c", sentiment="0.1", speaker="s", title="t")
     assert schema.validate_transcript(dict(symbol="A", quarter="2020Q1", transcript=[ent]), "A", "2020Q1") == [ent]
-    _raises(errors.MappingError, schema.validate_transcript, dict(symbol="B", quarter="2020Q1", transcript=[]), "A", "2020Q1")
-    _raises(errors.SchemaError, schema.validate_transcript, dict(symbol="A", quarter="2020Q1", transcript=[{}]), "A", "2020Q1")
+    _raises(
+        errors.MappingError,
+        schema.validate_transcript,
+        dict(symbol="B", quarter="2020Q1", transcript=[]),
+        "A",
+        "2020Q1",
+    )
+    _raises(
+        errors.SchemaError,
+        schema.validate_transcript,
+        dict(symbol="A", quarter="2020Q1", transcript=[{}]),
+        "A",
+        "2020Q1",
+    )
 
 
 def test_purge_table_and_checks() -> None:
@@ -155,14 +171,24 @@ def test_assert_events_in_partition() -> None:
 
 
 def _periods(ics: Sequence[float], net: float = 0.01, borrow: float = 0.001) -> list[dict[str, float]]:
-    return [dict(ic=i, ls_badj=net + 0.004, ls_raw=net, net10_badj=net, net20_badj=net - 0.004,
-                 net10_badj_borrow=net - borrow, turnover_units=4.0) for i in ics]
+    return [
+        dict(
+            ic=i,
+            ls_badj=net + 0.004,
+            ls_raw=net,
+            net10_badj=net,
+            net20_badj=net - 0.004,
+            net10_badj_borrow=net - borrow,
+            turnover_units=4.0,
+        )
+        for i in ics
+    ]
 
 
 def test_g1_and_g2_gates() -> None:
     p = params()
     part = p.partition("T")
-    qn = {q: 10 for q in part.scored_quarters}
+    qn = dict.fromkeys(part.scored_quarters, 10)
     ics = [0.10, 0.12, 0.09, 0.11, 0.13, 0.10, 0.12, 0.11]
     r1 = hstats.evaluate_g1(_periods(ics), qn, part, p)
     assert r1["G0_pass"] and r1["G1_pass"] and r1["verdict"].startswith("PASS")
@@ -172,7 +198,7 @@ def test_g1_and_g2_gates() -> None:
     assert r2["G2_pass"] and r2["G2"]["iii"]
     assert not hstats.evaluate_g2(_periods(ics), qn, part, p, dev_mean_ic=0.5)["G2"]["iii"]
     assert not hstats.evaluate_g2(_periods(ics, borrow=0.02), qn, part, p, 0.1)["G2_pass"]
-    thin = {q: 1 for q in part.scored_quarters}
+    thin = dict.fromkeys(part.scored_quarters, 1)
     assert not hstats.evaluate_g2(_periods(ics), thin, part, p, 0.1)["G2_pass"]
     one = hstats.evaluate_g2(_periods(ics[:1]), qn, part, p, 0.1)
     assert one["G2_pass"] is False and not any(one["G2"].values())

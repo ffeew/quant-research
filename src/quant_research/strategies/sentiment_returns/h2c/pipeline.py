@@ -1,4 +1,5 @@
 """End-to-end H2-C over one partition, on in-memory inputs. No file, network or environment access."""
+
 from __future__ import annotations
 
 import math
@@ -94,7 +95,12 @@ def run_h2c(
         if ev["status"] != "excl_no_reporttime" or ev["reportedDate"] < part.score_lo or not window_ok(ev["info_i0"]):
             continue
         d0 = allsess[ev["info_i0"]]
-        if not ev["label"] or not math.isfinite(ev["tone"]) or not math.isfinite(surprise(ev, d0)[1]) or target(ev["symbol"], d0)[0]:
+        if (
+            not ev["label"]
+            or not math.isfinite(ev["tone"])
+            or not math.isfinite(surprise(ev, d0)[1])
+            or target(ev["symbol"], d0)[0]
+        ):
             continue
         info[ev["quarter"]] = info.get(ev["quarter"], 0) + 1
 
@@ -113,11 +119,19 @@ def run_h2c(
         m = _stats.quarter_metrics(g, q, {id(e): allsess[e["a0"] + p.h0] for e in g}, p)
         if m is not None:
             periods.append(m)
-    res = (_stats.evaluate_g2(periods, qn, part, p, dev_mean_ic) if dev_mean_ic is not None
-           else _stats.evaluate_g1(periods, qn, part, p))
+    res = (
+        _stats.evaluate_g2(periods, qn, part, p, dev_mean_ic)
+        if dev_mean_ic is not None
+        else _stats.evaluate_g1(periods, qn, part, p)
+    )
     status_counts: dict[str, int] = {}
     for ev in EV:
         status_counts[ev["status"]] = status_counts.get(ev["status"], 0) + 1
-    counts = dict(status=status_counts, purge=pc, mapping=mdiag, info_default_would_keep=info,
-                  quarters_lt_min={q: qn.get(q, 0) for q in part.scored_quarters if qn.get(q, 0) < p.q_min_events})
+    counts = dict(
+        status=status_counts,
+        purge=pc,
+        mapping=mdiag,
+        info_default_would_keep=info,
+        quarters_lt_min={q: qn.get(q, 0) for q in part.scored_quarters if qn.get(q, 0) < p.q_min_events},
+    )
     return dict(partition=part.name, stats=res, periods=periods, events=EV, counts=counts)

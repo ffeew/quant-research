@@ -2,6 +2,7 @@
 
 Pre-2010 transcript exclusion (the ``exclude_mapped_before`` rule) and the ``excl_before_partition`` status for pre-partition holdout earnings rows are unverified against main_holdout; not for holdout use.
 """
+
 from __future__ import annotations
 
 import bisect
@@ -49,8 +50,11 @@ def prepare_earnings(rows: Iterable[dict[str, Any]], part: Partition, universe: 
 
 
 def map_transcripts(
-    keys: Iterable[tuple[str, str]], earnings: Sequence[dict[str, Any]], fye_months: dict[str, int],
-    part: Partition, p: H2CParams,
+    keys: Iterable[tuple[str, str]],
+    earnings: Sequence[dict[str, Any]],
+    fye_months: dict[str, int],
+    part: Partition,
+    p: H2CParams,
 ) -> tuple[dict[tuple[str, str], str], dict[str, Any]]:
     """Map transcript (symbol, 'YYYYQn') labels to earnings rows via the fiscal calendar.
 
@@ -89,15 +93,21 @@ def map_transcripts(
             raise MappingError(f"transcript maps outside {part.name} {s} {lab}")
         tx_of[key] = lab
         dg[1] += 1
-    per_symbol = {s: dict(files=v[0], matched=v[1], excluded_mapped=v[2], rate=v[1] / v[0], flag=v[1] / v[0] < 0.90)
-                  for s, v in diag.items()}
-    return tx_of, dict(per_symbol=per_symbol, listed=sum(v[0] for v in diag.values()), mapped=len(tx_of),
-                       excluded_mapped=n_excluded)
+    per_symbol = {
+        s: dict(files=v[0], matched=v[1], excluded_mapped=v[2], rate=v[1] / v[0], flag=v[1] / v[0] < 0.90)
+        for s, v in diag.items()
+    }
+    return tx_of, dict(
+        per_symbol=per_symbol, listed=sum(v[0] for v in diag.values()), mapped=len(tx_of), excluded_mapped=n_excluded
+    )
 
 
 def build_events(
-    earnings: Sequence[dict[str, Any]], tx_of: dict[tuple[str, str], str], sessions: Sequence[str],
-    part: Partition, p: H2CParams,
+    earnings: Sequence[dict[str, Any]],
+    tx_of: dict[tuple[str, str], str],
+    sessions: Sequence[str],
+    part: Partition,
+    p: H2CParams,
 ) -> list[Event]:
     """One event per earnings row, with day0 from reportTime (pre-market: the reportedDate session or next;
     post-market: the next session after reportedDate), and the return window [day0+h0, day0+h1] on ``sessions``
@@ -111,11 +121,27 @@ def build_events(
 
     EV: list[Event] = []
     for e in sorted(earnings, key=lambda e: (e["symbol"], str(e["reportedDate"]), e["fiscalDateEnding"])):
-        ev: Event = dict(symbol=e["symbol"], fiscalDateEnding=e["fiscalDateEnding"], reportedDate=str(e["reportedDate"]),
-                         reportTime=str(e["reportTime"]), label=tx_of.get((e["symbol"], e["fiscalDateEnding"]), ""),
-                         day0="", quarter="", ret_start="", ret_end="", n_parseable="", tone=float("nan"), n_prior="",
-                         surprise=float("nan"), beta=float("nan"), ret_raw=float("nan"), target=float("nan"),
-                         status="", a0=None, info_i0=None)
+        ev: Event = dict(
+            symbol=e["symbol"],
+            fiscalDateEnding=e["fiscalDateEnding"],
+            reportedDate=str(e["reportedDate"]),
+            reportTime=str(e["reportTime"]),
+            label=tx_of.get((e["symbol"], e["fiscalDateEnding"]), ""),
+            day0="",
+            quarter="",
+            ret_start="",
+            ret_end="",
+            n_parseable="",
+            tone=float("nan"),
+            n_prior="",
+            surprise=float("nan"),
+            beta=float("nan"),
+            ret_raw=float("nan"),
+            target=float("nan"),
+            status="",
+            a0=None,
+            info_i0=None,
+        )
         if e["r"] is None:
             ev["status"] = "excl_no_timestamp"
             EV.append(ev)
@@ -156,8 +182,11 @@ def purge_counts(events: Sequence[Event], part: Partition, p: H2CParams) -> dict
     """Counts for events with reportedDate inside ``part.purge_window`` (duplicates included, untimestamped not):
     missing reportTime / window ending after the window end (purged) / kept."""
     w0, w1 = part.purge_window
-    pw = [ev for ev in events if ev["status"] not in ("excl_no_timestamp", "excl_before_partition")
-          and w0 <= ev["reportedDate"] <= w1]
+    pw = [
+        ev
+        for ev in events
+        if ev["status"] not in ("excl_no_timestamp", "excl_before_partition") and w0 <= ev["reportedDate"] <= w1
+    ]
     pc = dict.fromkeys(PURGE_COUNT_KEYS, 0)
     pc["in_window_rows"] = len(pw)
     for ev in pw:

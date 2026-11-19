@@ -11,6 +11,7 @@ Some design choices are not settled. Each is an explicit optional parameter whos
 - ``sector_ic_method``         how the sector-neutral IC is formed (``"demeaned_spearman"`` is implemented).
 - ``n_universe``               the required universe size check.
 """
+
 from __future__ import annotations
 
 import os
@@ -59,7 +60,7 @@ class H3Params:
             raise H3ConfigError(f"h3 parameter {name!r} is not set; it is a configurable design choice")
         return v
 
-    def with_choices(self, **kw: Any) -> "H3Params":
+    def with_choices(self, **kw: Any) -> H3Params:
         bad = set(kw) - set(UNSETTLED)
         if bad:
             raise H3ConfigError(f"not an unsettled choice: {sorted(bad)}")
