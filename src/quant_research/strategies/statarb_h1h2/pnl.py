@@ -25,22 +25,35 @@ from .splits import (
 )
 
 
-def has_print(px: float) -> bool:
-    """The one last-print definition: a price is a print when it is present (not NaN) and > 0."""
-    return bool(np.isfinite(px) and px > 0)
+def tradable_mask(bars: dict[str, pd.DataFrame]) -> pd.DataFrame:
+    """THE one tradable-print definition, used everywhere (fills, forced cuts and settlements,
+    stress, the H1 tau / trusted print and bound, the suspension check, H2 receipts, last print,
+    and the gross a held name earns): a session is a print for a name when its close is present
+    and > 0 AND its volume is present and > 0 AND it is not forward-filled (bars["FFILL"], when
+    supplied; a missing flag counts as forward-filled). A close with zero volume is not a print."""
+    PX = bars["PX"]
+    VOL = bars["VOL"].reindex(index=PX.index, columns=PX.columns)
+    m = PX.notna() & PX.gt(0) & VOL.notna() & VOL.gt(0)
+    if "FFILL" in bars:
+        ff = bars["FFILL"].reindex(index=PX.index, columns=PX.columns)
+        m &= ~ff.fillna(True).astype(bool)
+    return m.astype(bool)
 
 
-def printed_mask(PX: pd.DataFrame) -> pd.DataFrame:
-    """Frame form of has_print: notna and price > 0."""
-    return PX.notna() & PX.gt(0)
-
-
-def last_print_index(PX: pd.DataFrame, s: str) -> int:
-    """Row of the last print of s (has_print), or -1 when it never printed."""
-    if s not in PX.columns:
+def last_print_index(bars: dict[str, pd.DataFrame], s: str, tp: pd.DataFrame | None = None) -> int:
+    """Row of the last tradable print of s (tradable_mask), or -1 when it never printed."""
+    tp = tradable_mask(bars) if tp is None else tp
+    if s not in tp.columns:
         return -1
-    idx = np.flatnonzero(printed_mask(PX[[s]])[s].to_numpy(dtype=bool))
+    idx = np.flatnonzero(tp[s].to_numpy(dtype=bool))
     return int(idx[-1]) if len(idx) else -1
+
+
+def require_aligned(bars: dict[str, pd.DataFrame], W: pd.DataFrame) -> None:
+    """Fail closed when a weight session is not a price session (it would silently never fill)."""
+    missing = W.index.difference(bars["PX"].index)
+    if len(missing):
+        raise Blocked(f"BLOCK: {len(missing)} weight session(s) not in the price index, e.g. {missing[0]!r}.")
 
 
 def _any(v: Any) -> Any:
@@ -167,9 +180,12 @@ class Fill:
 
 FORCED_CUT = "zero_adv_cut"  # cut toward 0 with no usable ADV (cap 0): allowed, never a grow
 FORCED_SETTLEMENT = "post_last_print_settlement"  # held remainder closed at the last close
-# Stress cost on forced trades: STRESS_COST_MULT x the one-way cost with no ADV (smallest bucket,
-# so the L4 floor applies). 2.0 is the shared cost model's stressed-cost multiple (cost_model.net_edge).
-STRESS_COST_MULT = 2.0
+# Stress cost on forced trades: STRESS_ONE_WAY_COST_MULT x the ONE-WAY cost of that trade, priced
+# with no ADV (the smallest liquidity bucket). Under FlooredCostModel that one-way cost is at least
+# the L4 floor plus half-spread; under the bare SharedCostModel there is no floor. 2.0 is a desk
+# choice for the one-way stress. It is deliberately NOT cost_model.net_edge's stress_mult, which
+# is a round-trip break-even multiple and is not reused here as a one-way multiple.
+STRESS_ONE_WAY_COST_MULT = 2.0
 
 
 def _cut_only(held: float, target: float) -> float:
@@ -200,11 +216,13 @@ def _fills(
     return); that settlement is not free: it is charged the stress cost, and the terminal bound /
     delisting stress book their loss on that held amount.
     Yields (session, previous session, held after the session's fills, trades, capped)."""
+    require_aligned(bars, W)
     PX, VOL = bars["PX"], bars["VOL"]
+    TP = tradable_mask(bars)
     W_exec = W.shift(1).fillna(0.0)
-    DV = PX * VOL
+    DV = (PX * VOL).mask(~TP & PX.notna(), 0.0)  # a priced non-print session trades $0
     ADV20 = DV.rolling(20, min_periods=10).mean().shift(1)  # row k: window ending k-1; read at the fill day
-    last_print = {str(c): last_print_index(PX, str(c)) for c in PX.columns}
+    last_print = {str(c): last_print_index(bars, str(c), TP) for c in PX.columns}
     pos = {d: i for i, d in enumerate(PX.index)}
     held = pd.Series(0.0, index=W_exec.columns)
     dates = W_exec.index
@@ -219,8 +237,9 @@ def _fills(
         for s, delta in want.items():
             if abs(delta) < 1e-15:
                 continue
-            px = at_float(PX, fill_day, s) if s in PX.columns and fill_day in pos else float("nan")
-            if not has_print(px):
+            printed = bool(TP.at[fill_day, s]) if s in TP.columns else False
+            px = at_float(PX, fill_day, s) if printed else float("nan")
+            if not printed:
                 gone = pos.get(fill_day, len(PX.index)) > last_print.get(str(s), -1)
                 lp = last_print.get(str(s), -1)
                 if not (gone and lp >= 0 and abs(float(target.loc[str(s)])) < 1e-15):
@@ -272,7 +291,11 @@ def apply_costs_and_returns(
     if cfg.is_pass_bar and cfg.borrow_rate < BORROW_UNKNOWN_REQUIRED:
         raise RuntimeError("pass-bar config must have borrow_rate >= 10%/yr")
     costs = costs or SharedCostModel()
-    R = bars["R"]
+    TP = tradable_mask(bars)
+    R = bars["R"].copy()
+    for c in R.columns:  # past its last print a held name is settled at the last close: it earns 0
+        lp = last_print_index(bars, str(c), TP) if c in TP.columns else -1
+        R.loc[R.index[lp + 1 :], c] = 0.0
     rets = []
     capped_sessions = 0
     forced: dict[str, list[float]] = {FORCED_CUT: [], FORCED_SETTLEMENT: []}
@@ -283,7 +306,7 @@ def apply_costs_and_returns(
                 t.side, t.px, t.shares, t.adv_shares, symbol=t.symbol, is_etf=t.symbol in ETFS, cfg=cfg
             )
             if t.forced is not None:
-                bps *= STRESS_COST_MULT
+                bps *= STRESS_ONE_WAY_COST_MULT
                 forced[t.forced].append(t.shares * t.px)
             trade_cost_frac += (t.shares * t.px / AUM) * bps / 1e4
         capped_sessions += capped
@@ -306,7 +329,7 @@ def apply_costs_and_returns(
         "forced_cut_notional_usd": float(sum(forced[FORCED_CUT])),
         "n_post_last_print_settlements": len(forced[FORCED_SETTLEMENT]),
         "post_last_print_settlement_notional_usd": float(sum(forced[FORCED_SETTLEMENT])),
-        "forced_trade_cost": f"stress: {STRESS_COST_MULT} x one-way cost at no ADV",
+        "forced_trade_cost": f"stress: {STRESS_ONE_WAY_COST_MULT} x one-way cost at no ADV",
         "cost_floor": getattr(costs, "floor_label", None),
         "daily": df,
     }
@@ -329,20 +352,10 @@ class AcquirerCloses(Protocol):
     def accepted_acquirer_closes(self, acquirer_id: str, start: pd.Timestamp, end: pd.Timestamp) -> pd.Series: ...
 
 
-def _trusted(bars: dict[str, pd.DataFrame], s: str) -> pd.Series:
-    """Trusted print: a print (has_print), volume > 0, not forward-filled."""
-    tr = printed_mask(bars["PX"][[s]])[s] & (bars["VOL"][s] > 0)
-    if "FFILL" in bars:
-        tr &= ~bars["FFILL"][s].fillna(True).astype(bool)
-    return tr
-
-
 def trusted_tau(bars: dict[str, pd.DataFrame], s: str) -> int | None:
-    """tau = last trusted print: volume > 0, a print (has_print), not forward-filled."""
-    if s not in bars["PX"].columns:
-        return None
-    idx = np.flatnonzero(_trusted(bars, s).to_numpy(dtype=bool))
-    return int(idx[-1]) if len(idx) else None
+    """tau = the last tradable print (tradable_mask), the same row as last_print_index."""
+    i = last_print_index(bars, s)
+    return i if i >= 0 else None
 
 
 def short_vmax(terms: dict[str, Any], tau_d: pd.Timestamp, h_d: pd.Timestamp, client: AcquirerCloses) -> float:
@@ -411,7 +424,7 @@ def h1_terminal_bound(
             raise Blocked(f"BLOCK H1: source-bound economic date < tau for {s}.")
         assert held is not None
         held_pre = held[s].iloc[:t].abs() > 0  # the position actually held over each session, not W
-        trusted = _trusted(bars, s)
+        trusted = tradable_mask(bars)[s]
         if (held_pre & ~trusted.iloc[:t]).any():
             raise Blocked(f"BLOCK H1: suspension gap before tau for {s} (fail closed).")
         if t + 1 >= len(dates):
@@ -471,7 +484,7 @@ def h2_delisting_receipts(
     bars: dict[str, pd.DataFrame], W: pd.DataFrame, positions: list[dict[str, Any]]
 ) -> list[dict[str, Any]]:
     """Base: a name still HELD past its last print (after the fills at its last close) is closed
-    at that last close (R is NaN afterwards, so it adds 0); the hedge leg and borrow run to the
+    at that last close (it earns 0 after the last print, see apply_costs_and_returns); the hedge leg and borrow run to the
     planned exit. Keyed on the position actually held (see _fills), not the planned window: a
     capped exit remainder, or a last print at exit_i-1, still gets a receipt. One receipt per name.
     Reporting only: changes no weight and no return."""
@@ -479,8 +492,9 @@ def h2_delisting_receipts(
     PX = bars["PX"]
     dates = W.index
     held: pd.DataFrame | None = None
+    tp = tradable_mask(bars)
     for s in dict.fromkeys(p["sym"] for p in positions):
-        last_i = last_print_index(PX, s)
+        last_i = last_print_index(bars, s, tp)
         if last_i < 0 or last_i + 1 >= len(dates) or s not in W.columns:
             continue
         if held is None:

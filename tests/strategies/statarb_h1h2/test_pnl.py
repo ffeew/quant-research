@@ -308,15 +308,19 @@ def test_no_adv_history_means_no_trade():
     assert pnl.held_positions(b, W)["B"].eq(0).all()
 
 
-def test_one_last_print_definition():
-    PX = pd.DataFrame({"A": [10.0, 0.0, np.nan, 11.0, 0.0, -1.0, np.nan]})
-    assert [pnl.has_print(v) for v in PX["A"]] == [True, False, False, True, False, False, False]
-    assert pnl.printed_mask(PX)["A"].tolist() == [True, False, False, True, False, False, False]
-    assert pnl.last_print_index(PX, "A") == 3 and pnl.last_print_index(PX, "Z") == -1
+def test_one_tradable_print_definition():
+    PX = pd.DataFrame({"A": [10.0, 0.0, np.nan, 11.0, 12.0, -1.0, 13.0, 14.0, 15.0]})
+    VOL = pd.DataFrame({"A": [1.0, 1.0, 1.0, 1.0, 0.0, 1.0, np.nan, 1.0, 1.0]})
+    FF = pd.DataFrame({"A": [False] * 7 + [True, np.nan]})
+    one = {"PX": PX, "VOL": VOL, "FFILL": FF}
+    want = [True, False, False, True, False, False, False, False, False]  # close > 0 AND volume > 0, no ffill
+    assert pnl.tradable_mask(one)["A"].tolist() == want
+    assert pnl.last_print_index(one, "A") == 3 == pnl.trusted_tau(one, "A")
+    assert pnl.last_print_index(one, "Z") == -1 and pnl.trusted_tau(one, "Z") is None
     b = _bars()
     b["PX"].iloc[20:, 0] = 0.0  # a zero price is no print (not only NaN): same last print everywhere
     b["VOL"].iloc[20:, 0] = 0
-    assert pnl.trusted_tau(b, "A") == 19 == pnl.last_print_index(b["PX"], "A")
+    assert pnl.trusted_tau(b, "A") == 19 == pnl.last_print_index(b, "A")
     W = pd.DataFrame(0.0, index=b["R"].index, columns=["A", "B"])
     W.iloc[10:28, 0] = 0.005
     pos = [{"sym": "A", "etf": "XLK", "w_sym": 0.005, "w_etf": 0.0, "entry_i": 10, "exit_i": 28, "N": 2.0}]
@@ -402,7 +406,8 @@ def test_h1_suspension_gap_check_uses_the_held_position():
 def test_zero_adv_allows_cuts_toward_zero_at_stress_cost_never_grows():
     b = _bars()
     d = b["R"].index
-    b["VOL"].iloc[13:, 0] = np.nan  # ADV20 for A is NaN from fill day 24 (fewer than 10 sessions left)
+    b["PX"].iloc[13:25, 0] = np.nan  # no prints 13-24 (suspended): from fill day 25 the ADV20
+    b["VOL"].iloc[13:25, 0] = np.nan  # window has 8 sessions, fewer than 10, so ADV20 is NaN
     W = pd.DataFrame(0.0, index=d, columns=["A", "B"])
     W.iloc[11:25, 0] = 0.1  # held 0.1 from close 11
     W.iloc[25, 0] = 0.04  # cut at close 25 with no ADV: allowed, in full
@@ -414,7 +419,7 @@ def test_zero_adv_allows_cuts_toward_zero_at_stress_cost_never_grows():
     assert np.isclose(held.iloc[27], 0.04) and held.iloc[28:].eq(0).all()
     out = pnl.apply_costs_and_returns(b, W, cfg, idea="H1", costs=FlatCost())
     tc = out["daily"]["tc"]
-    stress = pnl.STRESS_COST_MULT * 10.0
+    stress = 2.0 * 10.0  # pinned: 2.0 x the one-way cost
     assert np.isclose(tc.loc[d[26]], 0.06 * stress / 1e4) and np.isclose(tc.loc[d[28]], 0.04 * stress / 1e4)
     assert out["n_forced_cuts_zero_adv"] == 2 and np.isclose(out["forced_cut_notional_usd"], 0.10 * AUM)
 
@@ -428,6 +433,87 @@ def test_settlement_after_the_last_print_is_not_free():
         b, W, pnl.build_cost_config("unknown_borrow_required"), idea="H1", costs=FlatCost()
     )
     assert pnl.held_positions(b, W)["A"].iloc[20:22].tolist() == [pytest.approx(0.0002), 0.0]
-    assert np.isclose(out["daily"]["tc"].loc[d[21]], 0.0002 * pnl.STRESS_COST_MULT * 10.0 / 1e4)
+    assert np.isclose(out["daily"]["tc"].loc[d[21]], 0.0002 * 2.0 * 10.0 / 1e4)
     assert out["n_post_last_print_settlements"] == 1
     assert np.isclose(out["post_last_print_settlement_notional_usd"], 0.0002 * AUM)
+
+
+def test_stress_cost_is_two_times_the_one_way_cost():
+    assert pnl.STRESS_ONE_WAY_COST_MULT == 2.0  # pinned; not cost_model.net_edge's round-trip multiple
+    b = _thin_terminal_bars()
+    W = pd.DataFrame(0.0, index=b["R"].index, columns=["A", "B"])
+    W.iloc[12:18, 0] = 0.0012  # 2e-4 settled after the last print
+    out = pnl.apply_costs_and_returns(
+        b, W, pnl.build_cost_config("unknown_borrow_required"), idea="H1", costs=FlatCost()
+    )
+    forced = out["daily"]["tc"].loc[b["R"].index[21]]
+    assert np.isclose(forced, 0.0002 * 20.0 / 1e4)  # 2 x the flat 10 bp one-way cost
+    assert out["forced_trade_cost"] == "stress: 2.0 x one-way cost at no ADV"
+
+
+def _trailing_zero_volume_bars():
+    """A trades its last real print at close 24; closes 25-29 are $50 with zero volume and a
+    nonzero close-to-close return (stale marks, not prints)."""
+    b = _bars()
+    b["VOL"].iloc[25:, 0] = 0.0
+    b["R"].iloc[25:, 0] = 0.02
+    return b
+
+
+def test_trailing_zero_volume_closes_h1_tau_is_last_print_and_no_trade_after_bound():
+    b = _trailing_zero_volume_bars()
+    d = b["R"].index
+    assert (b["PX"]["A"].iloc[25:] == 50.0).all() and len(b["PX"]) - 25 == 5
+    assert pnl.trusted_tau(b, "A") == 24 == pnl.last_print_index(b, "A")
+    W = pd.DataFrame(0.0, index=d, columns=["A", "B"])
+    W.iloc[10:, 0] = 0.05  # held long through the stale closes
+    cfg = pnl.build_cost_config("unknown_borrow_required")
+    Wa, ov, rec = pnl.h1_terminal_bound(b, W, [{"symbol": "A", "identity_ok": True}], cfg)
+    assert rec[0]["tau"] == str(d[24].date()) and np.isclose(ov.iloc[25], -0.05) and np.isclose(ov.sum(), -0.05)
+    assert Wa["A"].iloc[24] == 0.05 and Wa["A"].iloc[25:].eq(0).all()  # W_adj zeroed from tau + 1
+    held = pnl.held_positions(b, Wa)["A"]
+    assert np.isclose(held.iloc[25], 0.05) and held.iloc[26:].eq(0).all()  # settled, never held on
+    after_tau = [(fd, t) for _d, fd, _h, ts, _c in pnl._fills(b, Wa) for t in ts if t.symbol == "A" and fd > d[24]]
+    assert len(after_tau) == 1  # no normal (1x) fill on a zero-volume close after the bound
+    assert after_tau[0][1].forced == pnl.FORCED_SETTLEMENT and after_tau[0][1].px == 50.0
+    out = pnl.apply_costs_and_returns(b, Wa, cfg, idea="H1", costs=FlatCost())
+    assert out["daily"]["gross"].loc[d[25] :].eq(0).all()  # no gross earned after the -100% bound
+    assert np.isclose(out["daily"]["tc"].loc[d[26]], 0.05 * 2.0 * 10.0 / 1e4)
+
+
+def test_zero_volume_close_cannot_be_exited_at_one_x():
+    b = _trailing_zero_volume_bars()
+    b["VOL"].iloc[:25, 0] = 1e4  # 1% ADV = 5e-4 of AUM per session
+    d = b["R"].index
+    W = pd.DataFrame(0.0, index=d, columns=["A", "B"])
+    W.iloc[12:24, 0] = 0.0012  # exit ordered at close 24 (the last print) is capped: 7e-4 remains
+    held = pnl.held_positions(b, W)["A"]
+    assert np.isclose(held.iloc[25], 0.0007) and held.iloc[26:].eq(0).all()
+    out = pnl.apply_costs_and_returns(
+        b, W, pnl.build_cost_config("unknown_borrow_required"), idea="H2", costs=FlatCost()
+    )
+    assert np.isclose(out["daily"]["tc"].loc[d[26]], 0.0007 * 2.0 * 10.0 / 1e4)  # stress, not 1x
+    assert out["n_post_last_print_settlements"] == 1
+    assert np.isclose(out["post_last_print_settlement_notional_usd"], 0.0007 * AUM)
+    assert out["daily"]["gross"].loc[d[25] :].eq(0).all()
+    pos = [{"sym": "A", "etf": "XLK", "w_sym": 0.0012, "w_etf": 0.0, "entry_i": 12, "exit_i": 24, "N": 2.0}]
+    rec = pnl.h2_delisting_receipts(b, W, pos)
+    assert len(rec) == 1 and rec[0]["last_close_session"] == str(d[24].date())
+    assert np.isclose(rec[0]["held_weight"], 0.0007)
+    ov, _ = pnl.h2_delisting_stress(b, W, pos)
+    assert np.isclose(ov.iloc[25], 0.0007 * -0.30) and np.isclose(ov.sum(), ov.iloc[25])
+
+
+def test_weights_off_the_price_index_fail_closed():
+    b = _bars()
+    d = b["R"].index
+    extra = d.append(pd.DatetimeIndex([d[-1] + pd.Timedelta(days=7)]))
+    W = pd.DataFrame(0.0, index=extra, columns=["A", "B"])
+    W.iloc[12:, 0] = 0.1
+    cfg = pnl.build_cost_config("unknown_borrow_required")
+    with pytest.raises(Blocked, match="not in the price index"):
+        pnl.apply_costs_and_returns(b, W, cfg, idea="H1", costs=ZeroCost())
+    with pytest.raises(Blocked, match="not in the price index"):
+        pnl.held_positions(b, W)
+    with pytest.raises(Blocked, match="not in the price index"):
+        pnl.h1_terminal_bound(b, W, [{"symbol": "A", "identity_ok": True}], cfg)

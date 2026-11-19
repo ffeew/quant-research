@@ -71,7 +71,25 @@ ratio (DSR) and purged cross-validation land in a later PR. No DEV run yet; no r
   - **Cost floor source.** The floor table is `backtest/engine.py:39-40`. One known difference:
     a thin ETF (L4 bucket) gets the 20 bp floor here but 2 bp in the engine, which floors every
     ETF at 2 bp.
-  - One last-print definition (price present and > 0) is used everywhere.
+  - The prior claim that there was one last-print definition was wrong: fills / last-print
+    tested price only, but H1 tau also required volume and a non-forward-filled row.
+- Fourth review:
+  - **One tradable print helper.** `tradable_mask` requires close > 0 AND volume > 0 and no
+    forward-fill (when the FFILL frame is supplied, missing flags fail closed). Fills, zero-ADV
+    cuts, last-print, tau, the suspension check, H1 bound, H2 receipts / stress and settlement
+    all use that rule. No normal fill is possible on a positive close with zero volume. Gross
+    is explicitly zero past the last tradable print, even if the input return frame has stale
+    nonzero returns. The forced settlement is charged at the stress cost at the last real close.
+  - **Named one-way stress.** `STRESS_ONE_WAY_COST_MULT = 2.0` is the desk's explicit choice:
+    twice the one-way cost of a forced trade priced with no ADV. It is NOT borrowed from the
+    cost model's round-trip break-even multiple. The L4 minimum plus half-spread holds only
+    under `FlooredCostModel`, not the bare `SharedCostModel`. A numeric test pins 2.0 and the
+    20 bp result of stressing a flat 10 bp one-way cost, so changing the constant to 1.0 fails.
+  - Weights with an index outside the price index fail closed, rather than silently being
+    unfillable. Tests use five trailing positive zero-volume closes, check tau == last-print,
+    W_adj flat from tau+1, no gross after the -100% bound, and receipt / -30% stress / charged
+    settlement for a capped H2 remainder. Reverting each fix makes its regression test fail.
+  - Synthetic checks only; no DEV run or real returns.
 - Not done yet: DSR and purged CV. Until they land there is no Stage A verdict, whatever a DEV
   Sharpe shows.
 
