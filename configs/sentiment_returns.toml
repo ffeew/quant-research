@@ -55,3 +55,26 @@ g0_min_quarters = 11
 purge_window = ["2013-11-01", "2013-12-31"]
 purge_boundary = "2013"
 exclude_mapped_before = "2010-01-01"
+
+# H3 library parameters (quant_research.strategies.sentiment_returns.h3). Method constants only. Unsettled design
+# choices (flat_clears_band_memory, drift_renormalise_legs, sector_ic_method, n_universe) are deliberately absent
+# here; set them explicitly before use. Data locations and integrity pins are runtime inputs, never stored here.
+[h3]
+window_sessions = 20
+window_sessions_fast = 5
+min_items = 5
+min_names = 40
+min_leg = 5
+long_in = 0.80
+long_hold = 0.60
+short_in = 0.20
+short_hold = 0.40
+rel_min = 0.50
+nw_lag = 4
+cost_side = 0.0010
+cost_side_sens = 0.0020
+beta_n = 252
+quantile_div = 5
+cutoff_hhmm = [15, 30]
+hedge = "SPY"
+research_only = ["MSTR"]

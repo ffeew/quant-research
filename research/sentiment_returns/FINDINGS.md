@@ -31,3 +31,10 @@ Numbers above are copied from these documents:
 - [reports/FISCAL_DIAGNOSTIC_S6B.md](reports/FISCAL_DIAGNOSTIC_S6B.md)
 - [reports/PREREG_H2C_r3.md](reports/PREREG_H2C_r3.md)
 - [reports/PREREG_H3_v2.md](reports/PREREG_H3_v2.md)
+
+## Status update: H2-C and H3
+- H2-C: DEV passed gates G0 and G1. The holdout test is pending; no holdout result yet.
+  - Code: `src/quant_research/strategies/sentiment_returns/h2c/`
+- H3: code only. Not run; no findings.
+  - Code: `src/quant_research/strategies/sentiment_returns/h3/`
+  - Design choices that are not yet settled are explicit parameters with no committed value in `configs/sentiment_returns.toml`.
