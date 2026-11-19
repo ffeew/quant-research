@@ -10,6 +10,7 @@ import pandas as pd
 
 from quant_research.backtest.costs import cost_model as cm
 
+from .frames import at_float, iloc_int
 from .guards import Blocked
 from .splits import (
     AUM,
@@ -20,6 +21,11 @@ from .splits import (
     H2_DELISTING_STRESS_SHORT,
     PARTICIPATION_CAP,
 )
+
+
+def _any(v: Any) -> Any:
+    """pd.Timestamp(None) is NaT at runtime; the stubs reject None."""
+    return v
 
 
 @dataclass(frozen=True)
@@ -84,11 +90,11 @@ def apply_costs_and_returns(bars: dict[str, pd.DataFrame], W: pd.DataFrame, cfg:
         for s, delta in dw.items():
             if abs(delta) < 1e-15 or s not in PX.columns:
                 continue
-            px = PX.at[d, s]
+            px = at_float(PX, d, s)
             if not (px > 0):
                 continue
-            adv = ADV20.at[d, s] if s in ADV20.columns else np.nan
-            adv_sh = (float(adv) / px) if (np.isfinite(adv) and adv > 0) else None
+            adv = at_float(ADV20, d, s) if s in ADV20.columns else np.nan
+            adv_sh = (adv / px) if (np.isfinite(adv) and adv > 0) else None
             sh = abs(delta) * AUM / px
             if adv_sh and sh > PARTICIPATION_CAP * adv_sh:
                 sh = PARTICIPATION_CAP * adv_sh
@@ -128,11 +134,11 @@ def trusted_tau(bars: dict[str, pd.DataFrame], s: str) -> int | None:
     tr = (bars["VOL"][s] > 0) & bars["PX"][s].notna()
     if "FFILL" in bars:
         tr &= ~bars["FFILL"][s].fillna(True).astype(bool)
-    idx = np.flatnonzero(tr.values)
+    idx = np.flatnonzero(tr.to_numpy(dtype=bool))
     return int(idx[-1]) if len(idx) else None
 
 
-def short_vmax(terms: dict, tau_d: pd.Timestamp, h_d: pd.Timestamp, client: AcquirerCloses) -> float:
+def short_vmax(terms: dict[str, Any], tau_d: pd.Timestamp, h_d: pd.Timestamp, client: AcquirerCloses) -> float:
     """V_max = max_k (cash_k + ratio_k * max accepted acquirer close over [tau, h]); else BLOCK."""
     if terms.get("worthless_cancellation") is True:
         return 0.0
@@ -155,9 +161,9 @@ def short_vmax(terms: dict, tau_d: pd.Timestamp, h_d: pd.Timestamp, client: Acqu
     return float(max(vals))
 
 
-def h1_terminal_bound(bars: dict[str, pd.DataFrame], W: pd.DataFrame, roster: list[dict], cfg: CostConfig, *,
+def h1_terminal_bound(bars: dict[str, pd.DataFrame], W: pd.DataFrame, roster: list[dict[str, Any]], cfg: CostConfig, *,
                       client: AcquirerCloses | None = None, path: str = "A",
-                      costs: CostModel | None = None) -> tuple[pd.DataFrame, pd.Series, list[dict]]:
+                      costs: CostModel | None = None) -> tuple[pd.DataFrame, pd.Series, list[dict[str, Any]]]:
     """Positions stranded in unresolved terminal rows: zero the leg from tau (the execution lag
     closes it at tau+1 with no exit-cost credit) and book an equity overlay at tau+1:
     long -100% of marked value; short max(P_tau, V_max) liability plus borrow from tau+1 to
@@ -180,7 +186,7 @@ def h1_terminal_bound(bars: dict[str, pd.DataFrame], W: pd.DataFrame, roster: li
             raise Blocked(f"BLOCK H1: no trusted print for held roster row {s}.")
         tau_d = dates[t]
         if (row.get("ledger_last_session_status") == "observed_last_trading_session"
-                and pd.Timestamp(row.get("ledger_last_session")) != tau_d):
+                and pd.Timestamp(_any(row.get("ledger_last_session"))) != tau_d):
             raise Blocked(f"BLOCK H1: tau != ledger last_session for {s}.")
         if row.get("economic_event_date") and pd.Timestamp(row["economic_event_date"]) < tau_d:
             raise Blocked(f"BLOCK H1: source-bound economic date < tau for {s}.")
@@ -223,14 +229,14 @@ def h1_terminal_bound(bars: dict[str, pd.DataFrame], W: pd.DataFrame, roster: li
             for j in range(book_i, end_i + 1):
                 overlay.iloc[j] -= per
             rec.update({"h": str(h_d.date()), "V_max": vmax, "liability": liab, "borrow_rate": rate})
-        W_adj.iloc[t:, W_adj.columns.get_loc(s)] = 0.0
+        W_adj.iloc[t:, iloc_int(W_adj.columns, s)] = 0.0
         receipts.append(rec)
     return W_adj, overlay, receipts
 
 
 # ---- H2 delisting base and counted stress ----
 
-def h2_delisting_receipts(bars: dict[str, pd.DataFrame], positions: list[dict]) -> list[dict]:
+def h2_delisting_receipts(bars: dict[str, pd.DataFrame], positions: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Base: a name that stops printing before its planned exit is closed at its last close
     (R is NaN afterwards, so it adds 0); the hedge leg and borrow run to the planned exit.
     Reporting only: changes no weight and no return."""
@@ -256,8 +262,9 @@ def h2_delisting_receipts(bars: dict[str, pd.DataFrame], positions: list[dict]) 
     return out
 
 
-def h2_delisting_stress(bars: dict[str, pd.DataFrame], W: pd.DataFrame, positions: list[dict],
-                        supplied_delist_returns: dict | None = None) -> tuple[pd.Series, list[dict]]:
+def h2_delisting_stress(bars: dict[str, pd.DataFrame], W: pd.DataFrame, positions: list[dict[str, Any]],
+                        supplied_delist_returns: dict[str, Any] | None = None
+                        ) -> tuple[pd.Series, list[dict[str, Any]]]:
     """Counted stress: on a null delisting return, -30% for longs and 0% for shorts, booked at
     last+1 on the weight held over that session. A supplied delisting return gets no stress."""
     sup = supplied_delist_returns or {}
@@ -269,7 +276,7 @@ def h2_delisting_stress(bars: dict[str, pd.DataFrame], W: pd.DataFrame, position
         if sup.get(s) is not None:
             out.append(dict(r, stress="not applied: supplied (non-null) delisting return"))
             continue
-        li = int(dates.get_loc(pd.Timestamp(r["last_close_session"])))
+        li = iloc_int(dates, pd.Timestamp(r["last_close_session"]))
         if li + 1 >= len(dates):
             continue
         w = float(W[s].iloc[li]) if s in W.columns else 0.0

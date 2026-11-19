@@ -17,8 +17,8 @@ def subtract_intervals(iv: Interval, cuts: list[Interval]) -> list[Interval]:
     for cs, ce in cuts:
         nxt: list[Interval] = []
         for s, e in out:
-            e_ = e if pd.notna(e) else pd.Timestamp.max
-            ce_ = ce if pd.notna(ce) else pd.Timestamp.max
+            e_: Any = e if pd.notna(e) else pd.Timestamp.max
+            ce_: Any = ce if pd.notna(ce) else pd.Timestamp.max
             if ce_ <= s or cs >= e_:
                 nxt.append((s, e))
                 continue
@@ -30,10 +30,12 @@ def subtract_intervals(iv: Interval, cuts: list[Interval]) -> list[Interval]:
     return out
 
 
-def build_membership(pm: pd.DataFrame, listing: pd.DataFrame, reused_tickers: dict, missing_names: dict, *,
+def build_membership(pm: pd.DataFrame, listing: pd.DataFrame, reused_tickers: dict[str, Any],
+                     missing_names: dict[str, Any], *,
                      lineage_excl: Iterable[str] = (), dev_universe: Iterable[str] | None = None,
-                     final_list: dict | None = None,
-                     listing_overlap_treatment: dict | None = None) -> tuple[pd.DataFrame, dict]:
+                     final_list: dict[str, Any] | None = None,
+                     listing_overlap_treatment: dict[str, str] | None = None
+                     ) -> tuple[pd.DataFrame, dict[str, Any]]:
     """PIT membership clipped to listing windows, minus reused-ticker original-member periods,
     minus missing names, minus ETFs, minus identity exclusions. Returns (mem, receipt).
 
@@ -59,9 +61,13 @@ def build_membership(pm: pd.DataFrame, listing: pd.DataFrame, reused_tickers: di
                       f"treatment: {uncovered}")
     ls["ipo"] = pd.to_datetime(ls["ipoDate"].replace({"null": None}), errors="coerce")
     ls["dl"] = pd.to_datetime(ls["delistingDate"].replace({"null": None}), errors="coerce")
-    windows = {s: [(r.ipo, (r.dl + pd.Timedelta(days=1)) if pd.notna(r.dl) else pd.NaT)
-                   for r in g.itertuples()] for s, g in ls.groupby("symbol")}
-    rows: list[dict] = []
+    windows: dict[str, list[tuple[Any, Any]]] = {}
+    for sym, g in ls.groupby("symbol"):
+        wl: list[tuple[Any, Any]] = []
+        for ipo, dl in zip(g["ipo"], g["dl"]):
+            wl.append((ipo, (dl + pd.Timedelta(days=1)) if pd.notna(dl) else pd.NaT))
+        windows[str(sym)] = wl
+    rows: list[dict[str, Any]] = []
     rec: dict[str, Any] = {
         "reused_removed": [], "missing_gap": [], "no_listing_record": [], "etf_rows_dropped": [],
         "listing_clipped": [], "lineage_excl_dropped": [], "final_list_sha256": fl.get("sha256"),
@@ -70,15 +76,15 @@ def build_membership(pm: pd.DataFrame, listing: pd.DataFrame, reused_tickers: di
         "after_boundary_member_rows": (sorted(pm.loc[pm["after_boundary"].astype(bool), "symbol"])
                                        if "after_boundary" in pm.columns else []),
     }
-    for r in pm.itertuples():
-        s = r.symbol
+    for sym, start_raw, end_raw in zip(pm["symbol"], pm["start_date_filled"], pm["end_date"]):
+        s = str(sym)
         if s in lineage:
             rec["lineage_excl_dropped"].append(s)
             continue
         if s in fl_excl:
             rec["final_list_excluded"].append({"symbol": s, "reason": fl_excl[s]})
             continue
-        iv = (pd.Timestamp(r.start_date_filled), pd.Timestamp(r.end_date) if pd.notna(r.end_date) else pd.NaT)
+        iv: Interval = (pd.Timestamp(start_raw), pd.Timestamp(end_raw) if pd.notna(end_raw) else pd.NaT)
         if s in ETFS:
             rec["etf_rows_dropped"].append(s)
             continue

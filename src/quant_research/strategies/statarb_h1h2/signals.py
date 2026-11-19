@@ -9,12 +9,16 @@ import numpy as np
 import pandas as pd
 
 from .events import boundary_ambiguous, covered, ev_in
+from .frames import at_float as _at
+from .frames import iloc_int as _iloc
 from .splits import LOAD0, NAME_CAP, SECTOR_ETF
 
+EvIdx = dict[str, np.ndarray]
 
-def signal_h1(bars: dict[str, pd.DataFrame], ELIG: pd.DataFrame, subind: pd.Series, evidx: dict, *,
+
+def signal_h1(bars: dict[str, pd.DataFrame], ELIG: pd.DataFrame, subind: pd.Series, evidx: EvIdx, *,
               L: int = 60, z_thr: float = 1.0, n_lead: int = 2, min_grp: int = 4, hold_weeks: int = 4,
-              eval_start: date, eval_end: date, last_exit_i: int) -> tuple[pd.DataFrame, list]:
+              eval_start: date, eval_end: date, last_exit_i: int) -> tuple[pd.DataFrame, list[pd.Timestamp]]:
     """H1 primary: L=60, |z|>=1, 4 weekly tranches, 2 leaders, min group 4.
 
     Weekly (last session of each W-FRI week): within each GICS sub-industry, the n_lead names
@@ -27,7 +31,7 @@ def signal_h1(bars: dict[str, pd.DataFrame], ELIG: pd.DataFrame, subind: pd.Seri
     R = bars["R"]
     DV = bars["PX"] * bars["VOL"]
     MEDDV60 = DV.rolling(60, min_periods=40).median()
-    dates = R.index
+    dates = pd.DatetimeIndex(R.index)
     wk = pd.DatetimeIndex(pd.Series(dates, index=dates).groupby(dates.to_period("W-FRI")).max().values)
     tranches: dict[pd.Timestamp, pd.Series] = {}
     for jj, t in enumerate(wk):
@@ -35,11 +39,11 @@ def signal_h1(bars: dict[str, pd.DataFrame], ELIG: pd.DataFrame, subind: pd.Seri
             continue
         if t > pd.Timestamp(eval_end):
             break
-        i = dates.get_loc(t)
+        i = _iloc(dates, t)
         if i < 260:
             continue
         el = ELIG.loc[t]
-        syms = [s for s in el.index[el.values] if s in subind.index]
+        syms = [s for s in el.index[el.to_numpy(dtype=bool)] if s in subind.index]
         g = pd.Series({s: subind[s] for s in syms}, dtype=object)
         w: dict[str, float] = {}
         act = 0
@@ -47,7 +51,7 @@ def signal_h1(bars: dict[str, pd.DataFrame], ELIG: pd.DataFrame, subind: pd.Seri
             ms = list(members.index)
             if len(ms) < min_grp:
                 continue
-            ms = sorted(ms, key=lambda s: -MEDDV60.at[t, s])
+            ms = sorted(ms, key=lambda s: -_at(MEDDV60, t, s))
             Ld, F = ms[:n_lead], ms[n_lead:]
             win = R.iloc[i - 252 + 1:i + 1]
             d = win[Ld].mean(axis=1) - win[F].mean(axis=1)
@@ -61,7 +65,7 @@ def signal_h1(bars: dict[str, pd.DataFrame], ELIG: pd.DataFrame, subind: pd.Seri
             sgn = np.sign(z)
             ent = i + 1
             if jj + hold_weeks < len(wk):
-                ex_i = dates.get_loc(wk[jj + hold_weeks]) + 1
+                ex_i = _iloc(dates, wk[jj + hold_weeks]) + 1
             else:
                 ex_i = len(dates) - 1
             if ex_i > last_exit_i:
@@ -96,7 +100,7 @@ def signal_h1(bars: dict[str, pd.DataFrame], ELIG: pd.DataFrame, subind: pd.Seri
 
 
 def signal_h2(bars: dict[str, pd.DataFrame], ELIG: pd.DataFrame, subind: pd.Series, sector: pd.Series,
-              ev_all: pd.DataFrame, evidx: dict, *, H: int = 40, thr: float = 1.5, unit: float = 0.005,
+              ev_all: pd.DataFrame, evidx: EvIdx, *, H: int = 40, thr: float = 1.5, unit: float = 0.005,
               gap_sessions: int = 50, NMAX: int = 100, eval_start: date, eval_end: date,
               last_exit_i: int) -> tuple[pd.DataFrame, list[dict[str, Any]]]:
     """H2 primary: H=40, |N|>=1.5, report window 50, unit 0.5%, max 100 live positions.
@@ -108,14 +112,17 @@ def signal_h2(bars: dict[str, pd.DataFrame], ELIG: pd.DataFrame, subind: pd.Seri
     from d0+1 for H sessions, hedged with -beta * unit of their ETF. Returns (weights, positions).
     """
     R = bars["R"]
-    dates = R.index
+    dates = pd.DatetimeIndex(R.index)
     ev = ev_all[ev_all.timing_quality == "exact_acceptance_time"].copy()
     ev["d0"] = pd.to_datetime(ev.reaction_session.fillna(ev.first_tradable_session))
     if "knowledge_time_utc" in ev.columns:
         ev = ev[~ev.knowledge_time_utc.map(boundary_ambiguous).astype(bool)]
     ev = ev[(ev.d0 >= pd.Timestamp(LOAD0)) & (ev.d0 <= pd.Timestamp(eval_end))]
 
-    etf_of0 = {s: SECTOR_ETF.get(sector.get(s)) for s in subind.index}
+    etf_of0: dict[str, str | None] = {}
+    for s in subind.index:
+        sec = sector.get(s)
+        etf_of0[s] = SECTOR_ETF.get(sec) if isinstance(sec, str) else None
 
     def hedge_etf(s: str, i: int) -> str:
         e = etf_of0.get(s)
@@ -124,15 +131,16 @@ def signal_h2(bars: dict[str, pd.DataFrame], ELIG: pd.DataFrame, subind: pd.Seri
         return e
 
     positions: list[dict[str, Any]] = []
-    for d0, grp in ev.groupby("d0"):
+    d0_key: Any
+    for d0_key, grp in ev.groupby("d0"):
+        d0 = pd.Timestamp(d0_key)
         if d0 < pd.Timestamp(eval_start) or d0 > pd.Timestamp(eval_end):
             continue
-        i = dates.get_loc(d0) if d0 in dates else None
+        i = _iloc(dates, d0) if d0 in dates else None
         if i is None or i < 252:
             continue
-        reps = []
-        for _, row in grp.iterrows():
-            s = row.symbol
+        reps: list[str] = []
+        for s in grp["symbol"]:
             if s not in ELIG.columns or i < 1 or not bool(ELIG.iloc[i - 1].get(s, False)):
                 continue
             if s not in subind.index:
@@ -144,19 +152,19 @@ def signal_h2(bars: dict[str, pd.DataFrame], ELIG: pd.DataFrame, subind: pd.Seri
         for s in reps:
             by_g.setdefault(subind[s], []).append(s)
         for gname, reporters in by_g.items():
-            reactions = []
+            reactions: list[tuple[str, float]] = []
             for s in reporters:
                 e = hedge_etf(s, i)
                 win = R[[s, e]].iloc[i - 252:i]
                 if win.dropna().shape[0] < 200:
                     continue
-                y = win[s].values
-                x = win[e].values
+                y = win[s].to_numpy(dtype=float)
+                x = win[e].to_numpy(dtype=float)
                 mask = np.isfinite(y) & np.isfinite(x)
                 if mask.sum() < 200:
                     continue
-                beta = np.polyfit(x[mask], y[mask], 1)[0]
-                r0 = R.at[dates[i], s] - beta * R.at[dates[i], e]
+                beta = float(np.polyfit(x[mask], y[mask], 1)[0])
+                r0 = _at(R, dates[i], s) - beta * _at(R, dates[i], e)
                 resid = y - beta * x
                 sig = np.nanstd(resid[-60:])
                 if not (sig > 0) or not np.isfinite(r0):
@@ -167,9 +175,9 @@ def signal_h2(bars: dict[str, pd.DataFrame], ELIG: pd.DataFrame, subind: pd.Seri
             N = float(np.mean([r for _, r in reactions]))
             if abs(N) < thr:
                 continue
-            members = [s for s in subind.index[subind == gname]
+            members = [s for s in subind.index[(subind == gname).to_numpy(dtype=bool)]
                        if s in ELIG.columns and bool(ELIG.iloc[i - 1].get(s, False))]
-            cands = []
+            cands: list[tuple[float, str, str, float]] = []
             for s in members:
                 if s in reporters:
                     continue
@@ -188,8 +196,8 @@ def signal_h2(bars: dict[str, pd.DataFrame], ELIG: pd.DataFrame, subind: pd.Seri
                         continue
                 e = hedge_etf(s, i)
                 win = R[[s, e]].iloc[i - 252:i]   # follower beta excludes d0
-                y = win[s].values
-                x_ = win[e].values
+                y = win[s].to_numpy(dtype=float)
+                x_ = win[e].to_numpy(dtype=float)
                 mask = np.isfinite(y) & np.isfinite(x_)
                 if mask.sum() < 200:
                     continue
@@ -213,7 +221,7 @@ def signal_h2(bars: dict[str, pd.DataFrame], ELIG: pd.DataFrame, subind: pd.Seri
     W = pd.DataFrame(0.0, index=dates, columns=cols)
     for p in positions:
         sl = slice(p["entry_i"], p["exit_i"])
-        W.iloc[sl, W.columns.get_loc(p["sym"])] += p["w_sym"]
-        W.iloc[sl, W.columns.get_loc(p["etf"])] += p["w_etf"]
+        W.iloc[sl, _iloc(W.columns, p["sym"])] += p["w_sym"]
+        W.iloc[sl, _iloc(W.columns, p["etf"])] += p["w_etf"]
     W = W.clip(-NAME_CAP, NAME_CAP)
     return W, positions

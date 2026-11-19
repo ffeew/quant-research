@@ -22,7 +22,7 @@ from .splits import EMBARGO1, LOAD0
 
 
 def _pq() -> Any:
-    import pyarrow.parquet as pq  # local import: nothing is read at module import time
+    import pyarrow.parquet as pq  # type: ignore[import-untyped]  # local import; pyarrow ships no stubs
     return pq
 
 
@@ -47,7 +47,9 @@ def load_bars_tr(cfg: HarnessConfig, filter_end: date, load_start: date = LOAD0)
 
 
 def bars_from_long(tr: pd.DataFrame) -> dict[str, pd.DataFrame]:
-    piv = lambda col: tr.pivot(index="session_date", columns="symbol", values=col)  # noqa: E731
+    def piv(col: str) -> pd.DataFrame:
+        return tr.pivot(index="session_date", columns="symbol", values=col)
+
     return {"R": piv("ret_total_best"), "TRI": piv("tr_index_best"), "PX": piv("close_raw"),
             "VOL": piv("volume_raw")}
 
@@ -57,7 +59,8 @@ def load_earnings(cfg: HarnessConfig, filter_end: date) -> pd.DataFrame:
         raise Blocked("REFUSING: earnings source is a DEV-only cut; no holdout source is bound.")
     pin = cfg.pin("earnings_dev_cut")
     p = verify_pinned_file("earnings_dev_cut", pin.path, pin.sha256)
-    return _pq().read_table(p, filters=[("announce_date_et", "<=", filter_end)]).to_pandas()
+    ev: pd.DataFrame = _pq().read_table(p, filters=[("announce_date_et", "<=", filter_end)]).to_pandas()
+    return ev
 
 
 def load_gics(cfg: HarnessConfig) -> tuple[pd.Series, pd.Series]:
@@ -71,7 +74,8 @@ def load_gics(cfg: HarnessConfig) -> tuple[pd.Series, pd.Series]:
 
 def load_parquet_pinned(cfg: HarnessConfig, name: str) -> pd.DataFrame:
     pin = cfg.pin(name)
-    return _pq().read_table(verify_pinned_file(name, pin.path, pin.sha256)).to_pandas()
+    df: pd.DataFrame = _pq().read_table(verify_pinned_file(name, pin.path, pin.sha256)).to_pandas()
+    return df
 
 
 def load_json_pinned(cfg: HarnessConfig, name: str) -> Any:
@@ -112,7 +116,7 @@ class FileAcquirerCloses:
 
     def sessions(self, start: pd.Timestamp, end: pd.Timestamp) -> pd.DatetimeIndex:
         self._guard(end)
-        import exchange_calendars as xcals
+        import exchange_calendars as xcals  # type: ignore[import-untyped]  # ships no stubs
         s = xcals.get_calendar("XNYS").sessions_in_range(pd.Timestamp(start).normalize(), pd.Timestamp(end).normalize())
         return pd.DatetimeIndex(s.tz_localize(None) if s.tz is not None else s)
 

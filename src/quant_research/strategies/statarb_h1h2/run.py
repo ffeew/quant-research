@@ -23,6 +23,7 @@ import pandas as pd
 from . import loaders
 from .config import DEV_INPUTS, HarnessConfig, load_config
 from .events import earliest_possible_index, make_evidx
+from .frames import iloc_int
 from .guards import Blocked, require_acceptance_hash
 from .pnl import (
     apply_costs_and_returns,
@@ -116,13 +117,13 @@ def _main(args: argparse.Namespace) -> int:
         final_list=final_list, listing_overlap_treatment=cfg.listing_overlap_treatment)
     ELIG = build_elig(bars, mem)
     ev_raw = loaders.load_earnings(cfg, filter_end)
-    ev = earliest_possible_index(ev_raw, bars["R"].index)
+    ev = earliest_possible_index(ev_raw, pd.DatetimeIndex(bars["R"].index))
     evidx = make_evidx(ev)
     dates = bars["R"].index
     eval_dates = dates[(dates >= pd.Timestamp(eval_start)) & (dates <= pd.Timestamp(eval_end))]
     if not len(eval_dates):
         raise Blocked("REFUSING: no sessions in the evaluation window.")
-    last_exit_i = int(dates.get_loc(eval_dates[-1])) - MARGIN
+    last_exit_i = iloc_int(dates, eval_dates[-1]) - MARGIN
 
     results: dict[str, Any] = {
         "stage": args.stage, "prereg_sha256": prereg_sha, "runner_version": RUNNER_VERSION,
@@ -147,7 +148,7 @@ def _main(args: argparse.Namespace) -> int:
             results[idea] = {"signal_only": True, "n_days_nonzero": int((W.abs().sum(axis=1) > 0).sum()),
                              "avg_gross": float(W.abs().sum(axis=1).mean())}
             continue
-        runs: list[tuple[str, pd.DataFrame, pd.Series | None, list | None]] = [(idea, W, None, None)]
+        runs: list[tuple[str, pd.DataFrame, pd.Series | None, list[dict[str, Any]] | None]] = [(idea, W, None, None)]
         if idea == "H1":
             roster = loaders.load_json_pinned(cfg, "h1_terminal_roster")
             client = loaders.FileAcquirerCloses(cfg) if "acquirer_closes" in cfg.inputs and \
