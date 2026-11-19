@@ -556,6 +556,9 @@ def run_all(mod: Any, tmp: Path) -> dict[str, Any]:
 # stress are keyed on the position held past the last print (receipts gain held_weight and
 # held_past_planned_exit, one per name), so rec2 and stress are excluded too; their behaviour is
 # pinned in test_v1_3f_fixes.py.
+# Review round 4: R4-print (one tradable-print rule, close > 0 AND volume > 0, not forward-filled)
+# moves only the already-excluded priced paths; on these fixtures every priced row with a close
+# has volume, so no further computation is excluded.
 FIXED = {
     "W1": "B1",
     "r1": "B1 B2 B3 R3-fill",
