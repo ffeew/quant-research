@@ -21,7 +21,7 @@ from tests.strategies.rank1_single_name.test_rank1_synthetic import fake_calenda
 START = "2090-01-01T00:00:00Z"
 END = "2200-01-01T00:00:00Z"
 
-from quant_research.strategies.rank1_single_name.rank1_sigma import DEFINITION_BYTES, TOMAS_SIGNED_NOTE_SHA256, TRClose
+from quant_research.strategies.rank1_single_name.rank1_sigma import COSTS_SIGNED_NOTE_SHA256, DEFINITION_BYTES, TRClose
 from quant_research.strategies.rank1_single_name.rank1_sigma import SIGMA_DEFINITION_SHA256 as SIGMA_SHA
 
 MOCK_BASIS_SHA = hashlib.sha256(b"INVENTED single TR provider receipt for software fixtures only").hexdigest()
@@ -30,7 +30,7 @@ MOCK_BASIS_SHA = hashlib.sha256(b"INVENTED single TR provider receipt for softwa
 def mock_sigma_contract():
     return dict(
         synthetic_only=True,
-        signed_note_sha256=TOMAS_SIGNED_NOTE_SHA256,
+        signed_note_sha256=COSTS_SIGNED_NOTE_SHA256,
         definition_bytes=DEFINITION_BYTES,
         tr_basis=dict(
             synthetic_only=True,

@@ -5,19 +5,19 @@
 **Single-run statement:** this is the one pre-registered v3 execution. No retry, no alternate data, no parameter change. Research only; not a trade.
 
 **Hashes (from `outputs_v3/meta.json` and `outputs_v3.HASH.txt`):**
-- outputs_v3 directory: `87acf086fec28c3005f253a4abbeec4ab50505acbaa3d6219a4ad6418423c647` = sha256 of `outputs_v3.MANIFEST.sha256` (23 files; stamped 2026-11-06 06:21:59 SGT).
-- PREREG-v3.md at run: `4689e3a411b9f2112fa7eb1c39ba8793225a96724701aefc40f2b0746e7ef2e4` (pinned state; candidate freeze was `c2718d67…4c0c` before the §2 pin wrote the build/CA/diff hashes).
-- Data build (v2): `c998ca5c33eee487bbdcdbee929ecc2e003078653c2ec5cf15b905c3f9e0ab78` (`…/signoff/trend_v3_v2_etf_daily_20261030.parquet`; 2005-01-03 → 2026-10-28).
-- Corporate-action table: `b415ae397380b6adf287110bdb759afa5ece1f1cde7dd0832d5924993c72fb5e`.
-- Substitution diff: `8225dded490c5567ec446d81b9e10d9161ee1225a3f7bc27e94dccc46bd671ee` (72 substituted rows).
-- Nasdaq xcheck input: `0a0b01461eda7c11cc7721120c2166e4b3fc801ab648ea2edd9116d6727ec0eb`.
-- Reference-source table: `1388e51cdf124667d2e4fb3d60f4a6fb853f63ccb4e816cd3cecfd3dc91c7380`.
-- data_spec_v3.json: `cd5553db078ec5626d56788e1b4d558b581a7ebf18e83911bb041771a2ee74c9`.
-- Cost model (TCA owner v1.1): `df67d604489583d36bb1a16dc7ed30c5568b9a17526f450e4c1a335f9fe8eebf`.
-- VIX series: `5ec8bca24a4e0b96392f65da384c16bb75393c728054a5bf26c3e56d146235b2`.
+- outputs_v3 directory: = sha256 of `outputs_v3.MANIFEST.sha256` (23 files; stamped 2026-11-06 06:21:59 SGT).
+- PREREG-v3.md at run: (pinned state; candidate freeze was before the §2 pin wrote the build/CA/diff hashes).
+- Data build (v2): (`…/signoff/trend_v3_v2_etf_daily_20261030.parquet`; 2005-01-03 → 2026-10-28).
+- Corporate-action table.
+- Substitution diff: (72 substituted rows).
+- Nasdaq xcheck input.
+- Reference-source table.
+- data_spec_v3.json.
+- Cost model (TCA owner v1.1).
+- VIX series.
 - Full values: `outputs_v3/meta.json`.
 
-**Harness fix (non-trial, pre-run; validator decision):** the internal review record. Only `tests/test_v3_engine.py` changed. Old sha256 `47e8be7384a1a42d3e091a05296a3a76c0a56abe3ffd081e67b5d24ae7716cc1` → new `f70e21d4492f99da0c51845d268559ab826aa12fbc75838eacee7c85eff27e6d`. Log: `NOTES-v3-preflight-fix-2026-11-06.md`. No strategy, data, threshold or N change.
+**Harness fix (non-trial, pre-run; validator decision):** the internal review record. Only `tests/test_v3_engine.py` changed. → new. Log: `NOTES-v3-preflight-fix-2026-11-06.md`. No strategy, data, threshold or N change.
 
 ## Mechanical verdict: **FAIL** (trend shelved for this sprint)
 
@@ -65,7 +65,7 @@ Blind note (meta): "2005-2007 is too short to judge on its own (A2); passing it 
 - **NW t (full):** 0.106445 (criterion 4).
 - **DSR** (`outputs_v3/dsr.csv`), gate row gross-dispersion, N=57, T=2749: DSR **0.087202** (sr_ann −0.064564; sr0 0.3464). N=47 companion: 0.093089. All-net-dispersion rows are reported alongside and are ~0.
 - **PBO** (`outputs_v3/pbo.json`): S=16, 12870 combinations, **40 of 57** trials with daily series, T=2448, **PBO 0.380186**, median logit 0.446. Gap 17 = the validator's diagnostics. Decision N remains 57 (`meta.n_trials`).
-- Trial log append: trial 47 `V3_PRIMARY`, data sha `c998ca5c…`, quasi-OOS net SR −0.064564.
+- Trial log append: trial 47 `V3_PRIMARY`, data, quasi-OOS net SR −0.064564.
 
 ## Stability (`outputs_v3/stability.csv`) and sensitivities
 
@@ -99,15 +99,15 @@ From the full segment: one-way turnover 116.9 (5.65×/yr), average cost 9.17 bps
 - **Splits applied (7):** Yahoo pre-2016 — IWM 2005-06-09 ×0.5; EFA/EEM 2005-06-09 ×1/3; EEM 2008-07-24 ×1/3; SLV 2008-07-24 ×0.1. CA table — EWJ 2016-11-07 ×4; USO 2020-04-29 ×8. File: `outputs_v3/splits_applied.csv`.
 - **Substitution diff audit:** 72 rows (SPY 16, USO 15, EEM 14, IWM 9, GLD/SLV/QQQ 4, EWJ 3, EFA 2, TLT 1; IEF 0).
 - **Nasdaq xcheck (report-only):** per-ticker share within 1bp on 2513 days — EFA/QQQ 100%; others 99.92–99.96%. Substituted rows with \|Nasdaq−Yahoo\| > 10bp: **0**. All rows > 25bp: **2** (GLD and SLV on 2026-04-20; neither substituted).
-- **LIMITS / breaker:** frozen to PREREG-v3 §5/§9.A/§9.B (LIMITS.md af513e3a…1cf6 at drafting). Disclosure: LIMITS v0.3.x not adopted; the live breaker may differ. Criterion 9 passes (one hard breach 2020-04-06, cured next open). Criterion 9s fails (strict: any EOD hard breach). Buffer breaches also cured (see `limit_breaches.csv`).
+- **LIMITS / breaker:** frozen to PREREG-v3 §5/§9.A/§9.B (LIMITS.md at drafting). Disclosure: LIMITS v0.3.x not adopted; the live breaker may differ. Criterion 9 passes (one hard breach 2020-04-06, cured next open). Criterion 9s fails (strict: any EOD hard breach). Buffer breaches also cured (see `limit_breaches.csv`).
 
 ## Output paths
 
 - Directory: `research/replications/trend-sleeve/outputs_v3/`
 - Manifest: `outputs_v3.MANIFEST.sha256` (23 lines)
-- Hash stamp: `outputs_v3.HASH.txt` → `87acf086fec28c3005f253a4abbeec4ab50505acbaa3d6219a4ad6418423c647`
+- Hash stamp: `outputs_v3.HASH.txt`
 - Key files: `criteria.csv`, `segments.csv`, `meta.json`, `pbo.json`, `dsr.csv`, `stability.csv`, `sensitivities.csv`, `trial_log_append.csv`, `limit_breaches.csv`, `splits_applied.csv`, `nasdaq_yahoo_*.csv`, `v3_daily.csv`, `v3_trades.csv`, `v3_weights.csv`, …
 
 ## Disposition
 
-Mechanical FAIL, independently confirmed by the validator: trend v3 shelved for this sprint. No further v3 run or same-trial tweak. Any future variant needs a new PREREG, trial budget and validator decision. Preserve `outputs_v3/` and directory hash unchanged. Formal decision: the internal review record (sha256 `92c62f463d3debb6eed13c07df5b00bdc63aed89fcbcb6a1d9c01dd9bc48e2de`).
+Mechanical FAIL, independently confirmed by the validator: trend v3 shelved for this sprint. No further v3 run or same-trial tweak. Any future variant needs a new PREREG, trial budget and validator decision. Preserve `outputs_v3/` and directory hash unchanged. Formal decision: the internal review record.

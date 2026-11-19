@@ -2,7 +2,7 @@
 
 Amended per validator preflight
 the internal review record
-sha256 `3bed621e668f8d42e7eae33f6a99efe5341c986e98c351b8d3d7f48ddb9e3f56`
+
 (RETURN FOR AMENDMENT — NOT authorised to run).
 
 Deterministic fixture tests only. No market returns, no R1–R7 synthetic P&L,

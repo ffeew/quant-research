@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""H3 Stage 1a filters F1-F4 on Source A (UNIVERSE_RULE_H3_v2 f1bd08f8 s2). Outputs ELIGIBLE_SCAN_H3.txt, EXCLUSION_1a.tsv, COUNTS_1a.tsv (O_EXCL). Regex matching case-insensitive (F3 header)."""
+"""H3 Stage 1a filters F1-F4 on Source A (UNIVERSE_RULE_H3_v2 s2). Outputs ELIGIBLE_SCAN_H3.txt, EXCLUSION_1a.tsv, COUNTS_1a.tsv (O_EXCL). Regex matching case-insensitive (F3 header)."""
 
 from __future__ import annotations
 

@@ -19,14 +19,14 @@ from quant_research.utils.pins import desk_pin
 if TYPE_CHECKING:
     import numpy.typing as npt
 
-# h2c_dev_run.py - H2-C DEV runner (confirmatory DEV leg), FROZEN CODE, per sealed PREREG r3 c4644754 + Erratum 01 b70527a1
-# + Erratum 02 db598118 (seal note ecca7291). Method adapted from h2_dev.py dba0e8fb (helpers copied, not imported).
+# h2c_dev_run.py - H2-C DEV runner (confirmatory DEV leg), FROZEN CODE, per sealed PREREG r3 + Erratum 01
+# + Erratum 02 (seal note). Method adapted from h2_dev.py (helpers copied, not imported).
 # DEV ONLY. Never opens HOLDOUT / TRANSCRIPTS_HOLDOUT / TRANSCRIPTS_EXCLUDED / ROUTE_TABLE / clean/. No network, no env vars.
 # Real run: no arguments (LOCK command, PREREG r3 §12). Test run: --synthetic <cfg.json>, all paths must sit under SYNTH_ROOT.
 # Exit codes: 0 ok | 2 sha mismatch | 3 mapping cross-check | 4 schema | 5 LOCK slots unfilled | 6 allowlist/forbidden path
 #             7 purge mismatch | 8 partition (row outside DEV) | 9 interpreter/flags/version/import | 10 argv/config | 11 calendar
 #             12 uncaught exception BEFORE any output (coded STOP, FD-6) | 13 any STOP/exception AFTER RUN_DIR/STATS exist (FD-6, final)
-# FREEZE r2 (FD-1..FD-8, FI-4/FI-7 AMEND per validator 0adf1120): real input shapes from schema walks 548f8646 / 9a6e7ba4.
+# FREEZE r2 (FD-1..FD-8, FI-4/FI-7 AMEND per validator): real input shapes from schema walks.
 import sys
 
 from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DATA_DIR, ...)
@@ -123,7 +123,7 @@ EXPECTED_TX_ENTRY_KEYS = {"content", "sentiment", "speaker", "title"}  # FI-4 (w
 FYE_REQUIRED_COLS = {"symbol", "fye_month", "status"}  # h2_dev.py
 VERSIONS = {"python": "3.13.5", "numpy": "2.5.4", "scipy": "1.18.1", "exchange_calendars": "4.13.2"}
 VENV_PY = f"{_QR.DATA_DIR}/.venv/bin/python"  # LOCK runtime (unchanged)
-ACCEPT_PY = f"{_QR.SCRATCH_DIR}/scratch/v_fd8_stage_20261114/venv/bin/python"  # FD-8 (validator note f0040cc3 L12): accept interpreter, SYNTHETIC only
+ACCEPT_PY = f"{_QR.SCRATCH_DIR}/scratch/v_fd8_stage_20261114/venv/bin/python"  # FD-8 (validator note L12): accept interpreter, SYNTHETIC only
 ACCEPT_IN_ROOT = f"{_QR.SCRATCH_DIR}/scratch/v_fd8_stage_20261114/in/"  # FD-8 (note L11, L22): the validator's stage in/ copies, SYNTHETIC only
 # =====================================================================================================================
 UNIVERSE = sorted(

@@ -83,12 +83,12 @@ Panels for the validator: `out_*/stock_day_scores.parquet` (symbol, d, text_lm, 
 
 ### 2026-10-30 ~02:30 SGT: the validator's decisions (02:24) applied
 - N = 153 (sector-LM, breadth, spillover); hype-fade gates at 345 (153 + 192 PEAD) and reports both. +4 VADER-twin trials; +1 R151 (breadth NB7, included: it is in the ±20% grid of R126).
-- VADER finance-domain handling: `lexicon/vader_finance_neutral_v1.txt` (sha256 4e1ff542…7d7632; LM 2011 cited words + plurals; removes liability, liabilities, cancer, crude from VADER 3.3.2) applied by `vader_fin.py` (sha256 0b8506ea…a6ca); pinned in `prereg_run.py`.
+- VADER finance-domain handling: `lexicon/vader_finance_neutral_v1.txt` (LM 2011 cited words + plurals; removes liability, liabilities, cancer, crude from VADER 3.3.2) applied by `vader_fin.py`; pinned in `prereg_run.py`.
 - All four documents: pre-2024 years count as OOS only after the ≥90% coverage floor is shown from the fetch; verdict capped at CONDITIONAL until the TCA owner's 2-9 Nov opening-auction pilot is in; G9 (2019+) kept.
 - Nothing frozen; no returns computed; no hold-out text read.
 
 ### 2026-10-30 ~02:35 SGT: TCA owner cost inputs wired in
-- Pinned: `tca/ethan_cost_inputs.md` (sha256 67d0ab41…f409432) + all 11 files in `tca/ethan_inputs/` (hashes in `prereg_run.py` TOMAS_FILE_SHA).
+- Pinned: `tca/ethan_cost_inputs.md` + all 11 files in `tca/ethan_inputs/` (hashes in `prereg_run.py` COSTS_FILE_SHA).
 - prereg_run.py: per side = max(model, floor 2 bp + full half-spread, TCA owner per-ETF Base); stop exits at continuous cost; whole shares; borrow 1%/yr calendar/360 (2× = 2%), HTB sensitivity 10%/yr; 25 bp reference only; today's ETB flags not used historically.
 - All four documents: per-side costs, card cost expectations (labelled expectations, not results), the TCA owner's §4 caveats; uplift as primary entry cost for spillover and hype-fade (normal and 2× reported). N unchanged (153 / 345).
 
@@ -101,6 +101,6 @@ Panels for the validator: `out_*/stock_day_scores.parquet` (symbol, d, text_lm, 
 - Sector-LM (new gate G11) and revision-breadth (gate 1, A12): 10%/yr borrow on every ETF short must leave net Sharpe > 0, else FAIL on costs. 1% base / 2% sensitivity stay as diagnostics. `prereg_run.py`: HTB_GATE_APPLIES = True. N unchanged (153 / 345). Historical quoted rates, if ever supplied, must be pinned and pre-registered before results.
 
 ### 2026-11-06 ~22:30 SGT: §5 control wiring (cost mode; nothing run)
-- `prereg_run.py` (current draft sha256 `60fa1a33c0a1cbfc7c94fbb076ac09ed40aa3c7f437c25ef621829af11033b6a`; freeze hash still blank) now has as-of adapters for REV5, MOM12-1, ANNSHARE (v1 event table `d568a60d…6d2e`, strict 09:25 ET) and SUE (strict loader against a PROPOSED schema; `sue_xbrl.parquet` absent, unpinned). They run only after `check(strict=True)`; `--check` reads hashes/metadata only.
+- `prereg_run.py` (current draft; freeze hash still blank) now has as-of adapters for REV5, MOM12-1, ANNSHARE (v1 event table, strict 09:25 ET) and SUE (strict loader against a PROPOSED schema; `sue_xbrl.parquet` absent, unpinned). They run only after `check(strict=True)`; `--check` reads hashes/metadata only.
 - Synthetic tests: `python3 -m unittest discover -s tests -v` (25 pass). Details, contract and blockers: `CONTROLS_WIRING.md`.
 - No trials added (N 153 / 345); scoring, sizing, costs, borrow and OOS/seen locks unchanged; no prices, text, tone, returns, EPS or SUE computed.

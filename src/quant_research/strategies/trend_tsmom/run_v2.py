@@ -111,7 +111,7 @@ def summarise(name: str, o: dict[str, Any]) -> dict[str, Any]:
         "corr_spy_m": c["corr_monthly"],
         "n_cap_trims": o.get("n_cap_trims", 0),
         "n_band_holds": o.get("n_band_holds", 0),
-        "tomas_flag": flag,
+        "costs_flag": flag,
     }
 
 
@@ -345,8 +345,8 @@ crit = [
     ("1 net Sharpe >= 0.40", f"{v1row.net_sharpe:.3f}", v1row.net_sharpe >= 0.40),
     (
         "2 TCA owner flag = PASS (net>0 at 2x costs AND cost <= 50% gross)",
-        f"{v1row.tomas_flag} (net@2x {v1row.net_at_2x_cost * 100:.2f}%, cost/gross {v1row.cost_drag / v1row.gross_ret * 100 if v1row.gross_ret > 0 else float('nan'):.0f}%)",
-        v1row.tomas_flag == "PASS",
+        f"{v1row.costs_flag} (net@2x {v1row.net_at_2x_cost * 100:.2f}%, cost/gross {v1row.cost_drag / v1row.gross_ret * 100 if v1row.gross_ret > 0 else float('nan'):.0f}%)",
+        v1row.costs_flag == "PASS",
     ),
     ("3 net max DD >= -15%", f"{v1row.net_maxdd * 100:.1f}%", v1row.net_maxdd >= -0.15),
     ("4a net Sharpe ex-2022 > 0", f"{ex22_sr:.3f}", ex22_sr > 0),

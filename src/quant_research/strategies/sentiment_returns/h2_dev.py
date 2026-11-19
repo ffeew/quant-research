@@ -1,10 +1,10 @@
 # h2_dev.py - H2 (earnings-call tone surprise -> post-event drift +2..+21), EXPLORATORY, DEV ONLY, per sealed prereg v5
-# (4b045f05...). Decisions: erratum 7584b5b5 (S3/S4 due-quarter rule), S6b readback b4652cef (H2 may proceed on DEV only).
-# Inputs: DEV partition only (b835e488), clean transcripts (SUMS ed284d37) opened only for due labels mapped to
-# day 0 <= 2024-11-29 (scored window end) - never any other transcript; S6b labels (SUMS 076f6af1).
+# Decisions: erratum (S3/S4 due-quarter rule), S6b readback (H2 may proceed on DEV only).
+# Inputs: DEV partition only, clean transcripts (SUMS) opened only for due labels mapped to
+# day 0 <= 2024-11-29 (scored window end) - never any other transcript; S6b labels (SUMS).
 # Helper logic (XNYS sessions, adjusted_close ratios, 252-return beta ending t-1, NW t, Student-t p) is COPIED from
-# dev_run.py (80f4bb71) - not imported, because dev_run.py executes at import and writes into its own folder.
-# Fiscal mapping (fy_state) COPIED from fiscal_diag_s6b.py (5aa458ac) and cross-checked against the S6b labels tsv.
+# dev_run.py - not imported, because dev_run.py executes at import and writes into its own folder.
+# Fiscal mapping (fy_state) COPIED from fiscal_diag_s6b.py and cross-checked against the S6b labels tsv.
 # No holdout, no raw/, no news, no network, no env vars.
 from __future__ import annotations
 

@@ -9,7 +9,7 @@
 "V1_HASH" = "PENDING"
 "OLD_HASH" = "PENDING"
 "PARENT_V13" = "PENDING"
-"VALIDATOR_PIT" = "PENDING"
+"VALIDATION_PIT" = "PENDING"
 
 ["data.earnings_events.v2.validate_v2"]
 "V1" = "PENDING"
@@ -23,8 +23,8 @@
 "V1" = "PENDING"
 "V2" = "PENDING"
 "OLD" = "PENDING"
-"VALIDATOR" = "PENDING"
-"DATA_OWNER" = "PENDING"
+"VALIDATION_SHA" = "PENDING"
+"DATA_SHA" = "PENDING"
 
 ["data.sec_edgar.common"]
 "RELEASE_TOP_HASH" = "PENDING"
@@ -55,26 +55,26 @@
 ["strategies.news_sentiment.prereg_run"]
 "COST_MODEL_SHA" = "PENDING"
 "COST_DOC_SHA" = "PENDING"
-"TCA_INPUTS_SHA" = "PENDING"
+"COSTS_INPUTS_SHA" = "PENDING"
 "EVENTS_SHA" = "PENDING"
-"TCA_FILE_SHA.asset_flags_paper.json" = "PENDING"
-"TCA_FILE_SHA.bucket_costs.csv" = "PENDING"
-"TCA_FILE_SHA.card_costs.json" = "PENDING"
-"TCA_FILE_SHA.card_costs.py" = "PENDING"
-"TCA_FILE_SHA.cost_tables.py" = "PENDING"
-"TCA_FILE_SHA.etf_costs.csv" = "PENDING"
-"TCA_FILE_SHA.open_vs_mid.py" = "PENDING"
-"TCA_FILE_SHA.open_vs_mid_raw.csv" = "PENDING"
-"TCA_FILE_SHA.per_side_costs.csv" = "PENDING"
-"TCA_FILE_SHA.run.log" = "PENDING"
-"TCA_FILE_SHA.sample_meta.json" = "PENDING"
+"COSTS_FILE_SHA.asset_flags_paper.json" = "PENDING"
+"COSTS_FILE_SHA.bucket_costs.csv" = "PENDING"
+"COSTS_FILE_SHA.card_costs.json" = "PENDING"
+"COSTS_FILE_SHA.card_costs.py" = "PENDING"
+"COSTS_FILE_SHA.cost_tables.py" = "PENDING"
+"COSTS_FILE_SHA.etf_costs.csv" = "PENDING"
+"COSTS_FILE_SHA.open_vs_mid.py" = "PENDING"
+"COSTS_FILE_SHA.open_vs_mid_raw.csv" = "PENDING"
+"COSTS_FILE_SHA.per_side_costs.csv" = "PENDING"
+"COSTS_FILE_SHA.run.log" = "PENDING"
+"COSTS_FILE_SHA.sample_meta.json" = "PENDING"
 
 ["strategies.portfolio_construction.earnings_gate"]
 "PINNED_SHA256.next_earnings_20261030.parquet" = "PENDING"
 "PINNED_SHA256.next_earnings_20261105.parquet" = "PENDING"
 
 ["strategies.rank1_single_name.rank1_sigma"]
-"TCA_SIGNED_NOTE_SHA256" = "PENDING"
+"COSTS_SIGNED_NOTE_SHA256" = "PENDING"
 
 ["strategies.sentiment_returns.fiscal_diag_s6b"]
 "SHA[0]" = "PENDING"

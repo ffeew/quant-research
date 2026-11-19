@@ -15,7 +15,7 @@ from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DA
 ROOT = pathlib.Path(f"{_QR.DESK_DIR}/research/replication")
 import os
 
-LOG = pathlib.Path(os.environ.get("DAVE_TRIAL_LOG", ROOT / "TRIAL_LOG.csv"))  # override only for code smoke tests
+LOG = pathlib.Path(os.environ.get("RESEARCH_TRIAL_LOG", ROOT / "TRIAL_LOG.csv"))  # override only for code smoke tests
 COLS = [
     "trial_id",
     "logged_at_sgt",

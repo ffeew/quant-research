@@ -10,11 +10,11 @@ if TYPE_CHECKING:
 
     import numpy.typing as npt
 
-# h3_dev_runner.py v3 (re-freeze 2026-11-13; v2 716e370f, v1 550211dc; v3 adds DV-25 stale terminal bar, the validator) - H3 DEV runner for sealed PREREG_H3_DRAFT_v2 (ecce2bbf...) + seal S1-S6 (40ddcc9c...).
+# h3_dev_runner.py v3 (re-freeze 2026-11-13; v2, v1; v3 adds DV-25 stale terminal bar, the validator) - H3 DEV runner for sealed PREREG_H3_DRAFT_v2 + seal S1-S6.
 # DEV ONLY (closes/events <= 2024-12-31). ONE run, guarded by an atomic LOCK. Raw output goes to validator first (S6).
-# Helper conventions COPIED (not imported) from dev_run.py (80f4bb71...): XNYS sessions, adjusted_close ratios,
+# Helper conventions COPIED (not imported) from dev_run.py: XNYS sessions, adjusted_close ratios,
 # 252-return OLS beta ending t-1, (ws, we] 15:30 ET cutoffs, UTC/ET readings of naive time_published, relevance-weighted
-# mean, Bartlett NW t, one-sided Student-t p (df = T-1), +/-1 day month padding; H1b-style entry from flat (h2_dev.py dba0e8fb
+# mean, Bartlett NW t, one-sided Student-t p (df = T-1), +/-1 day month padding; H1b-style entry from flat (h2_dev.py
 # for the guard/pin/exclusive-write pattern). v2 order: env_pin(5) -> config(6) -> S3 calendar(4) -> LOCK-exists(7) -> path guard(3)
 # -> PRE-LOCK preflight: every sha(2) + header lines + manifests + F1 universe x-check (8) -> atomic LOCK -> parse; any STOP after LOCK
 # exits nonzero BEFORE H3_DEV_RAW.json is written. --dry-check stops after the preflight (no data rows, no LOCK, no output).
@@ -62,7 +62,7 @@ def _sha_file(p: str) -> str:
 
 
 def env_check() -> dict[str, str]:
-    """Exit 5 on ANY mismatch with ENV_PIN_ADDENDUM_H3.md (2bb14197...). Runs before any third-party import."""
+    """Exit 5 on ANY mismatch with ENV_PIN_ADDENDUM_H3.md. Runs before any third-party import."""
     import platform
     from importlib import metadata
 

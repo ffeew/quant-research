@@ -1,7 +1,7 @@
 # RESULTS: IV-gap v2, DEV gate readout (the sentiment researcher, Daniel Koh's desk)
-Written 2026-11-13 ~23:50 SGT. Governed by PREREG r3 `PREREG_IV_GAP_v2_DRAFT_r3.md` 333bccad...2b46 (sealed, the validator).
-Run: `iv_gap_v2_run_r2_20261113/` SHA256SUMS 0b157ca0...6d29 (-c 6 OK), console 0c3243c9... (rc=0), FREEZE_NOTE cc997890...,
-RUNCHECK 567a6b26... (the validator, RUN ACCEPTED). Derived only from the sealed outputs by `derive.py`. No reader, AV or chain call; no rerun,
+Written 2026-11-13 ~23:50 SGT. Governed by PREREG r3 `PREREG_IV_GAP_v2_DRAFT_r3.md` (sealed, the validator).
+Run: `iv_gap_v2_run_r2_20261113/` SHA256SUMS (-c 6 OK), console (rc=0), FREEZE_NOTE,
+RUNCHECK (the validator, RUN ACCEPTED). Derived only from the sealed outputs by `derive.py`. No reader, AV or chain call; no rerun,
 no variant and no new cuts. The holdout (2016-06-01 onward) stayed unopened. v1 outputs were not opened.
 **Status: for the validator's check against the raw output first, then the fund manager.**
 

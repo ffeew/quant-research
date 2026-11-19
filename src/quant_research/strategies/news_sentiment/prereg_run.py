@@ -104,21 +104,21 @@ BORROW_BASE, BORROW_HTB_SENS = 0.01, 0.10
 COST_MULT_PRIMARY, COST_MULT_STRESS = 1.0, 2.0
 HTB_GATE_APPLIES = True  # Validator 2026-11-06 06:09 SGT: applies to SPDR ETF shorts (G11)
 HTB_GATE_RULE = "sharpe(simulate(..., borrow=BORROW_HTB_SENS)) > 0 else FAIL_ON_COSTS"
-TOMAS_INPUTS = f"{_QR.DESK_DIR}/tca/ethan_cost_inputs.md"
-TOMAS_INPUTS_SHA = desk_pin("strategies.news_sentiment.prereg_run", "TCA_INPUTS_SHA")
-TOMAS_DIR = f"{_QR.DESK_DIR}/tca/ethan_inputs"
-TOMAS_FILE_SHA = {
-    "asset_flags_paper.json": desk_pin("strategies.news_sentiment.prereg_run", "TCA_FILE_SHA.asset_flags_paper.json"),
-    "bucket_costs.csv": desk_pin("strategies.news_sentiment.prereg_run", "TCA_FILE_SHA.bucket_costs.csv"),
-    "card_costs.json": desk_pin("strategies.news_sentiment.prereg_run", "TCA_FILE_SHA.card_costs.json"),
-    "card_costs.py": desk_pin("strategies.news_sentiment.prereg_run", "TCA_FILE_SHA.card_costs.py"),
-    "cost_tables.py": desk_pin("strategies.news_sentiment.prereg_run", "TCA_FILE_SHA.cost_tables.py"),
-    "etf_costs.csv": desk_pin("strategies.news_sentiment.prereg_run", "TCA_FILE_SHA.etf_costs.csv"),
-    "open_vs_mid.py": desk_pin("strategies.news_sentiment.prereg_run", "TCA_FILE_SHA.open_vs_mid.py"),
-    "open_vs_mid_raw.csv": desk_pin("strategies.news_sentiment.prereg_run", "TCA_FILE_SHA.open_vs_mid_raw.csv"),
-    "per_side_costs.csv": desk_pin("strategies.news_sentiment.prereg_run", "TCA_FILE_SHA.per_side_costs.csv"),
-    "run.log": desk_pin("strategies.news_sentiment.prereg_run", "TCA_FILE_SHA.run.log"),
-    "sample_meta.json": desk_pin("strategies.news_sentiment.prereg_run", "TCA_FILE_SHA.sample_meta.json"),
+COSTS_INPUTS = f"{_QR.DESK_DIR}/tca/ethan_cost_inputs.md"
+COSTS_INPUTS_SHA = desk_pin("strategies.news_sentiment.prereg_run", "COSTS_INPUTS_SHA")
+COSTS_INPUTS_DIR = f"{_QR.DESK_DIR}/tca/ethan_inputs"
+COSTS_FILE_SHA = {
+    "asset_flags_paper.json": desk_pin("strategies.news_sentiment.prereg_run", "COSTS_FILE_SHA.asset_flags_paper.json"),
+    "bucket_costs.csv": desk_pin("strategies.news_sentiment.prereg_run", "COSTS_FILE_SHA.bucket_costs.csv"),
+    "card_costs.json": desk_pin("strategies.news_sentiment.prereg_run", "COSTS_FILE_SHA.card_costs.json"),
+    "card_costs.py": desk_pin("strategies.news_sentiment.prereg_run", "COSTS_FILE_SHA.card_costs.py"),
+    "cost_tables.py": desk_pin("strategies.news_sentiment.prereg_run", "COSTS_FILE_SHA.cost_tables.py"),
+    "etf_costs.csv": desk_pin("strategies.news_sentiment.prereg_run", "COSTS_FILE_SHA.etf_costs.csv"),
+    "open_vs_mid.py": desk_pin("strategies.news_sentiment.prereg_run", "COSTS_FILE_SHA.open_vs_mid.py"),
+    "open_vs_mid_raw.csv": desk_pin("strategies.news_sentiment.prereg_run", "COSTS_FILE_SHA.open_vs_mid_raw.csv"),
+    "per_side_costs.csv": desk_pin("strategies.news_sentiment.prereg_run", "COSTS_FILE_SHA.per_side_costs.csv"),
+    "run.log": desk_pin("strategies.news_sentiment.prereg_run", "COSTS_FILE_SHA.run.log"),
+    "sample_meta.json": desk_pin("strategies.news_sentiment.prereg_run", "COSTS_FILE_SHA.sample_meta.json"),
 }
 
 
@@ -142,9 +142,9 @@ def check(strict: bool) -> bool:
     )
     need("cost_model.py v1.1", sha(COST_MODEL) == COST_MODEL_SHA)
     need("cost_model.md v1.1", sha(COST_DOC) == COST_DOC_SHA)
-    need("ethan_cost_inputs.md", sha(TOMAS_INPUTS) == TOMAS_INPUTS_SHA)
-    for fn, h in TOMAS_FILE_SHA.items():
-        need(f"tca/ethan_inputs/{fn}", sha(os.path.join(TOMAS_DIR, fn)) == h)
+    need("ethan_cost_inputs.md", sha(COSTS_INPUTS) == COSTS_INPUTS_SHA)
+    for fn, h in COSTS_FILE_SHA.items():
+        need(f"tca/ethan_inputs/{fn}", sha(os.path.join(COSTS_INPUTS_DIR, fn)) == h)
     need("lm_positive", sha("lexicon/lm_positive.txt") == LM_POS_SHA)
     need("lm_negative", sha("lexicon/lm_negative.txt") == LM_NEG_SHA)
     try:
@@ -275,16 +275,16 @@ def sector_scores(x: pd.DataFrame, p: Mapping[str, Any]) -> pd.DataFrame:
     return cast(pd.DataFrame, g[g["size"] >= p["min_stocks"]]["mean"].unstack())
 
 
-_TOMAS_SIDE: pd.DataFrame | None = None
+_COSTS_SIDE: pd.DataFrame | None = None
 
 
-def tomas_per_side(sym: str) -> tuple[float, float]:
+def costs_per_side(sym: str) -> tuple[float, float]:
     """the TCA owner's measured per-side costs (tca/ethan_inputs/per_side_costs.csv): (base at the open, base_mktlim continuous)."""
-    global _TOMAS_SIDE
-    if _TOMAS_SIDE is None:
-        _TOMAS_SIDE = pd.read_csv(os.path.join(TOMAS_DIR, "per_side_costs.csv")).set_index("name")
-    if sym in _TOMAS_SIDE.index:
-        return float(cast(Any, _TOMAS_SIDE.at[sym, "base"])), float(cast(Any, _TOMAS_SIDE.at[sym, "base_mktlim"]))
+    global _COSTS_SIDE
+    if _COSTS_SIDE is None:
+        _COSTS_SIDE = pd.read_csv(os.path.join(COSTS_INPUTS_DIR, "per_side_costs.csv")).set_index("name")
+    if sym in _COSTS_SIDE.index:
+        return float(cast(Any, _COSTS_SIDE.at[sym, "base"])), float(cast(Any, _COSTS_SIDE.at[sym, "base_mktlim"]))
     return 0.0, 0.0
 
 
@@ -309,7 +309,7 @@ def leg_cost_bps(
         2 * hs_bucket * (half_spread_mult / 0.5 if venue == "open" else 1.0)
     )  # open applies 0.5x; mult 1.0 => 1.0x stress
     t = cm.trade_cost("buy", px, int(notional // px), adv_sh, spread_bps=spread, venue=venue)
-    base_open, base_cont = tomas_per_side(sym) if sym else (0.0, 0.0)
+    base_open, base_cont = costs_per_side(sym) if sym else (0.0, 0.0)
     return max(t["total_bps"], 2.0 + hs_bucket, base_open if venue == "open" else base_cont)
 
 

@@ -93,7 +93,7 @@ def summarize(
                 "breakeven_cost_bps": pg["mean_ann"] / traded_ann * 1e4 if traded_ann > 0 else np.nan,
                 "avg_long_mv": dd.long_mv.mean(),
                 "avg_short_mv": dd.short_mv.mean(),
-                "tomas_flag": flag(pn["mean_ann"], ps["mean_ann"], pg["mean_ann"], cost_ann + borrow_ann),
+                "costs_flag": flag(pn["mean_ann"], ps["mean_ann"], pg["mean_ann"], cost_ann + borrow_ann),
                 **meta,
             }
         )

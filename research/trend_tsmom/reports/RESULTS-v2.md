@@ -3,11 +3,11 @@
 **Owner:** Maya (Macro Strategist) · **Run:** Fri 30 Oct 2026, 01:37 SGT · **Spec:** `PREREG-v2.md` §1–§8 plus Amendments A1 (the validator) and A2 (STANDARD.md items). Both amendments were logged before the run.
 **One command:** `.venv/bin/python run_v2.py` (unit checks: `.venv/bin/python -m tests.test_v2_engine`, 23/23 PASS) · **Outputs:** `outputs_v2/` (v1 `outputs/` untouched)
 **Hashes:**
-- outputs_v2 directory: `1a19555e870896865cd3af470cbc4647138d2fa8f6f1748db7980d43f6a0039d`. This is the sha256 of `outputs_v2.MANIFEST.sha256`, the per-file sha256 list with sorted paths.
-- Data build: TR `0590692d…29db`.
-- Cost model: TCA owner v1.1 `df67d604…eebf`, unchanged from the pre-registration.
-- Code: combined `69f39bf7…0337`.
-- PREREG-v2.md at run time: `db90f920…bda`.
+- outputs_v2 directory. This is the sha256 of `outputs_v2.MANIFEST.sha256`, the per-file sha256 list with sorted paths.
+- Data build: TR.
+- Cost model: TCA owner v1.1, unchanged from the pre-registration.
+- Code: combined.
+- PREREG-v2.md at run time.
 - Full values are in `outputs_v2/meta.json`.
 
 Crypto remains excluded by desk decision.
@@ -167,7 +167,7 @@ The band saved about 0.6× turnover and added about 0.04 to net Sharpe.
 ## Caveats / limitations
 1. **Not out-of-sample.** 2017–2026 was fully seen in v1, and the v2 design was informed by v1's attribution (PREREG §1). Stage B on the 2005+ backfill is the real test. `bars/daily/extended/etf_total_return_spliced.parquet` exists but was **not read**.
 2. **Shortability look-ahead (A1.5).** Today's (2026-10-29) Alpaca shortable/ETB flags are applied to the whole history. USO is long/flat for this reason. Historical borrow availability is unknown.
-3. **Data build moved between pre-registration and run.** The TR file's sha256 was `87d09bb9…` at pre-registration (01:29 build) and `0590692d…` at run time (rebuilt 01:32:38 SGT). Per PREREG §2, all 19 v1 trials were re-run on the new build. They reproduce the v1-logged Sharpes to 3 decimals (e.g. baseline net 0.203, gross 0.607), so the rebuild did not move these ETFs materially.
+3. **Data build moved between pre-registration and run.** The TR file's sha256 was at pre-registration (01:29 build) and at run time (rebuilt 01:32:38 SGT). Per PREREG §2, all 19 v1 trials were re-run on the new build. They reproduce the v1-logged Sharpes to 3 decimals (e.g. baseline net 0.203, gross 0.607), so the rebuild did not move these ETFs materially.
 4. **Fills** are at the next session's close (lag 1), not STANDARD §2's "next-bar open or worse" open fill.
 5. **Borrow** base is the TCA owner's 25 bps. At STANDARD's 1%/yr floor, net Sharpe falls to 0.36.
 6. **No VIX series in the desk store**, so STANDARD §7's VIX regime split is not reported (gap; the data owner).

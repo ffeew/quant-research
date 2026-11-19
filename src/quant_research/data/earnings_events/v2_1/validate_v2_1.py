@@ -15,8 +15,8 @@ os.chdir(ROOT)
 V1 = desk_pin("data.earnings_events.v2_1.validate_v2_1", "V1")
 V2 = desk_pin("data.earnings_events.v2_1.validate_v2_1", "V2")
 OLD = desk_pin("data.earnings_events.v2_1.validate_v2_1", "OLD")
-VICTOR = desk_pin("data.earnings_events.v2_1.validate_v2_1", "VALIDATOR")
-DMITRI = desk_pin("data.earnings_events.v2_1.validate_v2_1", "DATA_OWNER")
+VALIDATION_SHA = desk_pin("data.earnings_events.v2_1.validate_v2_1", "VALIDATION_SHA")
+DATA_SHA = desk_pin("data.earnings_events.v2_1.validate_v2_1", "DATA_SHA")
 
 
 def sha(p: str) -> str:
@@ -32,8 +32,8 @@ assert sha("v2/earnings_events_8k202_v2.parquet") == V2
 assert sha("v2.1/earnings_events_8k202_v2.parquet") == V2
 assert sha("v2/SHA256SUMS") == sha("v2.1/PARENT_V2_SHA256SUMS")
 assert sha(f"{_QR.DATA_DIR}/earnings/edgar_8k_202.parquet") == OLD
-assert sha(f"{_QR.DESK_DIR}/validation/prereg_rulings/2026-11-06-ethan-8k202-v2-review.md") == VICTOR
-assert sha(f"{_QR.DATA_DIR}/derived/earnings_events_8k202_v1_reconciliation/DECISION.md") == DMITRI
+assert sha(f"{_QR.DESK_DIR}/validation/prereg_rulings/2026-11-06-ethan-8k202-v2-review.md") == VALIDATION_SHA
+assert sha(f"{_QR.DATA_DIR}/derived/earnings_events_8k202_v1_reconciliation/DECISION.md") == DATA_SHA
 
 v2 = pd.read_parquet("v2.1/earnings_events_8k202_v2.parquet")
 ins = v2[v2.in_sp500]

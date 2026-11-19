@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""DQ pass. Validator 63d3073d: content stats DEV-only (<2016-06-01).
+"""DQ pass. Validator: content stats DEV-only (<2016-06-01).
 OOS (>=2016-06-01): existence + row count (from manifest) + sha256 ONLY.
 Hashing OOS files (decompress + hash raw payload) is allowed for integrity;
 do not inspect quote/IV/expiry/greeks fields on OOS.

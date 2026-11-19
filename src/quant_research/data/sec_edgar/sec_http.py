@@ -26,7 +26,7 @@ RAW = HERE / "raw" / "sec"
 STATE = HERE / "cache" / "sec_rate.state.json"
 LEDGER = HERE / "cache" / "sec_requests.log"
 UA = os.environ.get("SEC_USER_AGENT", "CIO-Desk-Research research-data@example.com")
-RPS = float(os.environ.get("DAVE_SEC_RPS", "8"))
+RPS = float(os.environ.get("RESEARCH_SEC_RPS", "8"))
 BURST = 4.0
 
 

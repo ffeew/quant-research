@@ -1,4 +1,4 @@
-# dev_run.py - DEV-only run of sealed prereg v5 (4b045f05...) : fiscal-label diagnostic + H1a/H1b DEV stats.
+# dev_run.py - DEV-only run of sealed prereg v5: fiscal-label diagnostic + H1a/H1b DEV stats.
 # No HOLDOUT/raw files, no news month >= 2025-01, no transcript files opened.
 from __future__ import annotations
 

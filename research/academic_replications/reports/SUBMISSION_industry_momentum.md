@@ -11,7 +11,7 @@ Submitted by the derivatives researcher (Quant Research) to the validator, 2026-
 $QR_DESK_DIR/research/replication/.venv/bin/python $QR_DESK_DIR/research/replication/run_all.py --only imom
 ```
 Code: `research/replication/moskowitz-grinblatt-1999-industry-momentum/pipeline.py`, `_common/engine.py` (fills, costs, borrow), `_common/validation.py` (DSR, PBO, NW, walk-forward), `run_all.py`. Env: `research/replication/.venv` (`requirements.lock.txt`).
-Data snapshot: data owner SIP total_return ret_total_best (clean), fingerprint c50abc068669d327; file mtimes {"daily_total_return.parquet": "2026-10-30 01:32:38 SGT", "sp500_membership.parquet": "2026-10-30 01:31:38 SGT", "ff3_daily.parquet": "2026-10-30 01:10:57 SGT"}. Trial log: `research/replication/TRIAL_LOG.csv`; T x N daily net matrix: `research/replication/results/trials_daily_net_*.parquet`.
+Data snapshot: data owner SIP total_return ret_total_best (clean), fingerprint; file mtimes {"daily_total_return.parquet": "2026-10-30 01:32:38 SGT", "sp500_membership.parquet": "2026-10-30 01:31:38 SGT", "ff3_daily.parquet": "2026-10-30 01:10:57 SGT"}. Trial log: `research/replication/TRIAL_LOG.csv`; T x N daily net matrix: `research/replication/results/trials_daily_net_*.parquet`.
 
 ## Codified rules
 See the docstring of `pipeline.py` (copied below). No discretion, no overrides.
@@ -78,7 +78,7 @@ Execution: signal at the close of the last session of each month; market-on-open
 - Gross SR 0.12, 2x-cost SR -0.08; long leg gross SR 0.69 (ann 10.1%), short leg gross SR -0.54 (ann -8.6%).
 - Market: {"alpha_ann_vs_spy": 0.001, "alpha_t_nw_vs_spy": 0.022, "beta_spy": 0.009, "beta_t_nw": 0.335, "beta_neutral_test": "beta within +/-0.1 and |t|<2", "alpha_sharpe_vs_spy": 0.007, "alpha_ann_ff4": -0.032, "alpha_t_nw_ff4": -1.101, "load_Mkt-RF": 0.055, "load_SMB": -0.038, "load_HML": -0.016, "load_UMD": 0.49}
 - Gross-return beta vs SPY 0.01, gross alpha vs SPY 1.3% (t 0.35).
-- Turnover/costs: {"traded_per_yr_x_nav": 6.148, "avg_gross_exposure": 1.699, "oneway_turnover_per_yr_of_gross": 1.809, "avg_holding_months": 6.633, "gross_ret_per_unit_traded_bps": 23.833, "breakeven_cost_bps_per_side": 23.833, "assumed_avg_cost_bps_per_side": 6.497, "tomas_only_avg_cost_bps": 6.043, "breakeven_over_assumed": 3.669, "cost_drag_ann": 0.004, "borrow_drag_ann": 0.009, "avg_long_mv": 0.849, "avg_short_mv": 0.85}
+- Turnover/costs: {"traded_per_yr_x_nav": 6.148, "avg_gross_exposure": 1.699, "oneway_turnover_per_yr_of_gross": 1.809, "avg_holding_months": 6.633, "gross_ret_per_unit_traded_bps": 23.833, "breakeven_cost_bps_per_side": 23.833, "assumed_avg_cost_bps_per_side": 6.497, "costs_only_avg_cost_bps": 6.043, "breakeven_over_assumed": 3.669, "cost_drag_ann": 0.004, "borrow_drag_ann": 0.009, "avg_long_mv": 0.849, "avg_short_mv": 0.85}
 - Capacity: {"book_usd": 100000.0, "max_participation": 0.00019, "p99_participation": 8e-05, "share_trades_over_1pct_adv": 0.0, "max_participation_at_10x_book": 0.0019, "share_over_1pct_at_10x": 0.0}
 - Walk-forward: SR 0.22, t_NW 0.66, folds 8, picks ['topn_m20', 'topn_m20', 'all_m20', 'all_m20', 'all_m20', 'all_m20', 'all_m20', 'all_m20'], 2x SR 0.14
 - DSR (family N=48): 0.012; DSR (all derivatives researcher trials N=184): 0.001
@@ -133,7 +133,7 @@ Regimes (labels lagged 1 day):
 - Gross SR 0.48, 2x-cost SR 0.42; long leg gross SR 0.48 (ann 8.6%), short leg gross SR n/a (ann n/a).
 - Market: {"alpha_ann_vs_spy": -0.034, "alpha_t_nw_vs_spy": -1.169, "beta_spy": 0.874, "beta_t_nw": 31.457, "beta_neutral_test": "NOT beta-neutral", "alpha_sharpe_vs_spy": -0.366, "alpha_ann_ff4": -0.049, "alpha_t_nw_ff4": -1.783, "load_Mkt-RF": 0.882, "load_SMB": -0.114, "load_HML": 0.219, "load_UMD": 0.183}
 - Gross-return beta vs SPY 0.87, gross alpha vs SPY -2.9% (t -0.99).
-- Turnover/costs: {"traded_per_yr_x_nav": 7.68, "avg_gross_exposure": 1.0, "oneway_turnover_per_yr_of_gross": 3.84, "avg_holding_months": 3.125, "gross_ret_per_unit_traded_bps": 111.943, "breakeven_cost_bps_per_side": 111.943, "assumed_avg_cost_bps_per_side": 6.823, "tomas_only_avg_cost_bps": 6.507, "breakeven_over_assumed": 16.406, "cost_drag_ann": 0.005, "borrow_drag_ann": 0.0, "avg_long_mv": 1.0, "avg_short_mv": 0.0}
+- Turnover/costs: {"traded_per_yr_x_nav": 7.68, "avg_gross_exposure": 1.0, "oneway_turnover_per_yr_of_gross": 3.84, "avg_holding_months": 3.125, "gross_ret_per_unit_traded_bps": 111.943, "breakeven_cost_bps_per_side": 111.943, "assumed_avg_cost_bps_per_side": 6.823, "costs_only_avg_cost_bps": 6.507, "breakeven_over_assumed": 16.406, "cost_drag_ann": 0.005, "borrow_drag_ann": 0.0, "avg_long_mv": 1.0, "avg_short_mv": 0.0}
 - Capacity: {"book_usd": 100000.0, "max_participation": 0.01765, "p99_participation": 0.00026, "share_trades_over_1pct_adv": 0.00413, "max_participation_at_10x_book": 0.1765, "share_over_1pct_at_10x": 0.00413}
 - Walk-forward: SR 0.72, t_NW 2.17, folds 8, picks ['form_months_p20', 'all_p20', 'form_months_p20', 'all_p20', 'form_months_p20', 'form_months_p20', 'form_months_p20', 'all_p20'], 2x SR 0.70
 - DSR (family N=48): 0.178; DSR (all derivatives researcher trials N=184): 0.028
@@ -189,7 +189,7 @@ Regimes (labels lagged 1 day):
 - Gross SR -0.19, 2x-cost SR -0.46; long leg gross SR 0.49 (ann 8.5%), short leg gross SR -0.61 (ann -11.6%).
 - Market: {"alpha_ann_vs_spy": -0.046, "alpha_t_nw_vs_spy": -0.937, "beta_spy": -0.048, "beta_t_nw": -1.404, "beta_neutral_test": "beta within +/-0.1 and |t|<2", "alpha_sharpe_vs_spy": -0.289, "alpha_ann_ff4": -0.074, "alpha_t_nw_ff4": -1.759, "load_Mkt-RF": 0.007, "load_SMB": -0.051, "load_HML": 0.016, "load_UMD": 0.53}
 - Gross-return beta vs SPY -0.05, gross alpha vs SPY -2.5% (t -0.50).
-- Turnover/costs: {"traded_per_yr_x_nav": 16.332, "avg_gross_exposure": 2.017, "oneway_turnover_per_yr_of_gross": 4.049, "avg_holding_months": 2.963, "gross_ret_per_unit_traded_bps": -18.869, "breakeven_cost_bps_per_side": -18.869, "assumed_avg_cost_bps_per_side": 6.935, "tomas_only_avg_cost_bps": 6.648, "breakeven_over_assumed": -2.721, "cost_drag_ann": 0.011, "borrow_drag_ann": 0.01, "avg_long_mv": 1.006, "avg_short_mv": 1.01}
+- Turnover/costs: {"traded_per_yr_x_nav": 16.332, "avg_gross_exposure": 2.017, "oneway_turnover_per_yr_of_gross": 4.049, "avg_holding_months": 2.963, "gross_ret_per_unit_traded_bps": -18.869, "breakeven_cost_bps_per_side": -18.869, "assumed_avg_cost_bps_per_side": 6.935, "costs_only_avg_cost_bps": 6.648, "breakeven_over_assumed": -2.721, "cost_drag_ann": 0.011, "borrow_drag_ann": 0.01, "avg_long_mv": 1.006, "avg_short_mv": 1.01}
 - Capacity: {"book_usd": 100000.0, "max_participation": 0.01776, "p99_participation": 0.00039, "share_trades_over_1pct_adv": 0.0021, "max_participation_at_10x_book": 0.17757, "share_over_1pct_at_10x": 0.0021}
 - Walk-forward: SR 0.32, t_NW 0.95, folds 8, picks ['form_months_p20', 'form_months_p20', 'form_months_p20', 'form_months_p20', 'form_months_p20', 'form_months_p20', 'form_months_p20', 'form_months_p20'], 2x SR 0.21
 - DSR (family N=48): 0.000; DSR (all derivatives researcher trials N=184): 0.000

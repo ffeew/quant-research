@@ -1,7 +1,7 @@
-# oos_runner.py - single sealed H1b OOS run (prereg v5 4b045f05..., sealed; the fund manager/validator conditions).
+# oos_runner.py - single sealed H1b OOS run (prereg v5, sealed; the fund manager/validator conditions).
 # Reuses dev_run.py (copied byte-for-byte, sha pinned) by executing its source with a DECLARED, exact-match list of
 # textual edits (EDITS below; each must match exactly once). The SAME transformed source runs in both modes:
-#   --mode dev_rehearsal : DEV window/data (parity proof vs DEV_FREEZE 177f5e97). Refuses any HOLDOUT/raw path or news >= 2025-01.
+# --mode dev_rehearsal: DEV window/data (parity proof vs DEV_FREEZE). Refuses any HOLDOUT/raw path or news >= 2025-01.
 #   --mode oos           : H1b only, both readings (A3), decisions 2025-01-01..2026-10-31. One run; no retries.
 # No network. No trading. Output = raw stats for the validator (he rules PASS/FAIL, (d)).
 # v2 (validator C2): interpreter environment pinned via oos_config.json 'env_pin'; verified right after the config is parsed, before any

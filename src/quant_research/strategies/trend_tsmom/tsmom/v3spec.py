@@ -71,7 +71,7 @@ CA_TABLE_START = "2016-01-05"  # corporate-action table is the split source on/a
 ALPACA_START = "2016-01-04"  # build source switches from Yahoo to Alpaca SIP (data owner sign-off)
 NASDAQ_START = "2016-10-28"  # Nasdaq.com official close coverage starts
 # Yahoo split events before CA_TABLE_START: source $QR_SCRATCH_DIR/trend_v3_build/work_splitlog.parquet
-# (sha256 d749ec2e5bc90ef5ac34e8d3f2d534e5e18ebffb08149189063fd936c9639700), column yahoo_ratio = new shares per old.
+# column yahoo_ratio = new shares per old.
 PRE2016_SPLITS_SRC_SHA = desk_pin("strategies.trend_tsmom.tsmom.v3spec", "PRE2016_SPLITS_SRC_SHA")
 PRE2016_SPLITS = [
     ("IWM", "2005-06-09", 2.0),

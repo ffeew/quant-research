@@ -16,11 +16,11 @@ LIVE_STORE = Path(f"{_QR.DATA_DIR}")  # NOT read by the SUE build (live store di
 RELEASE = LIVE_STORE / "releases" / "v1.3"
 RELEASE_TOP_HASH = desk_pin("data.sec_edgar.common", "RELEASE_TOP_HASH")
 STORE = RELEASE  # 2026-11-06 22:xx: ALL SUE inputs read from the immutable v1.3 pin
-ETHAN_EVENTS_DIR = Path(f"{_QR.DESK_DIR}/equity/earnings_events")  # read-only
-ETHAN_ADDITIVE = LIVE_STORE / "derived" / "earnings_events_8k202_v1.parquet"  # optional ex99/timestamps only
+RESEARCH_EVENTS_DIR = Path(f"{_QR.DESK_DIR}/equity/earnings_events")  # read-only
+RESEARCH_ADDITIVE = LIVE_STORE / "derived" / "earnings_events_8k202_v1.parquet"  # optional ex99/timestamps only
 OUT = HERE / "out"
 OUT.mkdir(exist_ok=True)
-DATA_RELEASE_ID = "v1.3"  # top d137eea3…; SIP methodology settled (validator 2026-11-06). Sentiment researcher v1/v2 not used for any EPS/SUE value (SPEC.md).
+DATA_RELEASE_ID = "v1.3"  # top; SIP methodology settled (validator 2026-11-06). Sentiment researcher v1/v2 not used for any EPS/SUE value (SPEC.md).
 
 
 def sessions() -> pd.DatetimeIndex:

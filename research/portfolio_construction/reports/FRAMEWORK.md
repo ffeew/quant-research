@@ -65,7 +65,7 @@ Stage B can only **down-weight** a passed signal. It can never admit a signal th
 - No research signal has a PASS yet.
 - ⇒ **zero admitted signals** ⇒ §8 fallback applies.
 
-**Implementation (v2):** Stage A is an explicit input, `--victor_passed SIG1,SIG2`, with default empty, i.e. none passed as of 2026-10-30. A signal is validated only if it is in that list **and** passes Stage B. To do: parse verdicts-log.md directly.
+**Implementation (v2):** Stage A is an explicit input, `--validation_passed SIG1,SIG2`, with default empty, i.e. none passed as of 2026-10-30. A signal is validated only if it is in that list **and** passes Stage B. To do: parse verdicts-log.md directly.
 
 ## 2. Combination: IC-weighted, shrunk toward equal weight, with a correlation adjustment
 For admitted signals k = 1..K, each a cross-sectional z-score winsorised at ±3:
@@ -324,7 +324,7 @@ The composite is Σ_k sw_k·m_s(k)·p_s(k)·Z_k, divided by the cross-sectional 
 | Input | v0.6 (retired) | v0.7 |
 |---|---|---|
 | Universe | data.json symbols (non-crypto) | `DESK_UNIVERSE` = the same frozen 117 symbols (keys of `SECTOR`). MMC is absent from the store (it trades as MRSH there). The client fetches it from the API, but it has <260 bars, so it is dropped as before → 116 names |
-| Book history (prices, ATR, betas, LW Σ, signals) | data.json (Alpaca IEX via quant.py) | `desk_data_client.get_daily_bars(..., adjustment="all")`: store first (SIP, coverage end 2026-10-28; store VERSION v1.1 6e6353ec…, 2026-10-30T01:50:54+08:00), with zero-volume rows masked; window = today − 420 calendar days (as quant.py) |
+| Book history (prices, ATR, betas, LW Σ, signals) | data.json (Alpaca IEX via quant.py) | `desk_data_client.get_daily_bars(..., adjustment="all")`: store first (SIP, coverage end 2026-10-28; store VERSION v1.1, 2026-10-30T01:50:54+08:00), with zero-volume rows masked; window = today − 420 calendar days (as quant.py) |
 | Today's live row | data.json partial bar (IEX) | `desk_data_client.get_intraday_bars(..., "5Min")`: SIP 5-min bars from 09:30 ET, aggregated (o first, h/l max/min, v sum, c last). The client caps the end at now − 16 min. **Fails closed** if no bar comes back. `--live_source offline_test` (placeholder row, no API) is for tests only |
 | Sleeve proxy (m, σ_target) | the derivatives researcher's statarb IEX bars (deprecated 02:09) | `store_pit`: store bars via the client (`allow_api=False`) × PIT S&P 500 membership, minus the validator's `members_without_bars_symbols` (59, incl. SNDK) and SNDK. No delisting returns (as before). **PROVISIONAL – data defects pending the data owner's fixes**. A missing defect file → fail closed |
 | ADV | IEX × 21.6 | SIP from the store (TCA file where measured; median ratio 0.999) |
@@ -435,8 +435,8 @@ Research scripts:
 
 **2026-10-30 v0.6 run (02:08:24 SGT; superseded by the v0.7 run, see §4a.9; LIMITS alignment then cited as "v0.2", now v0.3.5):**
 - Files and log:
-  - `targets/targets_20261030T020824SGT.json`: tradable_derisk_only_v1, **empty**, 25 PASS + 1 INFO (T13 alert), 0 FAIL, sha256 87fe60d5a2be…;
-  - `shadow/targets_20261030T020824SGT.json`: shadow_fallback_composite_v1, 21 PASS + 2 INFO, 0 FAIL, sha256 76992a3eef79…;
+  - `targets/targets_20261030T020824SGT.json`: tradable_derisk_only_v1, **empty**, 25 PASS + 1 INFO (T13 alert), 0 FAIL;
+  - `shadow/targets_20261030T020824SGT.json`: shadow_fallback_composite_v1, 21 PASS + 2 INFO, 0 FAIL;
   - log lines 5–6 (schema_version 2).
 - Shadow: **12 names, gross 42.89%, net 5.43%, β +0.0022, ex-ante vol 4.64% raw / 5.79% inflated.** Names: LRCX −8.18%, NFLX −6.76%, UNH 5.70%, SPY 3.84%, MU 3.77%, PANW 3.39%, ISRG −3.13%, MRK 2.97%, SMH 2.24%, META 1.27%, ACN 0.98%, CAT −0.66%.
   - **Earnings flag (shadow):** the shorts LRCX, NFLX, ISRG and CAT have no known next release date.
@@ -541,7 +541,7 @@ The earlier label "equal-risk" was inaccurate and has been retired. The signal w
 ## 9. Implemented vs to-do summary
 | Component | construct.py today | To do |
 |---|---|---|
-| Admission gate | ✅ `--victor_passed` AND internal OOS test | Parse verdicts-log automatically |
+| Admission gate | ✅ `--validation_passed` AND internal OOS test | Parse verdicts-log automatically |
 | IC weights + shrinkage + correlation adjustment | ✅ (n0 = 20, C_shr, 50/50 blend) | Walk-forward IC and decay from the validator; per-signal budget cap |
 | Covariance shrinkage | ✅ LW 2004 optimal δ\* to constant correlation (fixed 0.5 optional) | Exclude cross-asset ETFs from the CC block |
 | Risk-forecast inflation | ✅ k = 1.25 in the 6% cap only (short-sample bias 1.15–1.37; v0.5 10y PIT L/S bias 1.14–1.23, **PROVISIONAL – data defects pending the data owner's fixes**) | Regime-dependent k (2020 bias ~1.5); re-run ls_volcap_wf after the data owner's fixes |

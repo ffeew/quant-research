@@ -31,7 +31,7 @@
 
 **Implementation.** See FRAMEWORK.md §8; v1 is archived at `archive/construct_v1_2026-10-30.py`.
 - `--fallback derisk` is the default.
-- `--victor_passed` is empty, since no validator PASS exists as of 2026-10-30.
+- `--validation_passed` is empty, since no validator PASS exists as of 2026-10-30.
 - The default cost model is `--cost_model tca`:
   - per side = measured pilot half-spread (or bucket default) + 0.75·σ·√(Q/ADV20) + H;
   - ADV is SIP where measured, else IEX × 21.6, the median SIP/IEX ratio over the 5 pilot names;
@@ -474,7 +474,7 @@ Source: `validation/backtests/pead_long_pit/data_issues.json` and `results.md` (
 > **PROVISIONAL: data defects are pending the data owner's fixes.** This applies to the sleeve m / σ_target below (the store_pit proxy).
 
 **Data sources (DESK_RULES #5)**
-- History comes only from the data owner's store (v1.1 6e6353ec…, coverage end 2026-10-28), read through `desk_data_client`.
+- History comes only from the data owner's store (v1.1, coverage end 2026-10-28), read through `desk_data_client`.
 - The live row comes from SIP 5-min bars through the client.
 - construct.py no longer reads data.json and makes no direct HTTP calls.
 - The research scripts default to the store.

@@ -36,9 +36,9 @@ def load_events() -> pd.DataFrame:
     ev = ev.merge(ee, on=["symbol", "cik", "announce_date_et"], how="left", suffixes=("", "_ee"))
     # exhibits
     # Prefer our exhibits map; overlay the sentiment researcher's additive ex99_url when accession matches (never filter events by it)
-    if common.ETHAN_ADDITIVE.exists():
-        eth = pd.read_parquet(common.ETHAN_ADDITIVE, columns=["accession", "ex99_url"])
-        eth = eth.rename(columns={"ex99_url": "ex99_url_ethan"})
+    if common.RESEARCH_ADDITIVE.exists():
+        eth = pd.read_parquet(common.RESEARCH_ADDITIVE, columns=["accession", "ex99_url"])
+        eth = eth.rename(columns={"ex99_url": "ex99_url_research"})
     else:
         eth = None
     for p in [common.OUT / "exhibits.parquet", common.OUT / "exhibits_from_ethan_cache.parquet"]:
@@ -51,8 +51,8 @@ def load_events() -> pd.DataFrame:
     if eth is not None:
         ev = ev.merge(eth, on="accession", how="left")
         # fill missing ex99 from sentiment researcher additive only
-        m = ev.ex99_url.isna() & ev.ex99_url_ethan.notna()
-        ev.loc[m, "ex99_url"] = ev.loc[m, "ex99_url_ethan"]
+        m = ev.ex99_url.isna() & ev.ex99_url_research.notna()
+        ev.loc[m, "ex99_url"] = ev.loc[m, "ex99_url_research"]
         ev.loc[m, "ex99_rule"] = "ethan_v1_additive"
     # CRITICAL: never drop rows for missing ex99 — use primary_doc url from edgar_8k_202
     miss = ev.ex99_url.isna()

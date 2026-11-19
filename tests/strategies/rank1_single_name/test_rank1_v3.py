@@ -368,7 +368,7 @@ class SignedSigmaCorrection(unittest.TestCase):
             "75da49ee5c68dd95587f7a26917870dbae3c6ddae81ce77634485e871acd7ef2",
         )
         self.assertEqual(
-            S.TOMAS_SIGNED_NOTE_SHA256, desk_pin("strategies.rank1_single_name.rank1_sigma", "TCA_SIGNED_NOTE_SHA256")
+            S.COSTS_SIGNED_NOTE_SHA256, desk_pin("strategies.rank1_single_name.rank1_sigma", "COSTS_SIGNED_NOTE_SHA256")
         )
         self.assertEqual(cost_adapter().sigma_estimator_pin(), S.SIGMA_DEFINITION_SHA256)
         c = mock_sigma_contract()

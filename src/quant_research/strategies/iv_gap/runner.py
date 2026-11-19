@@ -1,6 +1,6 @@
 """IV-gap v2 runner (FROZEN CANDIDATE; sentiment researcher desk; built 2026-11-13 SGT).
 
-Spec: PREREG_IV_GAP_v2_DRAFT_r3.md sha 333bccad2e2823a44c88aeb0839ee2fe55a548e4a6dcc97d9d2c8695cc072b46.
+Spec: PREREG_IV_GAP_v2_DRAFT_r3.md.
 Stdlib only. Run (ONE run, after validator confirmation + LOCK only):
   env -u ALPHAVANTAGE_API_KEY $QR_DATA_DIR/.venv/bin/python -I -B runner.py <NEW_RUN_DIR>
 Reads ONLY through the data owner's sealed reader ivgap_av_reader_v2.api (W1d). No mapping, no direct file reads of

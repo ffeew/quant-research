@@ -1,5 +1,5 @@
 """derive.py - IV-gap v2 DEV readout derivations. Reads ONLY the sealed run-dir CSVs
-(no reader, AV or chain calls). Applies prereg r3 (333bccad) s7 rules verbatim:
+(no reader, AV or chain calls). Applies prereg r3 s7 rules verbatim:
 reported cell iff n>=20; usable iff drop_rate<=0.10 in a non-killed symbol-year;
 kill iff symbol-year drop_rate over all kept legs > 0.10. No new thresholds."""
 

@@ -456,7 +456,7 @@ def test_nasdaq_scheduled_never_confirmed_fabricated():
     assert st3["ZZ"]["next"] == "2026-11-10" and st3["ZZ"]["kind"].startswith("known_estimated"), st3["ZZ"]
 
 
-def test_rachel_20261105_rejection_regressions():
+def test_risk_20261105_rejection_regressions():
     """Reproduce the risk manager's 2026-11-06 findings; production PINNED now authenticates 20261105 (AUTHORIZED 2026-11-06)."""
     import json
 

@@ -36,7 +36,7 @@ from quant_research.backtest.costs import cost_model as cm
 
 BOOK_USD = 100_000.0  # desk paper account equity ~ $100k (risk/2026-10-30-pilot-positions-review.md)
 BORROW_RATE = 0.01  # The validator §5 GC minimum
-VICTOR_FLOOR = {"L1": 5.0, "L2": 5.0, "L3": 10.0, "L4": 20.0}
+VALIDATION_FLOOR = {"L1": 5.0, "L2": 5.0, "L3": 10.0, "L4": 20.0}
 ETF_FLOOR = 2.0
 
 
@@ -78,10 +78,10 @@ def trade_costs(
         )
         b = tc["bucket"].split()[0]
         hs = cm.BUCKETS[tc["bucket"]][1]
-        floor = (ETF_FLOOR if s in etfs else VICTOR_FLOOR[b]) + hs
+        floor = (ETF_FLOOR if s in etfs else VALIDATION_FLOOR[b]) + hs
         rows.append((date, s, d, b, tc["total_bps"], floor, max(tc["total_bps"], floor), sh / a if a > 0 else np.nan))
     return pd.DataFrame(
-        rows, columns=["date", "symbol", "dw", "bucket", "tomas_bps", "victor_floor_bps", "bps", "participation"]
+        rows, columns=["date", "symbol", "dw", "bucket", "costs_bps", "validation_floor_bps", "bps", "participation"]
     )
 
 

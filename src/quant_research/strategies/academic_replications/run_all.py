@@ -484,7 +484,7 @@ def main() -> None:
             traded = daily.traded.sum() / yrs
             gross_book = (daily.long_mv + daily.short_mv).mean()
             avg_bps = (trades.dw.abs() * trades.bps).sum() / trades.dw.abs().sum() if len(trades) else np.nan
-            avg_tomas = (trades.dw.abs() * trades.tomas_bps).sum() / trades.dw.abs().sum() if len(trades) else np.nan
+            avg_costs = (trades.dw.abs() * trades.costs_bps).sum() / trades.dw.abs().sum() if len(trades) else np.nan
             be = pk["gross"]["ann_ret"] / traded * 1e4 if traded > 0 else np.nan
             pk["turn"] = {
                 "traded_per_yr_x_nav": traded,
@@ -494,7 +494,7 @@ def main() -> None:
                 "gross_ret_per_unit_traded_bps": be,
                 "breakeven_cost_bps_per_side": be,
                 "assumed_avg_cost_bps_per_side": avg_bps,
-                "tomas_only_avg_cost_bps": avg_tomas,
+                "costs_only_avg_cost_bps": avg_costs,
                 "breakeven_over_assumed": be / avg_bps if avg_bps else np.nan,
                 "cost_drag_ann": daily.cost.sum() / yrs,
                 "borrow_drag_ann": daily.borrow.sum() / yrs,
@@ -896,7 +896,7 @@ def write_submission(
         (
             "§5 costs >= validator minimums; borrow >= 1%/yr; exclude unborrowable",
             "MET (borrow caveat)",
-            f"avg {tr['assumed_avg_cost_bps_per_side']:.1f} bps/side (TCA-owner-only {tr['tomas_only_avg_cost_bps']:.1f}); borrow 1%/yr; no PIT borrow history exists, so unborrowable names cannot be excluded at signal time",
+            f"avg {tr['assumed_avg_cost_bps_per_side']:.1f} bps/side (TCA-owner-only {tr['costs_only_avg_cost_bps']:.1f}); borrow 1%/yr; no PIT borrow history exists, so unborrowable names cannot be excluded at signal time",
         ),
         (
             "§6 post-publication haircut",

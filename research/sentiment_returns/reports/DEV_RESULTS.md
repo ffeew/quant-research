@@ -1,4 +1,4 @@
-# DEV_RESULTS — sentiment→returns, prereg v5 (4b045f05…4c91, sealed). DEV ONLY. Not verified point-in-time;
+# DEV_RESULTS — sentiment→returns, prereg v5 (sealed). DEV ONLY. Not verified point-in-time;
 # survivorship upper bound; timestamp zone unconfirmed. No HOLDOUT file opened; no OOS computed; no trading.
 Freeze file: DEV_FREEZE.json (0444). Code: dev_run.py, fiscal_diag.py. Logs: dev_run.log, RUN_LOG.txt, fiscal_diag.log.
 Per-period tables: periods_<H>_<reading>.tsv (date, n, k, IC, L/S raw & beta-adj, turnover).

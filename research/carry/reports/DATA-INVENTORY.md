@@ -1,18 +1,18 @@
 # Carry (KMPV 2018): data inventory for Maya's carry track
 
 **Owner:** Maya (Macro Strategist) · **Written:** Fri 30 Oct 2026, ~02:30 SGT (UTC+8) · **Status:** inventory only. **No returns, signals or performance were computed.**
-- Method: file listing, `sha256sum -c` on the data owner's SHA256SUMS files, row/date coverage counts, and as-of spot checks through `ddc.alfred_asof` (store reads only; no live FRED or Alpaca call was needed).
+- Method: file listing, `sha256sum -c` on Dmitri's SHA256SUMS files, row/date coverage counts, and as-of spot checks through `ddc.alfred_asof` (store reads only; no live FRED or Alpaca call was needed).
 - Script: `research/replications/carry/inventory_check.py` (sha256 `62d61866…bbab`), output `inventory_check_output.json` (sha256 `7109e825…c1be`). Every count below comes from that JSON unless another path is cited.
 - **Not opened:** `data/bars/daily/extended/` (sealed trend-v3 holdout). There is also a `data/releases/v1.2/bars/daily/extended/` directory (seen only as a directory name in a file count); it was **not** opened either (see §6).
-- Desk data VERSION at check: `v1.1 6e6353ec…a7d1 2026-10-30T01:50:54+08:00` (`data/VERSION`). A `snapshots/20261029T182421Z_v1.2.json` and `releases/v1.2/` also exist, so the snapshot to pin is a question for the data owner.
+- Desk data VERSION at check: `v1.1 6e6353ec…a7d1 2026-10-30T01:50:54+08:00` (`data/VERSION`). A `snapshots/20261029T182421Z_v1.2.json` and `releases/v1.2/` also exist, so the snapshot to pin is a question for Dmitri.
 
 ## 1. Summary: which legs are feasible now
 
 | KMPV leg | Signal data in store | Tradeable proxy (Alpaca, 2016+ non-extended bars) | Verdict |
 |---|---|---|---|
 | **Government bond / US Treasury term structure** (yield − short rate + roll-down) | **YES.** Full PIT UST curve 1m–30y, daily, ALFRED vintages, 2004-01 → 2026-10-27 | **YES.** BIL, SHY, IEF, TLT (all shortable/ETB today; L1/L2 liquidity). No IEI, GOVT, VGIT etc. in store | **FEASIBLE NOW** (primary) |
-| **FX** (3m rate differential vs USD) | **PARTIAL.** OECD 3m interbank, monthly, PIT vintages, ~42–45 days lag (JP ~70–75); **EZ and GB end 2026-01** | **WEAK.** FXE, FXY, FXB, FXA, FXC, UUP in store; all **< $50M/day**; **FXE and FXB not shortable** today; **no CHF, NZD, SEK, NOK ETF** in store | **Data-feasible for 5 currencies, not recommended as primary** (cost + shortability + stale EUR/GBP rates). See §3 |
-| **Equity index** (dividend yield − local short rate) | **NO dividend yields delivered.** Only ETF cash distributions (ex-dates 2016-06 →) from which a trailing proxy could be built | SPY, EFA, EEM, EWJ, EWG, EWU, EWA, EWC… in store | **NOT FEASIBLE as specified** (proxy only, needs validator decision) |
+| **FX** (3m rate differential vs USD) | **PARTIAL.** OECD 3m interbank, monthly, PIT vintages, ~42–45 days lag (JP ~70–75); **EZ and GB end 2026-01** | **WEAK.** FXE, FXY, FXB, FXA, FXC, UUP in store; all **< $50M/day (L4)**; **FXE and FXB not shortable** today; **no CHF, NZD, SEK, NOK ETF** in store | **Data-feasible for 5 currencies, not recommended as primary** (cost + shortability + stale EUR/GBP rates). See §3 |
+| **Equity index** (dividend yield − local short rate) | **NO dividend yields delivered.** Only ETF cash distributions (ex-dates 2016-06 →) from which a trailing proxy could be built | SPY, EFA, EEM, EWJ, EWG, EWU, EWA, EWC… in store | **NOT FEASIBLE as specified** (proxy only, needs Victor ruling) |
 | **Commodity** (futures curve slope / roll yield) | **NO futures curves** (front/second month) in store | USO, UNG, DBC, DBA, GLD, SLV, CPER in store | **NOT FEASIBLE** (no signal data) |
 | **Credit** (OAS-based carry) | **PARTIAL.** IG/HY OAS only **2023-10-30 → 2026-10-28** (~3 years) | LQD, HYG in store | **NOT FEASIBLE** for a validated test (STANDARD §2 needs ≥ 10y; §3 needs ≥ 3y OOS) |
 
@@ -49,7 +49,7 @@ Still missing (checked by filename search across the store, excluding the sealed
 - **Curve nodes available for roll-down interpolation:** 1m, 3m, 6m, 1y, 2y, 3y, 5y, 7y, 10y, 20y, 30y.
 
 ### 2.2 Tradeable proxies (store bars `data/bars/daily/{adjusted,raw}/`, TR in `bars/daily/total_return/daily_total_return.parquet` sha256 `0590692d765515e0f76f4f6b7360c5ed7be38e2e85a5f91562dbfebcf8a129db`)
-Shortability from `assets/snapshots/assets_2026-10-29.parquet` (sha256 `3996cd928f05c391372cc27ed5701ebf1c7a1df54c654845ae1e3a63b49b2809`; **today's flags only**, no history: `data/STATUS.md`). Dollar volume = median of raw close × SIP volume over the last 252 sessions (liquidity only, not a return). TCA owner bucket edges from `tca/cost_model.md` §2 (20-day ADV: L1 > $1B, L2 $200M–1B, L3 $50–200M, L4 < $50M); the bucket used in a backtest is the lagged 20-day value as of each date, so the column is indicative only.
+Shortability from `assets/snapshots/assets_2026-10-29.parquet` (sha256 `3996cd928f05c391372cc27ed5701ebf1c7a1df54c654845ae1e3a63b49b2809`; **today's flags only**, no history: `data/STATUS.md`). Dollar volume = median of raw close × SIP volume over the last 252 sessions (liquidity only, not a return). Tomas bucket edges from `tca/cost_model.md` §2 (20-day ADV: L1 > $1B, L2 $200M–1B, L3 $50–200M, L4 < $50M); the bucket used in a backtest is the lagged 20-day value as of each date, so the column is indicative only.
 
 | ETF | Index maturity bucket (issuer description, not in store) | Bars | Sessions | Median $ vol (last 252) | Indicative bucket | Shortable / ETB today | Listing (`tca/tca_scripts/etf_listing.json`) |
 |---|---|---|---|---|---|---|---|
@@ -111,13 +111,13 @@ Shortability from `assets/snapshots/assets_2026-10-29.parquet` (sha256 `3996cd92
 
 ## 4. Equity-index leg
 - **Dividend yields: not delivered**, not in store (filename search, and `data/README.md` blockers list).
-- **What exists:** ETF cash distributions in `corporate_actions/dividends.parquet` (sha256 `f834766c748e87665d1fdb25ba3ddf19533e74f352943c1d914f80742831454e`) with `ex_date` and `known_as_of_date`. First ex-dates: SPY 2016-06-17 (41 by 2026-09-18); EFA, EEM, EWA, EWJ, EWU, EWC, EWG 2016-06-22 → 2026-06-15 (18–22 each, semi-annual). A trailing-12m distribution yield could be built from about 2017-06. It is backward-looking, not the expected/futures-implied yield that KMPV use; this would be a different signal and needs a validator decision before use.
+- **What exists:** ETF cash distributions in `corporate_actions/dividends.parquet` (sha256 `f834766c748e87665d1fdb25ba3ddf19533e74f352943c1d914f80742831454e`) with `ex_date` and `known_as_of_date`. First ex-dates: SPY 2016-06-17 (41 by 2026-09-18); EFA, EEM, EWA, EWJ, EWU, EWC, EWG 2016-06-22 → 2026-06-15 (18–22 each, semi-annual). A trailing-12m distribution yield could be built from about 2017-06. It is backward-looking, not the expected/futures-implied yield that KMPV use; this would be a different signal and needs a Victor ruling before use.
 - **Local short rates:** G10 3m (§3) covers US/EZ/GB/JP/CA/AU, with the EZ/GB 2026-01 end. EEM, EWZ, FXI, INDA, EWY, EWT have no local rate in store.
-- **Proxies in store:** SPY, QQQ, IWM, DIA, EFA, EEM, EWJ, EWZ, FXI, EWG, EWU, INDA, EWY, EWT, EWA, EWC (all 2016-01-04 → 2026-10-28). EWA **not shortable** today; EWG $59M, EWU $70M, EWA $87M, EWC $98M median $ vol.
+- **Proxies in store:** SPY, QQQ, IWM, DIA, EFA, EEM, EWJ, EWZ, FXI, EWG, EWU, INDA, EWY, EWT, EWA, EWC (all 2016-01-04 → 2026-10-28). EWA **not shortable** today; EWG $59M, EWU $70M, EWA $87M, EWC $98M median $ vol (L3).
 - **Verdict:** not feasible as KMPV specify it.
 
 ## 5. Commodity and credit legs
-- **Commodity:no futures front/second-month prices** in store, so no roll-yield signal. Proxies exist only for returns: USO (**not shortable**), UNG, DBC ($21.7M, L4), DBA ($20.7M, L4), GLD, SLV, CPER ($21.0M, L4). The card's main data blocker for data owner still stands (`research/papers/carry-koijen-moskowitz-pedersen-vrugt-2018.md`). **Not feasible.**
+- **Commodity:** **no futures front/second-month prices** in store, so no roll-yield signal. Proxies exist only for returns: USO (**not shortable**), UNG, DBC ($21.7M, L4), DBA ($20.7M, L4), GLD, SLV, CPER ($21.0M, L4). The card's main data blocker for Dmitri still stands (`research/papers/carry-koijen-moskowitz-pedersen-vrugt-2018.md`). **Not feasible.**
 - **Credit:** `data/sentiment/credit/` (`sha256sum -c` all OK): `credit_vintages_20261030.parquet` `e739c52dff967a5a1c939937af116da4cac1cdcf1d6483e40146e82526bc53c4`, `credit_pit_first_available_20261030.parquet` `738ff1ff2ef8aaecf56607ebd62756c725e9c4baa8ba86cd46de261da37c833e`, `credit_series_meta_20261030.parquet` `ed585a4413946451de9742370d01ddcba1e5fb84f270a9a504ae56699eabbdea`.
   - BAMLC0A0CM: 2023-10-30 → 2026-10-28, 794 obs (10 NaN), 1 revised. BAMLH0A0HYM2: same dates, 794 obs (8 NaN), 0 revised. Daily; available obs t+1 bd at 10:30 ET (realtime_start alone is look-ahead, README §13).
   - Proxies: LQD ($3,314M, L1), HYG ($3,066M, L1), both shortable/ETB.
@@ -130,7 +130,7 @@ Shortability from `assets/snapshots/assets_2026-10-29.parquet` (sha256 `3996cd92
 - Cost model: `tca/tca_scripts/cost_model.py` sha256 verified `df67d604489583d36bb1a16dc7ed30c5568b9a17526f450e4c1a335f9fe8eebf` (matches the brief).
 - Corporate actions: `corporate_actions/splits.parquet` / `all_actions.parquet` (hash to be pinned with the build).
 
-**Notes for the data owner / validator:**
+**Notes for Dmitri / Victor:**
 1. A second extended tree exists at `data/releases/v1.2/bars/daily/extended/` (with `yahoo/` and `signoff/` subfolders by file count). I did not open it. The seal probably needs to cover this copy too.
 2. `data/STATUS.md` says 49 ETFs, but BWX and CPER also have 2016+ bars in `bars/daily/adjusted/`.
 3. `data/VERSION` reads v1.1 while a v1.2 snapshot/release exists; which one gets pinned for carry is open.
