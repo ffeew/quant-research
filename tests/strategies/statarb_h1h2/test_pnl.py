@@ -241,6 +241,11 @@ def test_h2_delisting_stress_applies_to_held_position():
 
 
 def _terminal_short(n, h_i):
+    d, ov, rec, _b, _wa = _terminal_short_full(n, h_i)
+    return d, ov, rec
+
+
+def _terminal_short_full(n, h_i):
     b = _bars(n)
     b["PX"].iloc[20:, 0] = np.nan
     b["VOL"].iloc[20:, 0] = 0
@@ -253,8 +258,8 @@ def _terminal_short(n, h_i):
         "alternatives": [{"cash": 25.0, "ratio": 1.0, "acquirer_id": "ACQ", "acquirer_identity_accepted": True}],
     }
     roster = [{"symbol": "A", "identity_ok": True, "short_terms": terms}]
-    _, ov, rec = pnl.h1_terminal_bound(b, W, roster, pnl.build_cost_config("unknown_borrow_required"), client=Closes())
-    return d, ov, rec
+    Wa, ov, rec = pnl.h1_terminal_bound(b, W, roster, pnl.build_cost_config("unknown_borrow_required"), client=Closes())
+    return d, ov, rec, b, Wa
 
 
 def test_h1_terminal_borrow_accrues_three_days_over_a_weekend():
@@ -270,9 +275,10 @@ def test_h1_terminal_borrow_over_a_year_is_about_ten_percent():
     n = 300
     d0 = pd.bdate_range("2018-01-01", periods=n)
     h_i = int(np.searchsorted(d0.values, (d0[19] + pd.Timedelta(days=365)).to_datetime64()))
-    d, ov, _ = _terminal_short(n, h_i)
+    d, ov, _, b, Wa = _terminal_short_full(n, h_i)
     liability = 0.05 * (55.0 / 50.0 - 1.0)
-    borrow = -ov.sum() - liability
+    base = pnl.apply_costs_and_returns(b, Wa, pnl.build_cost_config("unknown_borrow_required"), idea="H1")
+    borrow = -ov.sum() - liability + base["daily"]["borrow"].loc[d[20] :].sum()  # tau -> tau+1 is base borrow
     days = (d[h_i] - d[19]).days  # tau close -> h close
     assert days >= 365
     assert np.isclose(borrow, 0.05 * 0.10 * days / 360)
@@ -509,11 +515,11 @@ def test_weights_off_the_price_index_fail_closed():
     W = pd.DataFrame(0.0, index=extra, columns=["A", "B"])
     W.iloc[12:, 0] = 0.1
     cfg = pnl.build_cost_config("unknown_borrow_required")
-    with pytest.raises(Blocked, match="not in the price index"):
+    with pytest.raises(Blocked, match="weight index != price index"):
         pnl.apply_costs_and_returns(b, W, cfg, idea="H1", costs=ZeroCost())
-    with pytest.raises(Blocked, match="not in the price index"):
+    with pytest.raises(Blocked, match="weight index != price index"):
         pnl.held_positions(b, W)
-    with pytest.raises(Blocked, match="not in the price index"):
+    with pytest.raises(Blocked, match="weight index != price index"):
         pnl.h1_terminal_bound(b, W, [{"symbol": "A", "identity_ok": True}], cfg)
 
 
@@ -534,3 +540,31 @@ def test_adv20_counts_non_print_sessions_as_zero_dollars():
     W2 = pd.DataFrame(0.0, index=d, columns=["A", "B"])
     W2.iloc[2:, 0] = 0.1
     assert pnl.held_positions(pre, W2)["A"].iloc[:16].eq(0).all()  # 10 sessions of history first
+
+
+def test_weights_must_equal_the_price_index():
+    b = _bars()
+    d = b["R"].index
+    cfg = pnl.build_cost_config("unknown_borrow_required")
+    short = pd.DataFrame({"A": 0.1, "B": 0.0}, index=d[:-3])  # a strict subset: 3 price sessions skipped
+    flipped = pd.DataFrame({"A": 0.1, "B": 0.0}, index=d[::-1])  # same sessions, different order
+    for W in (short, flipped):
+        with pytest.raises(Blocked, match="weight index != price index"):
+            pnl.apply_costs_and_returns(b, W, cfg, idea="H1", costs=ZeroCost())
+        with pytest.raises(Blocked, match="weight index != price index"):
+            pnl.held_positions(b, W)
+    assert pnl.held_positions(b, pd.DataFrame({"A": 0.1, "B": 0.0}, index=d)).shape == (len(d), 2)
+
+
+def test_h1_short_bound_charges_tau_to_tau1_borrow_once():
+    d, ov, rec, b, Wa = _terminal_short_full(30, 27)  # short 0.05 from close 10, tau = 19
+    cfg = pnl.build_cost_config("unknown_borrow_required")
+    per_day = 0.05 * 0.10 / 360
+    liability = 0.05 * (55.0 / 50.0 - 1.0)
+    assert np.isclose(ov.iloc[20], -liability)  # tau+1 overlay: the liability only, no borrow
+    base = pnl.apply_costs_and_returns(b, Wa, cfg, idea="H1")["daily"]["borrow"]
+    assert np.isclose(base.loc[d[20]], per_day * (d[20] - d[19]).days)  # base borrow covers tau -> tau+1
+    assert base.loc[d[21] :].eq(0).all()  # settled: no base borrow after tau+1
+    total = float(base.loc[d[20] :].sum()) - float(ov.sum()) - liability
+    assert np.isclose(total, per_day * (d[27] - d[19]).days)  # every day from tau to h, once
+    assert rec[0]["borrow_rate"] == 0.10
