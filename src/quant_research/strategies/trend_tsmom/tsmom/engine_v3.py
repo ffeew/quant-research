@@ -1,6 +1,6 @@
 """PREREG-v3 engine: limits-compliant ETF trend sleeve (dollar NAV accounting, open fills, H6 stops, H8/H9 breakers).
 
-Spec: PREREG-v3.md §3-§5 + Victor's amendments A1-A6 (§9.A) + implementation clarifications (§9.B).
+Spec: PREREG-v3.md §3-§5 + the validator's amendments A1-A6 (§9.A) + implementation clarifications (§9.B).
 The v1/v2 engine (tsmom/engine.py) is untouched; this is a separate module.
 
 Panel (all DataFrames indexed by session date, columns = symbols):
@@ -9,7 +9,7 @@ Panel (all DataFrames indexed by session date, columns = symbols):
     volume  shares
     rf      Series, daily risk-free rate (decimal per session)
 Accounting: NAV = cash + sum(holdings$). Cash (incl. short proceeds) earns rf; borrow is charged on short MV
-(calendar days / 360). Costs (Tomas v1.1 trade_cost) and borrow reduce NAV. Daily excess return = NAV_k/NAV_k-1 - 1 - rf_k.
+(calendar days / 360). Costs (TCA owner v1.1 trade_cost) and borrow reduce NAV. Daily excess return = NAV_k/NAV_k-1 - 1 - rf_k.
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DA
 
 sys.path.insert(0, f"{_QR.COSTS_DIR}")
 from quant_research.backtest.costs import (
-    cost_model as tca,  # Tomas v1.1 (hash pinned in PREREG-v3 §2; verified by run_v3.py)
+    cost_model as tca,  # TCA owner v1.1 (hash pinned in PREREG-v3 §2; verified by run_v3.py)
 )
 
 ANN = 252
@@ -50,7 +50,7 @@ class V3Config:
     cov_window: int = 252
     cov_min: int = 60
     long_flat: tuple[str, ...] = ("USO",)  # pinned list (not shortable)
-    # limits (Hana buffers; LIMITS §1)
+    # limits (portfolio-construction lead buffers; LIMITS §1)
     pos_cap: float | None = 0.095  # H1 buffer
     pos_hard: float = 0.10  # H1 hard (breach counter)
     risk_cap: float | None = 0.0095  # H2 buffer: |w| * stop_dist <= 0.95%
@@ -81,15 +81,13 @@ class V3Config:
     venue: str = "continuous"
     impact_k: float = 1.0
     borrow_rate: float = 0.01  # STANDARD floor
-    split_tol: float = 1.3  # §9.B(7) heuristic: cross-check only (Victor ruling 9B-7)
+    split_tol: float = 1.3  # §9.B(7) heuristic: cross-check only (validator decision 9B-7)
     split_source: str = (
-        "table"  # "table" = Dmitri's corporate-action table (required for the run); "heuristic" = tests only
+        "table"  # "table" = the data owner's corporate-action table (required for the run); "heuristic" = tests only
     )
     split_xcheck_tol: float = 0.05  # |log(implied / table factor)| tolerance on a table split day
-    trim_venue: str = "continuous"  # H8 close trim costed at Tomas venue "continuous" (ruling 9B-2)
-    max_open_fallback: float = (
-        0.005  # missing-open -> close fallback allowed on <= 0.5% of open-priced fills (ruling 9B-8)
-    )
+    trim_venue: str = "continuous"  # H8 close trim costed at TCA owner venue "continuous"
+    max_open_fallback: float = 0.005  # missing-open -> close fallback allowed on <= 0.5% of open-priced fills
 
 
 class DataAbort(RuntimeError):
@@ -121,7 +119,7 @@ FROZEN_BREAKER = dict(
     h9_min_days=5,
     shadow_days=5,
     intraday_breaker=True,
-)  # §5/§9.A A5/§9.B(1), frozen; LIMITS v0.3.x NOT adopted (ruling 9B-1)
+)  # §5/§9.A A5/§9.B(1), frozen; LIMITS v0.3.x NOT adopted
 
 
 def month_ends(idx: pd.DatetimeIndex) -> pd.DatetimeIndex:
@@ -141,7 +139,7 @@ def split_ratios(tr: pd.DataFrame, close: pd.DataFrame, tol: float) -> pd.DataFr
 def split_matrix_from_table(
     table: pd.DataFrame | None, tr: pd.DataFrame, close: pd.DataFrame, tol_heur: float, tol_x: float
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """§9.B(7) as amended: splits come from Dmitri's corporate-action table (columns symbol, date, price_factor, where
+    """§9.B(7) as amended: splits come from the data owner's corporate-action table (columns symbol, date, price_factor, where
     price_factor = raw price after / before, e.g. 2-for-1 -> 0.5, 1-for-8 reverse -> 8). The >30% raw-vs-TR heuristic is a
     cross-check only; any mismatch aborts. Returns (split factor matrix, applied-splits DataFrame)."""
     syms = list(close.columns)
@@ -226,9 +224,7 @@ def precompute(panel: dict[str, Any], syms: list[str], cfg: V3Config) -> dict[st
     cumx = logx.cumsum()
     if cfg.split_source == "table":
         if panel.get("splits") is None:
-            raise SplitTableMissing(
-                "split_source='table' but the panel carries no corporate-action table (ruling 9B-7)"
-            )
+            raise SplitTableMissing("split_source='table' but the panel carries no corporate-action table")
         split, applied = split_matrix_from_table(panel["splits"], tr, c, cfg.split_tol, cfg.split_xcheck_tol)
     elif cfg.split_source == "heuristic":
         split = split_ratios(tr, c, cfg.split_tol)
@@ -530,7 +526,7 @@ def run(
         if bad.any():
             raise OHLCUnavailable(
                 f"OHLC missing on {idx[k].date()} for held {[syms[a] for a in np.nonzero(bad)[0]]} "
-                f"(no fallback pre-granted; ruling 9B-8)"
+                f"(no fallback pre-granted)"
             )
         g_on = np.where(has_tr, (1 + np.nan_to_num(r)) * np.where(np.isfinite(o / c), o / c, 1.0), 1.0)
         g_oc = np.where(has_tr & np.isfinite(c / o), c / o, 1.0)
@@ -631,7 +627,7 @@ def run(
         if bad.any():
             raise OHLCUnavailable(
                 f"high/low missing on {idx[k].date()} for position {[syms[a] for a in np.nonzero(bad)[0]]} "
-                f"opened/held this session (no fallback pre-granted; ruling 9B-8)"
+                f"opened/held this session (no fallback pre-granted)"
             )
         for a in range(nS):
             if h[a] == 0 or not cfg.stops or not np.isfinite(stop[a]) or not has_tr[a]:
@@ -806,7 +802,7 @@ def run(
     if cfg.max_open_fallback is not None and ofb["share"] > cfg.max_open_fallback + 1e-12:
         raise OpenFallbackExceeded(
             f"missing-open fallback on {ofb['fallback_fills']}/{ofb['open_priced_fills']} open-priced "
-            f"fills ({ofb['share']:.2%}) > {cfg.max_open_fallback:.1%} (ruling 9B-8)"
+            f"fills ({ofb['share']:.2%}) > {cfg.max_open_fallback:.1%}"
         )
     return {
         "daily": out_daily,

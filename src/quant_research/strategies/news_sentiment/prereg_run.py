@@ -3,7 +3,7 @@
 STATUS: written 2026-10-30, NOT EXECUTED. Per desk instructions (no returns or signal statistics before freeze) it has
 only been syntax-checked and run in --check mode (artefact/hash checks; reads no text, prices or returns).
 2026-11-06 ~22:30 SGT: §5 control adapters wired (REV5, MOM12-1, ANNSHARE from v1 event table, SUE loader/aggregation
-against a PROPOSED input contract pending Dave). Tested only on synthetic data (tests/test_controls_asof.py).
+against a PROPOSED input contract pending the derivatives researcher). Tested only on synthetic data (tests/test_controls_asof.py).
 
 Usage:
   python prereg_run.py --check                 # artefact + hash checks only
@@ -31,6 +31,7 @@ import numpy as np
 import pandas as pd
 
 from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DATA_DIR, ...)
+from quant_research.utils.pins import desk_pin
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 os.chdir(HERE)
@@ -54,9 +55,9 @@ dd = cast(_DeskStore, _desk_data)
 
 PREREG, PREREG_SHA, MANIFEST = "PREREG_sector_lm_5d.md", "PREREG_sector_lm_5d.sha256", "PREREG_manifest.txt"
 COST_MODEL = f"{_QR.COSTS_DIR}/cost_model.py"
-COST_MODEL_SHA = "df67d604489583d36bb1a16dc7ed30c5568b9a17526f450e4c1a335f9fe8eebf"  # Tomas v1.1
+COST_MODEL_SHA = desk_pin("strategies.news_sentiment.prereg_run", "COST_MODEL_SHA")  # TCA owner v1.1
 COST_DOC = f"{_QR.DESK_DIR}/tca/cost_model.md"
-COST_DOC_SHA = "684daa3946a75a2193071616e7710d8ccb691fcdef3a7877d45456af22f4378c"
+COST_DOC_SHA = desk_pin("strategies.news_sentiment.prereg_run", "COST_DOC_SHA")
 LM_POS_SHA = "6fb159d5a3b69e553edbc237c8d14551eafa5f71bb819a3807153489b7f6ab75"
 LM_NEG_SHA = "58fb732dd47af8b95a62abaa417039681b1c4d61035fa2b06022dc08c559d564"
 VADER_LEX_SHA = "1ec9c6e9ee19aade328f8beb393a6afa71a5bb3acf7d3cc22d4ef568df374bf5"
@@ -66,8 +67,8 @@ VADER_FIN_OVERRIDE_SHA = (
 )
 VADER_FIN_PY_SHA = "0b8506ea47193fac39b93b3022bdb7d7dfff827d99a19ded0b219360e279a6ca"  # vader_fin.py
 N_FAMILY = 153
-N_HYPEFADE = 153 + 192  # Victor rulings 2026-10-30 ~02:24 SGT
-SUE_PATH = f"{_QR.DATA_DIR}/derived/sue_xbrl.parquet"  # Dave; stamped at 10-Q/10-K acceptance
+N_HYPEFADE = 153 + 192  # Validator decisions 2026-10-30 ~02:24 SGT
+SUE_PATH = f"{_QR.DATA_DIR}/derived/sue_xbrl.parquet"  # The derivatives researcher; stamped at 10-Q/10-K acceptance
 EVENTS_DIR = f"{_QR.DESK_DIR}/equity/earnings_events"  # see EVENTS_PATH/EVENTS_SHA (§5 block); never globbed
 OOS = (
     pd.Timestamp("2016-01-05"),
@@ -92,32 +93,32 @@ PRIMARY = dict(hold=5, k=3, min_stocks=3, min_sectors=6, scorer="lm", filt=True,
 NEIGH = dict(hold=(4, 6), k=(2, 4), min_stocks=(2, 4), min_sectors=(5, 7))
 # LIMITS v0.3.5 sizing: 5 sleeves x 6 ETFs; per-sleeve gross g with 5g/6 <= 9.5% (H1 buffer) -> g = 11.4%; total 57% <= 58% (H3 buffer)
 SLEEVE_GROSS, EQUITY_USD = 0.114, 100_000.0
-# Borrow (Tomas ethan_cost_inputs.md §3, Victor look-ahead ruling): primary 1%/yr (STANDARD GC floor), 2x stress = 2%/yr
+# Borrow (TCA owner ethan_cost_inputs.md §3, validator look-ahead decision): primary 1%/yr (STANDARD GC floor), 2x stress = 2%/yr
 # via cost_mult=2; 10%/yr unknown-borrow GATE (G11) because historical ETB flags are unknown (flags exist only from 2026-10-30, and
 # today's flags are NOT applied to history). 25 bp/yr is a reference only and is not used. Calendar-day / 360 basis.
 BORROW_BASE, BORROW_HTB_SENS = 0.01, 0.10
-# Victor 2026-11-06: (2) the 2x run = 2x the PRIMARY cost (here: no uplift, so primary = Base); cost_mult multiplies the
-# primary per-side cost and borrow. (5) + 06:09 SGT ruling: the 10%/yr unknown-borrow run is a REQUIRED gate (G11) for the
+# Validator 2026-11-06: (2) the 2x run = 2x the PRIMARY cost (here: no uplift, so primary = Base); cost_mult multiplies the
+# primary per-side cost and borrow. (5) + 06:09 SGT decision: the 10%/yr unknown-borrow run is a REQUIRED gate (G11) for the
 # ETF shorts too: net Sharpe > 0 with borrow=BORROW_HTB_SENS, else FAIL on costs. Today's ETB flags / ETF liquidity are
 # not historical evidence. 1% base and 2% sensitivity remain diagnostics. (3) none of these add trials.
 COST_MULT_PRIMARY, COST_MULT_STRESS = 1.0, 2.0
-HTB_GATE_APPLIES = True  # Victor 2026-11-06 06:09 SGT: applies to SPDR ETF shorts (G11)
+HTB_GATE_APPLIES = True  # Validator 2026-11-06 06:09 SGT: applies to SPDR ETF shorts (G11)
 HTB_GATE_RULE = "sharpe(simulate(..., borrow=BORROW_HTB_SENS)) > 0 else FAIL_ON_COSTS"
 TOMAS_INPUTS = f"{_QR.DESK_DIR}/tca/ethan_cost_inputs.md"
-TOMAS_INPUTS_SHA = "67d0ab41e8ba268fbcfcd159b7af288a7d40f76e86e7811610cfddd50f409432"
+TOMAS_INPUTS_SHA = desk_pin("strategies.news_sentiment.prereg_run", "TCA_INPUTS_SHA")
 TOMAS_DIR = f"{_QR.DESK_DIR}/tca/ethan_inputs"
 TOMAS_FILE_SHA = {
-    "asset_flags_paper.json": "99b4feaeae3e3bb6b9044428014557b3ad938e7f357332a164ffbbb4910e2a7d",
-    "bucket_costs.csv": "bee81d9b302fee2f3531127264cf4f47671e329dd2d2671979f42520ffcad7dc",
-    "card_costs.json": "beed6c07eee1210d2d7ec4ab2d4b2a1f8763aeaae78b754335e1b824207e7096",
-    "card_costs.py": "d4c2de0b61b915791e037a5c33c7352f927e6710f277264e6127c95515418ce3",
-    "cost_tables.py": "c58a5d121439ad9f351622eb99b399635fff87da5e5d6a6597f6f93f97bb0212",
-    "etf_costs.csv": "8e0221a2977a5614223a33f5ca885f3ab010f3e874de9723dfeadcbd1d448a0e",
-    "open_vs_mid.py": "08e3e0f678739cc0f32b68581a74881788a8b6d9179d30d3db5fcbad4720f701",
-    "open_vs_mid_raw.csv": "e5c7afb15e233ffb245bc0cb1f418f7406033e83f724ae60905c631dcf5e9fe2",
-    "per_side_costs.csv": "82e3ffda3904e84f28220d9f8c81ecb10d4d9ac8a3ca4fbd69d9fda41a48712a",
-    "run.log": "4ba5000f910f8b4143040efa07e28d985c500eb76f6255a6f214916badfa1401",
-    "sample_meta.json": "7cc5aed7188b11cd7fd4db17c64b842027696408577ba7f60d581ef9941264bc",
+    "asset_flags_paper.json": desk_pin("strategies.news_sentiment.prereg_run", "TCA_FILE_SHA.asset_flags_paper.json"),
+    "bucket_costs.csv": desk_pin("strategies.news_sentiment.prereg_run", "TCA_FILE_SHA.bucket_costs.csv"),
+    "card_costs.json": desk_pin("strategies.news_sentiment.prereg_run", "TCA_FILE_SHA.card_costs.json"),
+    "card_costs.py": desk_pin("strategies.news_sentiment.prereg_run", "TCA_FILE_SHA.card_costs.py"),
+    "cost_tables.py": desk_pin("strategies.news_sentiment.prereg_run", "TCA_FILE_SHA.cost_tables.py"),
+    "etf_costs.csv": desk_pin("strategies.news_sentiment.prereg_run", "TCA_FILE_SHA.etf_costs.csv"),
+    "open_vs_mid.py": desk_pin("strategies.news_sentiment.prereg_run", "TCA_FILE_SHA.open_vs_mid.py"),
+    "open_vs_mid_raw.csv": desk_pin("strategies.news_sentiment.prereg_run", "TCA_FILE_SHA.open_vs_mid_raw.csv"),
+    "per_side_costs.csv": desk_pin("strategies.news_sentiment.prereg_run", "TCA_FILE_SHA.per_side_costs.csv"),
+    "run.log": desk_pin("strategies.news_sentiment.prereg_run", "TCA_FILE_SHA.run.log"),
+    "sample_meta.json": desk_pin("strategies.news_sentiment.prereg_run", "TCA_FILE_SHA.sample_meta.json"),
 }
 
 
@@ -161,7 +162,7 @@ def check(strict: bool) -> bool:
         need("vaderSentiment installed", False)
     need("sue_xbrl.parquet present", os.path.exists(SUE_PATH))
     need(
-        "sue_xbrl sha pinned (pending Dave)",
+        "sue_xbrl sha pinned (pending the derivatives researcher)",
         SUE_SHA is not None and os.path.exists(SUE_PATH) and sha(SUE_PATH) == SUE_SHA,
     )
     need(
@@ -278,7 +279,7 @@ _TOMAS_SIDE: pd.DataFrame | None = None
 
 
 def tomas_per_side(sym: str) -> tuple[float, float]:
-    """Tomas's measured per-side costs (tca/ethan_inputs/per_side_costs.csv): (base at the open, base_mktlim continuous)."""
+    """the TCA owner's measured per-side costs (tca/ethan_inputs/per_side_costs.csv): (base at the open, base_mktlim continuous)."""
     global _TOMAS_SIDE
     if _TOMAS_SIDE is None:
         _TOMAS_SIDE = pd.read_csv(os.path.join(TOMAS_DIR, "per_side_costs.csv")).set_index("name")
@@ -295,9 +296,9 @@ def leg_cost_bps(
     sym: str | None = None,
     venue: str = "open",
 ) -> float:
-    """One-way bps = max(Tomas v1.1 model at `venue`, STANDARD §5 liquid-ETF floor 2 bp + FULL normal half-spread,
-    Tomas's measured per-side Base for this ETF). venue='open' for MOO entries/exits; 'continuous' for stop exits
-    (Tomas: stops fill at continuous-session cost plus gap; the gap is already in the stop fill price).
+    """One-way bps = max(TCA owner v1.1 model at `venue`, STANDARD §5 liquid-ETF floor 2 bp + FULL normal half-spread,
+    The TCA owner's measured per-side Base for this ETF). venue='open' for MOO entries/exits; 'continuous' for stop exits
+    (the TCA owner: stops fill at continuous-session cost plus gap; the gap is already in the stop fill price).
     The 0.5x open half-spread multiplier is an unverified assumption; the floor binds until the SPY pilot (2-9 Nov) reports."""
     from quant_research.backtest.costs import cost_model as cm
 
@@ -438,19 +439,19 @@ def pbo_cscv(M: pd.DataFrame, S: int = 16) -> float:
 # SYNTHETIC data only (tests/test_controls_asof.py). No prices, calendars, event rows or SUE rows are read by --check.
 #
 # Event table choice: v1 (pinned below), not v2. Reason: ANNSHARE needs only accession, cik, acceptance_utc,
-# session_date_0925, in_sp500 and index_symbols. Victor ACCEPTED v1 for timestamps + PIT membership
-# (validation/prereg_rulings/2026-11-06-ethan-8k202-pit-review.md); v2 is a CONDITIONAL accept with promotion blockers open
-# and, by Victor's own check, has identical acceptance/session timing for all 31,467 accessions, so v2 adds nothing ANNSHARE
+# session_date_0925, in_sp500 and index_symbols. The validator ACCEPTED v1 for timestamps + PIT membership
+# (the internal review record); v2 is a CONDITIONAL accept with promotion blockers open
+# and, by the validator's own check, has identical acceptance/session timing for all 31,467 accessions, so v2 adds nothing ANNSHARE
 # uses. v1 also carries none of v2's later-availability fields (ex99_available_*, cluster lags), so they cannot leak in.
 # Only the explicit v1 path is read (never a glob over versioned tables, which would duplicate accessions), and only
 # EVENT_COLS; ex99_*, exhibit, cluster, lag and other retrospective columns are never loaded or used as predictors.
 EVENTS_PATH = f"{_QR.DESK_DIR}/equity/earnings_events/earnings_events_8k202.parquet"
 EVENTS_SHA = (
-    "d568a60d19348ad2948083df6a95f64e501f25615d773cdac14ebd9629216d2e"  # v1, Victor PIT ruling (timestamps/PIT only)
+    desk_pin("strategies.news_sentiment.prereg_run", "EVENTS_SHA")  # v1, validator PIT decision (timestamps/PIT only)
 )
 EVENT_COLS = ["accession", "cik", "acceptance_utc", "session_date_0925", "in_sp500", "index_symbols"]
 SUE_SHA: str | None = (
-    None  # PENDING Dave: final sue_xbrl.parquet hash. None => strict check fails closed; never filled from a guess.
+    None  # PENDING the derivatives researcher: final sue_xbrl.parquet hash. None => strict check fails closed; never filled from a guess.
 )
 NY = "America/New_York"
 CUTOFF = pd.Timedelta(hours=9, minutes=25)  # §4.3/§5: info usable at d only if strictly before 09:25 ET of d
@@ -466,7 +467,7 @@ CONTROL_LONG_HIGH = {
 CONTROL_MISSING_POLICY: str | None = (
     None  # §5 "same eligible sectors": if a control is undefined for a sector that is eligible in L,
 )
-# the run RAISES (no invented fill / drop). Needs a Victor ruling before freeze (README).
+# the run RAISES (no invented fill / drop). Needs a validator decision before freeze (README).
 _STRICT_OK = False
 
 
@@ -639,7 +640,7 @@ def annshare_panel(
     return out
 
 
-# SUE input contract (PROPOSED by Ethan from SUE_NOTE.md §6; NOT Dave-approved). Grain: one row per 8-K 2.02 event.
+# SUE input contract (PROPOSED by the sentiment researcher from SUE_NOTE.md §6; NOT derivatives-researcher-approved). Grain: one row per 8-K 2.02 event.
 SUE_REQUIRED = {
     "accession": "8-K Item 2.02 accession in the pinned event table (join key; unique)",
     "sue": "float; NaN = not computable (row ignored); +/-inf rejected",
@@ -806,7 +807,7 @@ def on_primary_eligibility(L: pd.DataFrame, X: pd.DataFrame, name: str) -> pd.Da
     gap = L.notna() & Xa.isna()
     if gap.values.any() and CONTROL_MISSING_POLICY is None:
         raise ControlInputError(
-            f"{name}: undefined on {int(gap.values.sum())} primary-eligible sector-days; needs a ruling"
+            f"{name}: undefined on {int(gap.values.sum())} primary-eligible sector-days; needs a decision"
         )
     return Xa
 

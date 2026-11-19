@@ -1,6 +1,6 @@
 """Run: $QR_DESK_DIR/portfolio/.venv/bin/python $QR_DESK_DIR/portfolio/tests/test_earnings.py
-LIMITS H7 earnings gate (default policy risk_ruling_20261030_0227; strict = pre-ruling option) (earnings_gate.py) + LIMITS §5 T12 sigma_target rule (construct.sigma_target_rule).
-Synthetic calendars only; plus one smoke test against Dmitri's real calendar (read-only)."""
+LIMITS H7 earnings gate (default policy risk_ruling_20261030_0227; strict = pre-decision option) (earnings_gate.py) + LIMITS §5 T12 sigma_target rule (construct.sigma_target_rule).
+Synthetic calendars only; plus one smoke test against the data owner's real calendar (read-only)."""
 
 import datetime as dt
 import math
@@ -11,6 +11,7 @@ import numpy as np
 import pandas as pd
 
 from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DATA_DIR, ...)
+from quant_research.utils.pins import desk_pin
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from quant_research.strategies.portfolio_construction import earnings_gate as eg
@@ -104,7 +105,7 @@ def test_sigma_target_rule():
     assert abs(v3 - r.std() * math.sqrt(252)) < 1e-12 and v != v3
 
 
-# ======== Risk ruling risk_ruling_20261030_0227 (DEFAULT policy): rules 1-5, strict CLI option, file checks ========
+# ======== Risk decision risk_ruling_20261030_0227 (DEFAULT policy): rules 1-5, strict CLI option, file checks ========
 import tempfile
 
 NOW2 = dt.datetime(
@@ -273,8 +274,8 @@ def test_rule4_stale_main_calendar_full_failsafe():
 
 
 def test_rule5_earliest_date_wins():
-    """Ruling (5): earliest across sources. Main-calendar nasdaq_scheduled is ESTIMATED (never confirmed).
-    Prior wrong assumption that 'all calendar rows are confirmed' is rejected (Rachel 2026-11-06)."""
+    """Decision (5): earliest across sources. Main-calendar nasdaq_scheduled is ESTIMATED (never confirmed).
+    Prior wrong assumption that 'all calendar rows are confirmed' is rejected (risk manager 2026-11-06)."""
     g = NX[
         "ES4"
     ]  # rows 2027-01-25 (+ candidate 2026-12-29) and refresh 2027-01-12 -> earliest 2026-12-29; free-text dates ignored
@@ -319,13 +320,12 @@ def test_sha_pin_and_newest_file():
 
 def test_missing_pin_fail_closed():
     """Unlisted sidecar basename must NOT load (sha256_ok false); full fail-safe for dependents.
-    Rachel AUTHORIZED 20261105 pin 2026-11-06; missing-pin fail-closed is proven with a fake unlisted basename."""
+    Risk manager AUTHORIZED 20261105 pin 2026-11-06; missing-pin fail-closed is proven with a fake unlisted basename."""
     # Production pin authenticates the authorized 20261105 bytes
     path = f"{_QR.DATA_DIR}/earnings/next_earnings/next_earnings_20261105.parquet"
     assert os.path.exists(path)
-    assert (
-        eg.PINNED_SHA256.get("next_earnings_20261105.parquet")
-        == "8c9cfe2d07d397bbc89d172b7b6548d492f522a4ad3a7d13135c4b7775454cbe"
+    assert eg.PINNED_SHA256.get("next_earnings_20261105.parquet") == desk_pin(
+        "strategies.portfolio_construction.earnings_gate", "PINNED_SHA256.next_earnings_20261105.parquet"
     )
     nx_ok, ni_ok = eg.load_next(dt.datetime(2026, 11, 6, 6, 40, tzinfo=SGT), path=path, pinned=eg.PINNED_SHA256)
     assert nx_ok is not None and ni_ok["sha256_ok"] and ni_ok["usable"] and ni_ok["sha256_pinned"] == ni_ok["sha256"]
@@ -340,9 +340,8 @@ def test_missing_pin_fail_closed():
     assert nx is None and ni["sha256_pinned"] is None and ni["sha256_ok"] is False
     assert "no accepted pin" in ni["reason"] and "FULL FAIL-SAFE" in ni["reason"]
     # 20261030 pin retained
-    assert (
-        eg.PINNED_SHA256["next_earnings_20261030.parquet"]
-        == "4189dd77b4cf1b39e5e9be7c8f99fc279a0fdb7b4d4313c1537363c8948d26b2"
+    assert eg.PINNED_SHA256["next_earnings_20261030.parquet"] == desk_pin(
+        "strategies.portfolio_construction.earnings_gate", "PINNED_SHA256.next_earnings_20261030.parquet"
     )
 
 
@@ -356,11 +355,15 @@ REAL_EXPECT = {
 
 def test_real_named_cases_clear_through_20261106():
     """Named cases against production-pinned 20261030 at NOW2; both 20261030 and 20261105 are in PINNED
-    (Rachel AUTHORIZED 20261105 on 2026-11-06). Staleness of 20261105 at NOW2 still makes newest unusable."""
+    (risk manager AUTHORIZED 20261105 on 2026-11-06). Staleness of 20261105 at NOW2 still makes newest unusable."""
     ev_, inf = eg.load_calendar(NOW2)
     pin_path = f"{_QR.DATA_DIR}/earnings/next_earnings/next_earnings_20261030.parquet"
     nx, ni = eg.load_next(NOW2, path=pin_path, pinned=eg.PINNED_SHA256)
-    assert ni["sha256"] == "4189dd77b4cf1b39e5e9be7c8f99fc279a0fdb7b4d4313c1537363c8948d26b2" and ni["sha256_ok"]
+    assert (
+        ni["sha256"]
+        == desk_pin("strategies.portfolio_construction.earnings_gate", "PINNED_SHA256.next_earnings_20261030.parquet")
+        and ni["sha256_ok"]
+    )
     st, info = eg.gate_policy(list(REAL_EXPECT), NOW2, 6, set(), events=ev_, info=inf, nxt=nx, ninfo=ni)
     assert info["horizon_end_session"] == "2026-11-06"
     for s, (d, wo) in REAL_EXPECT.items():
@@ -372,13 +375,12 @@ def test_real_named_cases_clear_through_20261106():
     # NOW2 is 2026-10-30; sidecar fetched 2026-11-05 is in the future relative to NOW2 — load may treat by age.
     # Regardless: pin map must contain both authorized hashes.
     assert "next_earnings_20261105.parquet" in eg.PINNED_SHA256
-    assert (
-        eg.PINNED_SHA256["next_earnings_20261030.parquet"]
-        == "4189dd77b4cf1b39e5e9be7c8f99fc279a0fdb7b4d4313c1537363c8948d26b2"
+    assert eg.PINNED_SHA256["next_earnings_20261030.parquet"] == desk_pin(
+        "strategies.portfolio_construction.earnings_gate", "PINNED_SHA256.next_earnings_20261030.parquet"
     )
 
 
-# ======== Rachel 2026-11-06 rejection regressions (nasdaq forecast ≠ confirmed; buffered exits) ========
+# ======== risk manager 2026-11-06 rejection regressions (nasdaq forecast ≠ confirmed; buffered exits) ========
 PROMOTED_20 = [
     "ACN",
     "ADBE",
@@ -402,7 +404,7 @@ PROMOTED_20 = [
     "WMT",
 ]
 ELEVEN_BUFFERED_IN_WINDOW = ["CRM", "DE", "DIS", "HD", "INTU", "LOW", "MDT", "NVDA", "PANW", "TJX", "WMT"]
-# Dmitri/Rachel expected estimated-buffer boundaries (unbuffered store dates; buffer computed)
+# The data owner/risk manager expected estimated-buffer boundaries (unbuffered store dates; buffer computed)
 FOCUS_BUFFER = {
     "AMAT": dict(
         window_open="2026-10-22", buffered_release="2026-11-05", close_by_short="2026-10-21", close_by_long="2026-11-04"
@@ -415,7 +417,9 @@ FOCUS_BUFFER = {
     ),
 }
 TEST_PIN_20261105 = {
-    "next_earnings_20261105.parquet": "8c9cfe2d07d397bbc89d172b7b6548d492f522a4ad3a7d13135c4b7775454cbe"
+    "next_earnings_20261105.parquet": desk_pin(
+        "strategies.portfolio_construction.earnings_gate", "PINNED_SHA256.next_earnings_20261105.parquet"
+    )
 }
 
 
@@ -453,7 +457,7 @@ def test_nasdaq_scheduled_never_confirmed_fabricated():
 
 
 def test_rachel_20261105_rejection_regressions():
-    """Reproduce Rachel's 2026-11-06 findings; production PINNED now authenticates 20261105 (AUTHORIZED 2026-11-06)."""
+    """Reproduce the risk manager's 2026-11-06 findings; production PINNED now authenticates 20261105 (AUTHORIZED 2026-11-06)."""
     import json
 
     now = dt.datetime(2026, 11, 6, 6, 40, tzinfo=SGT)
@@ -470,18 +474,18 @@ def test_rachel_20261105_rejection_regressions():
     assert (
         ni["usable"]
         and ni["sha256_ok"]
-        and ni["sha256_pinned"] == "8c9cfe2d07d397bbc89d172b7b6548d492f522a4ad3a7d13135c4b7775454cbe"
+        and ni["sha256_pinned"]
+        == desk_pin("strategies.portfolio_construction.earnings_gate", "PINNED_SHA256.next_earnings_20261105.parquet")
     )
-    assert (
-        eg.PINNED_SHA256["next_earnings_20261030.parquet"]
-        == "4189dd77b4cf1b39e5e9be7c8f99fc279a0fdb7b4d4313c1537363c8948d26b2"
+    assert eg.PINNED_SHA256["next_earnings_20261030.parquet"] == desk_pin(
+        "strategies.portfolio_construction.earnings_gate", "PINNED_SHA256.next_earnings_20261030.parquet"
     )
     st, _ = eg.gate_policy(u94, now, 6, set(), events=cal, info=dict(cinfo), nxt=nx, ninfo=ni, policy=eg.POLICY_RULING)
     # (1) none of the 20 Nasdaq-estimated names may be kind=known (confirmed branch)
     assert all(st[s]["kind"] != "known" for s in PROMOTED_20), [s for s in PROMOTED_20 if st[s]["kind"] == "known"]
     # (2) eleven buffered-in-window names must be in_window under estimated semantics
     assert all(st[s]["in_window"] and st[s]["kind"] == "known_estimated_in_window" for s in ELEVEN_BUFFERED_IN_WINDOW)
-    # (3) AMAT/BRK.B/CSCO buffered exits (Rachel/Dmitri table); remain in-window even if window_open is in the past
+    # (3) AMAT/BRK.B/CSCO buffered exits (the risk manager/data owner table); remain in-window even if window_open is in the past
     for s, exp in FOCUS_BUFFER.items():
         g = st[s]
         assert g["kind"] == "known_estimated_in_window" and g["in_window"], (s, g)

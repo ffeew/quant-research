@@ -1,11 +1,11 @@
 """PREREG-v3 single run. Subcommands:
   preflight            checks everything that does NOT touch the backfill (hashes, pin status, unit tests, outputs_v3 absent)
   pin --sha256 H --ca-sha256 C --diff-sha256 F
-                       verify the signed-off v2 build (data_spec_v3.json:path) hashes to H, Dmitri's corporate-action
+                       verify the signed-off v2 build (data_spec_v3.json:path) hashes to H, the data owner's corporate-action
                        table (corporate_actions.path) to C and his v2 substitution diff (substitution_diff.path) to F,
                        then pin all three in PREREG-v3 §2 + §12. Refuses while the §2 reference-source table is TBD.
   run                  the ONE run (refuses on placeholder / hash mismatch / existing outputs_v3/); writes outputs_v3/
-Usage once Dmitri's hashes arrive:  .venv/bin/python run_v3.py pin --sha256 <H> --ca-sha256 <C> --diff-sha256 <F> && .venv/bin/python run_v3.py run
+Usage once the data owner's hashes arrive:.venv/bin/python run_v3.py pin --sha256 <H> --ca-sha256 <C> --diff-sha256 <F> &&.venv/bin/python run_v3.py run
 """
 
 from __future__ import annotations
@@ -63,14 +63,16 @@ def guard_pin(
     diff_pinned: str | None = None,
     src_pinned: str | None = None,
 ) -> tuple[str, str, str, str]:
-    """A4 + run gate (ruling 9B) + option (b): no run until the v2 build, corporate-action table, substitution diff and
+    """A4 + run gate + option (b): no run until the v2 build, corporate-action table, substitution diff and
     reference-source table hashes are ALL pinned in PREREG-v3 §2."""
     if src_pinned is None:
         die("PREREG-v3 §2 reference-source table is still TBD (rule S2, TBD-2); it must be pinned before the v2 build.")
     if pinned is None:
-        die("PREREG-v3 §2 data-build hash is still the placeholder (Amendment A4). Pin Dmitri's signed-off hash first.")
+        die(
+            "PREREG-v3 §2 data-build hash is still the placeholder (Amendment A4). Pin the data owner's signed-off hash first."
+        )
     if ca_pinned is None:
-        die("PREREG-v3 §2 corporate-action table hash is still the placeholder (run gate, ruling 9B-7).")
+        die("PREREG-v3 §2 corporate-action table hash is still the placeholder (run gate).")
     if diff_pinned is None:
         die("PREREG-v3 §2 v2 substitution-diff hash is still the placeholder (option (b), rule S6).")
     return pinned, ca_pinned, diff_pinned, src_pinned
@@ -85,7 +87,7 @@ def load_spec() -> dict[str, Any]:
         die(f"{SPEC} missing")
     spec = cast(dict[str, Any], json.load(open(SPEC)))
     if not spec_filled(spec):
-        die(f"{SPEC} not filled in (path/layout/column map and corporate_actions from Dmitri's sign-off note)")
+        die(f"{SPEC} not filled in (path/layout/column map and corporate_actions from the data owner's sign-off note)")
     return spec
 
 
@@ -144,14 +146,16 @@ def cmd_pin(h: str, ca: str, diff: str) -> None:
         )
     txt = open(D.PREREG, encoding="utf-8").read()
     if D.PLACEHOLDER not in txt or D.CA_PLACEHOLDER not in txt or D.DIFF_PLACEHOLDER not in txt:
-        die("PREREG-v3 already (partly) pinned; a second pin is a protocol change (log it by hand with Victor)")
-    txt = txt.replace(f"**`{D.PLACEHOLDER}`**", f"**`{h}`** (Dmitri sign-off; pinned {now()}; path `{spec['path']}`)")
-    txt = txt.replace(f"**`{D.CA_PLACEHOLDER}`**", f"**`{ca}`** (Dmitri sign-off; pinned {now()}; path `{cap}`)")
-    txt = txt.replace(f"**`{D.DIFF_PLACEHOLDER}`**", f"**`{diff}`** (Dmitri v2 diff; pinned {now()}; path `{dfp}`)")
+        die("PREREG-v3 already (partly) pinned; a second pin is a protocol change (log it by hand with the validator)")
+    txt = txt.replace(
+        f"**`{D.PLACEHOLDER}`**", f"**`{h}`** (data owner sign-off; pinned {now()}; path `{spec['path']}`)"
+    )
+    txt = txt.replace(f"**`{D.CA_PLACEHOLDER}`**", f"**`{ca}`** (data owner sign-off; pinned {now()}; path `{cap}`)")
+    txt = txt.replace(f"**`{D.DIFF_PLACEHOLDER}`**", f"**`{diff}`** (data owner v2 diff; pinned {now()}; path `{dfp}`)")
     txt = (
         txt.rstrip("\n")
         + f"\n- {now()}: data-build hash pinned (A4): `{h}` for `{spec['path']}`; corporate-action table "
-        f"hash pinned (ruling 9B-7): `{ca}` for `{cap}`; v2 substitution-diff hash pinned (option (b)): `{diff}` for `{dfp}` (data_spec_v3.json sha256 `{D.sha_file(SPEC)}`). Nothing run yet.\n"
+        f"hash pinned: `{ca}` for `{cap}`; v2 substitution-diff hash pinned (option (b)): `{diff}` for `{dfp}` (data_spec_v3.json sha256 `{D.sha_file(SPEC)}`). Nothing run yet.\n"
     )
     open(D.PREREG, "w", encoding="utf-8").write(txt)
     print("pinned", h, ca, diff)
@@ -159,7 +163,7 @@ def cmd_pin(h: str, ca: str, diff: str) -> None:
 
 # ------------------------------------------------------------------ evaluation helpers
 def pbo_add_u23(M: pd.DataFrame) -> pd.DataFrame:
-    """Ruling 9B-9: append Victor's 5 v1 cost settings (u23 columns 20-24) on the same window."""
+    """Decision 9B-9: append the validator's 5 v1 cost settings (u23 columns 20-24) on the same window."""
     U = pd.read_csv(S.U23_PATH, index_col=0, parse_dates=True)
     cols = list(U.columns)[19:24]
     if cols != S.U23_COLS:
@@ -222,13 +226,13 @@ def cmd_run() -> None:
         die(f"{OUT}/ already exists: v3 is a single run")
     spec = load_spec()
     if D.sha_file(COST_MODEL) != S.COST_MODEL_SHA:
-        die("Tomas v1.1 cost model hash differs from the PREREG pin")
+        die("TCA owner v1.1 cost model hash differs from the PREREG pin")
     pf = preflight(run_tests=True)
     if not pf["unit_tests_pass"]:
         die("unit checks failed; see tests/unit_checks_v3_output.txt")
     t0 = now()
     if D.sha_file(S.U23_PATH) != S.U23_SHA:
-        die("Victor's u23 net matrix (PBO columns, ruling 9B-9) differs from the pinned sha256")
+        die("the validator's u23 net matrix (PBO columns) differs from the pinned sha256")
     if D.sha_file(spec["substitution_diff"]["path"]) != diff_pinned:
         die("v2 substitution diff differs from the §2 pin (option (b), rule S6)")
     if src_pinned != S.REF_SOURCE_TABLE_SHA:
@@ -382,7 +386,7 @@ def cmd_run() -> None:
         ("6 quasi-OOS trades >= 100", q.n_trades, q.n_trades >= 100),
         ("7a no year > 40% of net PnL", years.share_of_total.max(), years.share_of_total.max() <= 0.40),
         (
-            "7b no calendar-year Sharpe < -0.5 (§7.7; confirmed hard by Victor)",
+            "7b no calendar-year Sharpe < -0.5 (§7.7; confirmed hard by the validator)",
             years.sharpe.min(),
             years.sharpe.min() >= -0.5,
         ),
@@ -393,7 +397,7 @@ def cmd_run() -> None:
         ),
         ("8 stability: all 10 > 0 and >= 50% of primary", int(stab_t["pass"].sum()), bool(stab_t["pass"].all())),
         (
-            "9 LIMITS compliance (ruling 9B-4: orders ok, breaches cured next open, hard-breach sessions <= 1%)",
+            "9 LIMITS compliance (decision 9B-4: orders ok, breaches cured next open, hard-breach sessions <= 1%)",
             json.dumps({k: v for k, v in lc.items() if k != "breaches"}),
             lc["pass"],
         ),
@@ -406,7 +410,9 @@ def cmd_run() -> None:
     hard = ct[ct.criterion.str.match(r"^(1|2a|2b|2c|3|4|5|6|7a|7b|7c|8|9|10|11) ")]
     # best attainable verdict is CONDITIONAL PASS (survivorship haircut; partly-seen quasi-OOS) -- PREREG-v3 §7
     verdict = (
-        "FAIL (trend shelved for this sprint)" if not hard["pass"].all() else "CONDITIONAL PASS (for Victor's review)"
+        "FAIL (trend shelved for this sprint)"
+        if not hard["pass"].all()
+        else "CONDITIONAL PASS (for the validator's review)"
     )
     # artefacts
     prim["daily"].to_csv(f"{OUT}/v3_daily.csv")
@@ -443,7 +449,7 @@ def cmd_run() -> None:
         "limits_breaker_basis": {
             "frozen_to": f"PREREG-v3 §5/§9.A/§9.B (LIMITS.md {S.LIMITS_FROZEN_SHA_ABBR} at drafting)",
             "disclosure": "LIMITS v0.3.x changes (H9 re-arm at EOD DD<5%, 3%/episode backstop, "
-            "chain lock, review validity) NOT adopted (ruling 9B-1); the live breaker may differ.",
+            "chain lock, review validity) NOT adopted; the live breaker may differ.",
         },
         "open_fallback": prim["open_fallback"],
         "splits_applied": int(len(prim["splits_applied"])),

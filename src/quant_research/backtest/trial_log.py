@@ -1,4 +1,4 @@
-"""Append-only trial log (Victor STANDARD §1.3). One row per variant ever run by Dave. Dave, 2026-10-30."""
+"""Append-only trial log (validator STANDARD §1.3). One row per variant ever run by the derivatives researcher. The derivatives researcher, 2026-10-30."""
 
 from __future__ import annotations
 
@@ -151,8 +151,8 @@ def historical_rows() -> list[dict[str, Any]]:
                 r.sharpe_net,
                 r.start,
                 r.end,
-                "v1 engine: next-close MOC, Tomas costs only, borrow 25bp, book $1M",
-                "Dmitri SIP total return (clean)",
+                "v1 engine: next-close MOC, TCA owner costs only, borrow 25bp, book $1M",
+                "data owner SIP total return (clean)",
             )
     for fam, name in [
         ("resmom", "UMD public proxy"),
@@ -193,9 +193,9 @@ def historical_rows() -> list[dict[str, Any]]:
                     "param_tag": tag,
                     "params": "",
                     "universe": "PIT S&P 500 (before SNDK/AA/Q interval exclusion)",
-                    "data": "Dmitri store, v2 run killed mid-way",
+                    "data": "data owner store, v2 run killed mid-way",
                     "fill": fill,
-                    "costs": "max(Tomas, Victor floor) + 1% borrow",
+                    "costs": "max(the TCA owner, validator floor) + 1% borrow",
                     "role": "superseded_rerun",
                     "has_daily_series": False,
                     "sr_net_full": float(n),

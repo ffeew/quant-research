@@ -14,10 +14,11 @@ from collections.abc import Callable
 from typing import Any
 
 from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DATA_DIR, ...)
+from quant_research.utils.pins import desk_pin
 
 RUN = f"{_QR.DESK_DIR}/research/original/iv_gap_v2_run_r2_20261113"
 OUT = sys.argv[1]
-EXP = {"SHA256SUMS": "0b157ca0522fa27a592bb7c6145ea04cd5efea69b3743f19c4db702917aa6d29"}
+EXP = {"SHA256SUMS": desk_pin("strategies.iv_gap.derive", "EXP.SHA256SUMS")}
 
 
 def sha(p: str) -> str:

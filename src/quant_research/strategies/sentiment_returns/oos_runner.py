@@ -1,10 +1,10 @@
-# oos_runner.py - single sealed H1b OOS run (prereg v5 4b045f05..., sealed L293; Jeremy/Victor conditions L297).
+# oos_runner.py - single sealed H1b OOS run (prereg v5 4b045f05..., sealed; the fund manager/validator conditions).
 # Reuses dev_run.py (copied byte-for-byte, sha pinned) by executing its source with a DECLARED, exact-match list of
 # textual edits (EDITS below; each must match exactly once). The SAME transformed source runs in both modes:
 #   --mode dev_rehearsal : DEV window/data (parity proof vs DEV_FREEZE 177f5e97). Refuses any HOLDOUT/raw path or news >= 2025-01.
 #   --mode oos           : H1b only, both readings (A3), decisions 2025-01-01..2026-10-31. One run; no retries.
-# No network. No trading. Output = raw stats for Victor (he rules PASS/FAIL, L297 (d)).
-# v2 (Victor C2): interpreter environment pinned via oos_config.json 'env_pin'; verified right after the config is parsed, before any
+# No network. No trading. Output = raw stats for the validator (he rules PASS/FAIL, (d)).
+# v2 (validator C2): interpreter environment pinned via oos_config.json 'env_pin'; verified right after the config is parsed, before any
 #   other input is read and before the lock/output folder exist (exit 5 on mismatch). Observed values logged in RUNNER_LOG + *_RAW.json.
 from __future__ import annotations
 
@@ -20,9 +20,10 @@ from collections.abc import Mapping, Sequence
 from typing import Any, NoReturn, cast
 
 from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DATA_DIR, ...)
+from quant_research.utils.pins import desk_pin
 
 STAGE = os.path.dirname(os.path.abspath(__file__))
-DEV_RUN_SHA = "80f4bb71485d2e20741f76a5a2197d64cdb05afeaf7f4d11ba7ac565d462329f"  # = DEV MANIFEST entry
+DEV_RUN_SHA = desk_pin("strategies.sentiment_returns.oos_runner", "DEV_RUN_SHA")  # = DEV MANIFEST entry
 NEWS_RE = re.compile(r"/news/([^/]+)/(\d{4}-\d{2})\.json$")
 
 
@@ -134,10 +135,10 @@ def transformed_source(src: str) -> str:
     return src[:i]
 
 
-# ---------------- pass bars (prereg v5 s5, A1-A5; Victor seal note on Holm step-down) ----------------
+# ---------------- pass bars (prereg v5 s5, A1-A5; validator seal note on Holm step-down) ----------------
 def holm_h1b(p_h1b: float, p_h1a: float = 1.0, alpha: float = 0.05) -> dict[str, dict[str, Any]]:
     # s5 / A5: family N = 2 {H1a, H1b}, one-sided, Holm at 0.05 within each reading. A2 + seal record: H1a failed DEV,
-    # keeps its Holm slot with p := 1. Step-down (Victor, seal L293): smallest p tested at alpha/2 = 0.025; the larger at
+    # keeps its Holm slot with p := 1. Step-down (the validator, seal): smallest p tested at alpha/2 = 0.025; the larger at
     # 0.05 only if the smaller is rejected. Ties (p_h1b == 1) -> H1b ordered first; it is not rejected either way.
     fam = sorted([("H1b", p_h1b), ("H1a", p_h1a)], key=lambda x: (x[1], x[0] != "H1b"))
     m = len(fam)
@@ -179,9 +180,7 @@ def evaluate_h1b(oos: Mapping[str, Mapping[str, Any]], dev: Mapping[str, Mapping
             half_dev_mean_ic=0.5 * d["mean_ic"],
         )
     out["PASS_both_readings (A3 conjunctive gate)"] = bool(out["UTC"]["all_met"] and out["ET"]["all_met"])
-    out["note"] = (
-        "Runner-computed against v5 s5 bars; Victor rules PASS/FAIL (L297 (d)). A pass is evidence only (L297 (e))."
-    )
+    out["note"] = "Runner-computed against v5 s5 bars; the validator rules PASS/FAIL (d). A pass is evidence only (e)."
     return out
 
 
@@ -228,7 +227,7 @@ def main() -> None:
         die("oos decisions must be >= 2025-01-01 (B8)")
     hyps = M["hypotheses"]
     if a.mode == "oos" and hyps != ["H1b"]:
-        die("L297 (c): oos mode runs H1b only")
+        die("(c): oos mode runs H1b only")
 
     # ---- input sha verification BEFORE lock/output creation (abort on mismatch; no retries) ----
     PRE: list[tuple[object, ...]] = [("env (verified vs env_pin before lock):", json.dumps(ENV, sort_keys=True))]
@@ -277,7 +276,7 @@ def main() -> None:
         check_sums(M["holdout_sums"], rel["holdout_sums_sha256"], ["daily_holdout.csv"])
     PRE.append(("input shas OK (verified before lock/out creation)",))
 
-    # ---- one-run guard + lock (L297 (c)) ----
+    # ---- one-run guard + lock (c) ----
     out = M["out_dir"]
     if os.path.exists(M["lock_file"]):
         die(f"lock file exists: {M['lock_file']} (one run only)", 4)
@@ -390,8 +389,8 @@ def main() -> None:
             ev[h]["pass_bars"] = evaluate_h1b(oo, dev)
     O = dict(
         mode=a.mode,
-        prereg="PREREG_DRAFT_v5.md 4b045f05da541175624946865ab695ed2f2c2fc1484554c065d940a2ec284c91",
-        conditions="L297: one H1b OOS sitting; no reruns; Victor rules",
+        prereg=desk_pin("strategies.sentiment_returns.oos_runner", "O.prereg"),
+        conditions="one H1b OOS sitting; no reruns; the validator rules",
         oos_runner_sha256=me,
         dev_run_sha256=DEV_RUN_SHA,
         oos_config_sha256=cfg_sha,

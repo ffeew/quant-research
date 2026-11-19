@@ -1,6 +1,6 @@
 # RESULTS v3: limits-compliant ETF trend sleeve (single pre-registered run)
 
-**Owner:** Maya (Macro Strategist) · **Run:** Fri 6 Nov 2026, 06:21:23 → 06:21:59 SGT · **Spec:** `PREREG-v3.md` (§1–§12; Victor A1–A6, §9.B/§9.C, option-(b) data rules).
+**Owner:** Maya (Macro Strategist) · **Run:** Fri 6 Nov 2026, 06:21:23 → 06:21:59 SGT · **Spec:** `PREREG-v3.md` (§1–§12; validator A1–A6, §9.B/§9.C, option-(b) data rules).
 **One command:** `.venv/bin/python run_v3.py run` (after one authorised `pin` and a clean `preflight`). Unit checks at run: 106/106 PASS. **Outputs:** `outputs_v3/` (v1/v2 outputs untouched).
 **Single-run statement:** this is the one pre-registered v3 execution. No retry, no alternate data, no parameter change. Research only; not a trade.
 
@@ -13,15 +13,15 @@
 - Nasdaq xcheck input: `0a0b01461eda7c11cc7721120c2166e4b3fc801ab648ea2edd9116d6727ec0eb`.
 - Reference-source table: `1388e51cdf124667d2e4fb3d60f4a6fb853f63ccb4e816cd3cecfd3dc91c7380`.
 - data_spec_v3.json: `cd5553db078ec5626d56788e1b4d558b581a7ebf18e83911bb041771a2ee74c9`.
-- Cost model (Tomas v1.1): `df67d604489583d36bb1a16dc7ed30c5568b9a17526f450e4c1a335f9fe8eebf`.
+- Cost model (TCA owner v1.1): `df67d604489583d36bb1a16dc7ed30c5568b9a17526f450e4c1a335f9fe8eebf`.
 - VIX series: `5ec8bca24a4e0b96392f65da384c16bb75393c728054a5bf26c3e56d146235b2`.
 - Full values: `outputs_v3/meta.json`.
 
-**Harness fix (non-trial, pre-run; Victor ruling):** `validation/prereg_rulings/2026-11-06-trend-v3-preflight-fix.md`. Only `tests/test_v3_engine.py` changed. Old sha256 `47e8be7384a1a42d3e091a05296a3a76c0a56abe3ffd081e67b5d24ae7716cc1` → new `f70e21d4492f99da0c51845d268559ab826aa12fbc75838eacee7c85eff27e6d`. Log: `NOTES-v3-preflight-fix-2026-11-06.md`. No strategy, data, threshold or N change.
+**Harness fix (non-trial, pre-run; validator decision):** the internal review record. Only `tests/test_v3_engine.py` changed. Old sha256 `47e8be7384a1a42d3e091a05296a3a76c0a56abe3ffd081e67b5d24ae7716cc1` → new `f70e21d4492f99da0c51845d268559ab826aa12fbc75838eacee7c85eff27e6d`. Log: `NOTES-v3-preflight-fix-2026-11-06.md`. No strategy, data, threshold or N change.
 
 ## Mechanical verdict: **FAIL** (trend shelved for this sprint)
 
-This is the pipeline's mechanical verdict from `outputs_v3/criteria.csv` / `meta.json` (`mechanical_verdict`). **Victor's formal verdict is now logged:** FAIL; trend v3 shelved for this sprint. See `validation/prereg_rulings/2026-11-06-trend-v3-results.md` and `validation/verdicts-log.md` (06:29 SGT).
+This is the pipeline's mechanical verdict from `outputs_v3/criteria.csv` / `meta.json` (`mechanical_verdict`). **The validator's formal verdict is now logged:** FAIL; trend v3 shelved for this sprint. See the internal review record and `validation/verdicts-log.md` (06:29 SGT).
 
 ## Criteria (exactly `outputs_v3/criteria.csv`)
 
@@ -36,10 +36,10 @@ This is the pipeline's mechanical verdict from `outputs_v3/criteria.csv` / `meta
 | 5 | PBO < 0.20 | 0.380186 | False |
 | 6 | quasi-OOS trades ≥ 100 | 1520 | True |
 | 7a | no year > 40% of net PnL | 6.187624 | False |
-| 7b | no calendar-year Sharpe < −0.5 (§7.7; confirmed hard by Victor) | −2.108033 | False |
+| 7b | no calendar-year Sharpe < −0.5 (§7.7; confirmed hard by the validator) | −2.108033 | False |
 | 7c | no SPY/VIX regime Sharpe < −0.5 (VIX required) | −0.426921 | True |
 | 8 | stability: all 10 > 0 and ≥ 50% of primary | 2 | False |
-| 9 | LIMITS compliance (ruling 9B-4: orders ok, breaches cured next open, hard-breach sessions ≤ 1%) | sessions 5218; hard_breach_sessions 1 (2020-04-06); share 0.000192; uncured []; orders_ok true; pass true | True |
+| 9 | LIMITS compliance (decision 9B-4: orders ok, breaches cured next open, hard-breach sessions ≤ 1%) | sessions 5218; hard_breach_sessions 1 (2020-04-06); share 0.000192; uncured []; orders_ok true; pass true | True |
 | 9s | LIMITS compliance strict (no EOD hard breach) | (empty) | False |
 | 10 | blind 2005–2007 net return > 0 (A2) | −0.075226 | False |
 | 11 | every trade ≤ 1% ADV20 | 0.000648 | True |
@@ -64,7 +64,7 @@ Blind note (meta): "2005-2007 is too short to judge on its own (A2); passing it 
 
 - **NW t (full):** 0.106445 (criterion 4).
 - **DSR** (`outputs_v3/dsr.csv`), gate row gross-dispersion, N=57, T=2749: DSR **0.087202** (sr_ann −0.064564; sr0 0.3464). N=47 companion: 0.093089. All-net-dispersion rows are reported alongside and are ~0.
-- **PBO** (`outputs_v3/pbo.json`): S=16, 12870 combinations, **40 of 57** trials with daily series, T=2448, **PBO 0.380186**, median logit 0.446. Gap 17 = Victor's diagnostics (ruling 9B-9). Decision N remains 57 (`meta.n_trials`).
+- **PBO** (`outputs_v3/pbo.json`): S=16, 12870 combinations, **40 of 57** trials with daily series, T=2448, **PBO 0.380186**, median logit 0.446. Gap 17 = the validator's diagnostics. Decision N remains 57 (`meta.n_trials`).
 - Trial log append: trial 47 `V3_PRIMARY`, data sha `c998ca5c…`, quasi-OOS net SR −0.064564.
 
 ## Stability (`outputs_v3/stability.csv`) and sensitivities
@@ -99,7 +99,7 @@ From the full segment: one-way turnover 116.9 (5.65×/yr), average cost 9.17 bps
 - **Splits applied (7):** Yahoo pre-2016 — IWM 2005-06-09 ×0.5; EFA/EEM 2005-06-09 ×1/3; EEM 2008-07-24 ×1/3; SLV 2008-07-24 ×0.1. CA table — EWJ 2016-11-07 ×4; USO 2020-04-29 ×8. File: `outputs_v3/splits_applied.csv`.
 - **Substitution diff audit:** 72 rows (SPY 16, USO 15, EEM 14, IWM 9, GLD/SLV/QQQ 4, EWJ 3, EFA 2, TLT 1; IEF 0).
 - **Nasdaq xcheck (report-only):** per-ticker share within 1bp on 2513 days — EFA/QQQ 100%; others 99.92–99.96%. Substituted rows with \|Nasdaq−Yahoo\| > 10bp: **0**. All rows > 25bp: **2** (GLD and SLV on 2026-04-20; neither substituted).
-- **LIMITS / breaker:** frozen to PREREG-v3 §5/§9.A/§9.B (LIMITS.md af513e3a…1cf6 at drafting). Disclosure: LIMITS v0.3.x not adopted (ruling 9B-1); the live breaker may differ. Criterion 9 passes (one hard breach 2020-04-06, cured next open). Criterion 9s fails (strict: any EOD hard breach). Buffer breaches also cured (see `limit_breaches.csv`).
+- **LIMITS / breaker:** frozen to PREREG-v3 §5/§9.A/§9.B (LIMITS.md af513e3a…1cf6 at drafting). Disclosure: LIMITS v0.3.x not adopted; the live breaker may differ. Criterion 9 passes (one hard breach 2020-04-06, cured next open). Criterion 9s fails (strict: any EOD hard breach). Buffer breaches also cured (see `limit_breaches.csv`).
 
 ## Output paths
 
@@ -110,4 +110,4 @@ From the full segment: one-way turnover 116.9 (5.65×/yr), average cost 9.17 bps
 
 ## Disposition
 
-Mechanical FAIL, independently confirmed by Victor: trend v3 shelved for this sprint. No further v3 run or same-trial tweak. Any future variant needs a new PREREG, trial budget and Victor ruling. Preserve `outputs_v3/` and directory hash unchanged. Formal ruling: `validation/prereg_rulings/2026-11-06-trend-v3-results.md` (sha256 `92c62f463d3debb6eed13c07df5b00bdc63aed89fcbcb6a1d9c01dd9bc48e2de`).
+Mechanical FAIL, independently confirmed by the validator: trend v3 shelved for this sprint. No further v3 run or same-trial tweak. Any future variant needs a new PREREG, trial budget and validator decision. Preserve `outputs_v3/` and directory hash unchanged. Formal decision: the internal review record (sha256 `92c62f463d3debb6eed13c07df5b00bdc63aed89fcbcb6a1d9c01dd9bc48e2de`).

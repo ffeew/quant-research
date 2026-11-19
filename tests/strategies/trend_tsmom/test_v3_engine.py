@@ -16,6 +16,7 @@ import numpy as np
 import pandas as pd
 
 from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DATA_DIR, ...)
+from quant_research.utils.pins import desk_pin
 
 sys.path.insert(0, ".")
 from quant_research.strategies.trend_tsmom.tsmom import data_v3 as D3
@@ -298,7 +299,7 @@ try:
 except ATRUnavailable:
     check("no high/low: run aborts with ATRUnavailable", True)
 
-# 5b. ruling 9B-8: held position with missing high/low (or close) -> abort; no close-trigger fallback
+# 5b. decision 9B-8: held position with missing high/low (or close) -> abort; no close-trigger fallback
 kh = kf + 10
 s_held = base["weights"].iloc[kh].abs().idxmax()
 P = clone(P0)
@@ -343,7 +344,7 @@ check(
 )
 check("9B-8: base synthetic run has zero fallback fills", base["open_fallback"]["fallback_fills"] == 0)
 
-# 5d. ruling 9B-11: a flip is one trade
+# 5d. decision 9B-11: a flip is one trade
 from quant_research.strategies.trend_tsmom.run_v3 import trade_stats
 
 tt = pd.DataFrame(
@@ -479,7 +480,7 @@ else:
     check("H9: halt persisted (no lift condition met) -- no adds", adds == 0)
 check("A6: drawdown measured in NAV dollars (dd == 1 - nav/hwm)", np.allclose(d9.dd, 1 - d9.nav / d9.hwm))
 
-# 6b. ruling 9B-1: breaker frozen to the PREREG (LIMITS v0.3.x not adopted)
+# 6b. decision 9B-1: breaker frozen to the PREREG (LIMITS v0.3.x not adopted)
 check(
     "9B-1: PRIMARY breaker parameters equal the frozen §5/§9.B set",
     all(getattr(S3.PRIMARY, k_) == v_ for k_, v_ in FROZEN_BREAKER.items()) and S3.PRIMARY.breakers,
@@ -491,7 +492,7 @@ check(
     "LIMITS.md" not in eng_src and "live breaker may differ" in run_src,
 )
 
-# 6c. ruling 9B-4: criterion 7.9 -- breaches cured at the next open, hard breaches dated, > 1% of sessions fails
+# 6c. decision 9B-4: criterion 7.9 -- breaches cured at the next open, hard breaches dated, > 1% of sessions fails
 lc0 = limits_compliance(base)
 check("9B-4: base synthetic run: 7.9 passes, no hard breaches", lc0["pass"] and lc0["hard_breach_sessions"] == 0)
 
@@ -529,7 +530,7 @@ check(
     lc3["hard_breach_sessions"] >= 2 and lc3["hard_breach_share"] > 0.01 and not lc3["pass"] and not lc3["uncured"],
 )
 
-# 6d. ruling 9B-9: PBO matrix = 24 logged + 5 u23 cost settings + v3 + 10 stability = 40 of 57; DSR N stays 57
+# 6d. decision 9B-9: PBO matrix = 24 logged + 5 u23 cost settings + v3 + 10 stability = 40 of 57; DSR N stays 57
 from quant_research.strategies.trend_tsmom.run_v3 import pbo_add_u23
 
 Mp = pd.read_csv("outputs_v2/returns_matrix_net_Tx24.csv", index_col=0, parse_dates=True).loc[
@@ -553,7 +554,7 @@ _pre = D3.pre2016_split_table()
 _sl = pd.read_parquet(f"{_QR.SCRATCH_DIR}/trend_v3_build/work_splitlog.parquet")
 _slp = _sl[pd.to_datetime(_sl.ex_date) < pd.Timestamp(S3.CA_TABLE_START)]
 check(
-    "C7: the 5 frozen pre-2016 Yahoo splits match Dmitri's splitlog (hash and ratios)",
+    "C7: the 5 frozen pre-2016 Yahoo splits match the data owner's splitlog (hash and ratios)",
     D3.sha_file(f"{_QR.SCRATCH_DIR}/trend_v3_build/work_splitlog.parquet") == S3.PRE2016_SPLITS_SRC_SHA
     and sorted(
         (r.symbol, str(pd.Timestamp(cast(str, r.ex_date)).date()), float(cast(float, r.yahoo_ratio)))
@@ -707,7 +708,7 @@ check("run gate: refuses while the corporate-action table hash is a placeholder"
 check("option (b): refuses while the v2 substitution-diff hash is a placeholder", _refuses((A_, C_, None, R_)))
 check("option (b): refuses while the reference-source table is TBD (TBD-2)", _refuses((A_, C_, F_, None)))
 check("run gate: all four hashes pinned -> guard passes", run_v3.guard_pin(A_, C_, F_, R_) == (A_, C_, F_, R_))
-# Victor 2026-11-06: placeholder assertion uses a temporary PREREG fixture only; live state asserts the pin.
+# Validator 2026-11-06: placeholder assertion uses a temporary PREREG fixture only; live state asserts the pin.
 import contextlib
 import tempfile as _tf
 
@@ -730,7 +731,7 @@ finally:
         os.unlink(_tmp.name)
 _ok_live = (
     _live_diff is not None
-    and _live_diff == "8225dded490c5567ec446d81b9e10d9161ee1225a3f7bc27e94dccc46bd671ee"
+    and _live_diff == desk_pin("tests.strategies.trend_tsmom.test_v3_engine", "live_diff")
     and D3.sha_file(_diff_path) == _live_diff
     and _live_prereg == D3.PREREG
 )

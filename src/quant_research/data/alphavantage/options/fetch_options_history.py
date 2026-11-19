@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Resumable AV HISTORICAL_OPTIONS for SPY/QQQ (QQQQ pre-rename).
-Victor 63d3073d: OOS (>=2016-06-01) -> oos_holdout/; no content inspect/print.
+Validator 63d3073d: OOS (>=2016-06-01) -> oos_holdout/; no content inspect/print.
 Rate <=40/min. Never print/log API key.
 """
 

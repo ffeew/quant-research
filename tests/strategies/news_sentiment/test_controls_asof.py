@@ -11,6 +11,7 @@ import pandas as pd
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from quant_research.strategies.news_sentiment import prereg_run as pr
+from quant_research.utils.pins import desk_pin
 
 CAL = pd.bdate_range("2030-03-01", "2030-06-28")  # synthetic sessions (spans the 2030-03-10 US DST change)
 NY = "America/New_York"
@@ -323,7 +324,7 @@ class TestGuards(unittest.TestCase):
         self.assertEqual(
             pr.PRIMARY, dict(hold=5, k=3, min_stocks=3, min_sectors=6, scorer="lm", filt=True, window="overnight_full")
         )
-        self.assertEqual(pr.EVENTS_SHA, "d568a60d19348ad2948083df6a95f64e501f25615d773cdac14ebd9629216d2e")
+        self.assertEqual(pr.EVENTS_SHA, desk_pin("strategies.news_sentiment.prereg_run", "EVENTS_SHA"))
         self.assertIsNone(pr.SUE_SHA)
 
 

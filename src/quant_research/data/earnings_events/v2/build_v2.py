@@ -10,13 +10,14 @@ import numpy as np
 import pandas as pd
 
 from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DATA_DIR, ...)
+from quant_research.utils.pins import desk_pin
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 V2 = os.path.dirname(os.path.abspath(__file__))
-V1_HASH = "d568a60d19348ad2948083df6a95f64e501f25615d773cdac14ebd9629216d2e"
-OLD_HASH = "d07358318c6b0016afa9b5e3d885b1ce508bdd5af83328e692bcba2653a9fe5f"
-PARENT_V13 = "d137eea39928ec8d27b4e8ace5266c01bf74a81ca7e6d07a9d84f9a71b6dc13a"
-VICTOR_PIT = "6eb132f1ee9e5fd65cb48e49828ed2e63b16fc54fe46dcc98b89406082e4474f"
+V1_HASH = desk_pin("data.earnings_events.v2.build_v2", "V1_HASH")
+OLD_HASH = desk_pin("data.earnings_events.v2.build_v2", "OLD_HASH")
+PARENT_V13 = desk_pin("data.earnings_events.v2.build_v2", "PARENT_V13")
+VICTOR_PIT = desk_pin("data.earnings_events.v2.build_v2", "VALIDATOR_PIT")
 
 os.chdir(ROOT)
 
@@ -74,7 +75,7 @@ v2["canonical_cik_rule"] = np.where(
     "single_cik",
 )
 
-# ---------- cluster availability (Victor: first acceptance ≠ full info public) ----------
+# ---------- cluster availability (the validator: first acceptance ≠ full info public) ----------
 # Pin: keep cluster-first ACCESSION (v1 stable; Item 2.02 event identity).
 # Add conservative EX-99 availability time when a sibling first supplies EX-99.1.
 multi = core[core.cluster_n_filings > 1].merge(ex_audit, on="accession", how="left")
@@ -143,7 +144,7 @@ v2.loc[single_mask & ~v2.in_sp500, "cluster_availability_flag"] = "outside_index
 v2.loc[single_mask, "cluster_rule_pin"] = "cluster_first_accession_retained; availability may lag to sibling EX-99"
 
 # For deferred cases, point ex99_* display fields at the sibling exhibit while keeping event accession
-# (do not rewrite acceptance_utc — Victor accepted v1 timestamps; availability is separate)
+# (do not rewrite acceptance_utc — the validator accepted v1 timestamps; availability is separate)
 defer_map = cluster_concern.set_index("first_acc")
 for first_acc, row in defer_map.iterrows():
     sib_acc = str(row.sib_ex99_acc).split(";")[0]
@@ -168,7 +169,7 @@ print("deferred EX99 clusters applied:", n_deferred)
 
 # ---------- lineage decisions AA / EVHC (NOT restored as in_sp500) ----------
 # AA: membership ends 2016-11-01 (removed on Arconic spin). Alcoa Corp CIK1675149 post-split
-# never in sp500_membership as AA. Victor accepted v1 membership PIT.
+# never in sp500_membership as AA. The validator accepted v1 membership PIT.
 # EVHC: CIK1578318 Holdings filings are before membership start 2016-12-02; segment correctly
 # uses CIK1678531 Envision Healthcare Corp for the membership window.
 lineage_decisions = [
@@ -433,7 +434,7 @@ key_recon.to_parquet(f"{V2}/symbol_accession_key_reconciliation.parquet", index=
 key_recon.to_csv(f"{V2}/symbol_accession_key_reconciliation.csv", index=False)
 
 # ---------- finalize v2 columns / version ----------
-v2["dataset_version"] = "earnings_events_8k202 v2 (Ethan, 2026-11-06)"
+v2["dataset_version"] = "earnings_events_8k202 v2 (the sentiment researcher, 2026-11-06)"
 v2["v1_parent_sha256"] = V1_HASH
 v2["victor_pit_ruling_sha256"] = VICTOR_PIT
 # ensure accession unique

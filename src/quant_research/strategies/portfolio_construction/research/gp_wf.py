@@ -131,7 +131,7 @@ def part_b(src: str, gross: float = 0.58, cap: float = 0.095, borrow_yr: float =
     return out, phis
 
 if __name__ == "__main__":
-    # DESK_RULES #5: default = Dmitri's store via desk_data_client. `--retired` reproduces the pre-rule-5 run
+    # DESK_RULES #5: default = the data owner's store via desk_data_client. `--retired` reproduces the pre-rule-5 run
     # (statarb audit copy + data.json) for audit only. New output never overwrites the retired-source file out/gp_wf.json.
     retired = "--retired" in sys.argv
     if retired:
@@ -142,7 +142,7 @@ if __name__ == "__main__":
         A = part_a("store")
         B, phis = part_b("store")
         out = "gp_wf_store.json"
-    json.dump(dict(data_source="RETIRED (audit)" if retired else "Dmitri's store via desk_data_client", taus=TAUS, gp_map={e: gp(e) for e in (0.5, 2, 8)},
+    json.dump(dict(data_source="RETIRED (audit)" if retired else "the data owner's store via desk_data_client", taus=TAUS, gp_map={e: gp(e) for e in (0.5, 2, 8)},
                    partA=A, partB=B, phi_mean=phis), open(f"{_QR.DESK_DIR}/portfolio/research/out/{out}", "x"), indent=1, default=float)
     pd.set_option("display.width", 250)
     print(pd.DataFrame(A).round(4).to_string())

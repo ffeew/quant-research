@@ -1,14 +1,14 @@
 #!/usr/bin/env python
-"""One-command desk re-run + validation pack for Dave's three replications, built to Victor's STANDARD.md v1.0.
+"""One-command desk re-run + validation pack for the derivatives researcher's three replications, built to the validator's STANDARD.md v1.0.
 
   $QR_DESK_DIR/research/replication/.venv/bin/python $QR_DESK_DIR/research/replication/run_all.py [--only resmom,bab,imom]
         [--force-stock-imom] [--book 100000] [--skip-grid]
 
-What it does (all read-only on Dmitri's / Tomas's / Victor's files; writes only under research/replication/):
-  1. Loads Dmitri's SIP total returns (ret_total_best, suspect corporate-action days zeroed) + PIT S&P 500 membership.
-     Reads Dmitri's store only (no fallback; stops if the store is not ready). Live data, if ever needed, via desk_data_client.
+What it does (all read-only on the data owner's / TCA owner's / validator's files; writes only under research/replication/):
+  1. Loads the data owner's SIP total returns (ret_total_best, suspect corporate-action days zeroed) + PIT S&P 500 membership.
+     Reads the data owner's store only (no fallback; stops if the store is not ready). Live data, if ever needed, via desk_data_client.
   2. For each family runs the base parameters and the +/-20% neighbourhood (one at a time and jointly) for every book,
-     next-open fills, Tomas costs with Victor's floors, 1%/yr borrow; plus next-close fills and no-clean data as
+     next-open fills, TCA owner costs with the validator's floors, 1%/yr borrow; plus next-close fills and no-clean data as
      extra trials. Every run is appended to TRIAL_LOG.csv; the T x N daily net-return matrix goes to results/.
   3. Walk-forward OOS (expanding train, 1-year test folds, 21-session embargo, pick = best train Sharpe over the
      parameter grid), DSR (N = full logged trial count), PBO (CSCV, S=16), alpha vs SPY and FF3+UMD, legs, regimes,
@@ -158,7 +158,7 @@ def main() -> None:
     primary = cast(bool, st["primary_ready"])
     if not primary:
         raise SystemExit(
-            "Dmitri's store is not ready (see data/STATUS.md). No fallback by design (DESK_RULES.md rule #5)."
+            "the data owner's store is not ready (see data/STATUS.md). No fallback by design (DESK_RULES.md rule #5)."
         )
     if primary:
         panel = dd.load_panel(clean=True)
@@ -194,7 +194,7 @@ def main() -> None:
         members_at = lambda t: list(elig.columns[elig.loc[t].values])
         ff = dd.ff3_daily()
         fp, mt, _man = data_fingerprint()
-        data_label = f"Dmitri SIP total_return ret_total_best (clean), fingerprint {fp}"
+        data_label = f"Data owner SIP total_return ret_total_best (clean), fingerprint {fp}"
         suspect_log = cast(pd.DataFrame, panel["suspect_log"])
         log(
             f"PRIMARY: {R.shape[1]} symbols {R.index[0].date()}..{R.index[-1].date()}; PIT eligible per month-end median "
@@ -203,7 +203,7 @@ def main() -> None:
         suspect_log.to_csv(OUT / "suspect_returns.csv", index=False)
     rf = ff["RF"]
     ctx = {"month_ends": mes, "members_at": members_at, "ff3": ff}
-    cost_label = f"Tomas v1.1 max Victor floor; borrow {engine.BORROW_RATE:.2%}/yr; book ${a.book:,.0f}"
+    cost_label = f"TCA owner v1.1 max validator floor; borrow {engine.BORROW_RATE:.2%}/yr; book ${a.book:,.0f}"
     spy_ex = (R["SPY"] - rf.reindex(R.index).ffill()).rename("SPY_ex") if "SPY" in R.columns else None
     umd_d = (
         pd.read_parquet(dd.DATA / "factors/ken_french/mom_daily.parquet")
@@ -637,14 +637,14 @@ def data_caveats(fam: str, cfg: FamilyCfg, packs: dict[str, dict[str, Any]], ext
     L += [
         "### 1. Missing delisting returns (material for long books)",
         "",
-        f"Dmitri's `data/universe/delisting_returns.parquet` has terminal returns only for deals matched in Alpaca's corporate-action feed "
+        f"The data owner's `data/universe/delisting_returns.parquet` has terminal returns only for deals matched in Alpaca's corporate-action feed "
         f"(which starts 2020-04). Of the {dc.get('names_with_bars_ending_early', 'n/a')} stocks whose bars end before the sample end, "
         f"{dc.get('matched_deal_terminal_return', 'n/a')} have a terminal return and {dc.get('unmatched', 'n/a')} do not (they cannot be told apart as "
         "merger vs performance delisting from the data available, so they are treated as performance-related in the stress). "
         "Base runs treat a held position whose bars stop as cash at the last close (0%). Sensitivity (base params, next-open fills, "
         "each logged as a data_alt trial):",
         "- **table**: matched terminal return where known, else 0%;",
-        "- **conservative**: matched terminal return where known, else **-30% on both legs** (Victor's suggested assumption; shorts gain);",
+        "- **conservative**: matched terminal return where known, else **-30% on both legs** (the validator's suggested assumption; shorts gain);",
         "- **adverse**: matched where known, else -30% on longs and **+30% on shorts** (takeover-premium case; worst for every book).",
         "",
         "| book | delisting events while held (long / short) | net SR base | table | conservative | adverse | net ann base | ann conservative | ann adverse |",
@@ -661,7 +661,7 @@ def data_caveats(fam: str, cfg: FamilyCfg, packs: dict[str, dict[str, Any]], ext
     L += [
         "",
         "Per-event detail (symbol, weight held, last bar, return applied in the base run = 0): `delisting_exits_<book>.csv`. "
-        "Victor's file lists 120 delisting rows (47 matched, 70 no deal, 3 acquirer price missing); pre-2020 delistings have no terminal "
+        "the validator's file lists 120 delisting rows (47 matched, 70 no deal, 3 acquirer price missing); pre-2020 delistings have no terminal "
         "return at all, so the 2016-2019 part of every book is the most exposed.",
         "",
     ]
@@ -672,7 +672,7 @@ def data_caveats(fam: str, cfg: FamilyCfg, packs: dict[str, dict[str, Any]], ext
     L += [
         "- Every membership interval is mapped to the symbol's bars (`_common/desk_data.validate_intervals`, output "
         "`results/membership_intervals_coverage.csv`); a name is eligible at a signal date only if it is a PIT member in a kept interval "
-        "AND has a bar on that date. The SNDK interval from 2025-11-28 maps to the new Sandisk bars and is kept. Dmitri's fixes for "
+        "AND has a bar on that date. The SNDK interval from 2025-11-28 maps to the new Sandisk bars and is kept. The data owner's fixes for "
         "POM, SPLS, NFX, APC, CA, CSRA, DNB, TE (former members cut at the first gap > 10 sessions) are inherited.",
         "",
     ]
@@ -779,8 +779,8 @@ def write_submission(
     L = [
         f"# Validation submission: {cfg['title']}",
         "",
-        f"Submitted by Dave (Quant Research) to Victor, {RUN_TS} SGT. Built against validation/STANDARD.md v1.0. "
-        "Self-assessment only; the verdict is Victor's.",
+        f"Submitted by the derivatives researcher (Quant Research) to the validator, {RUN_TS} SGT. Built against validation/STANDARD.md v1.0. "
+        "Self-assessment only; the verdict is the validator's.",
         "",
         "## Reproduce (one command)",
         "```",
@@ -881,7 +881,7 @@ def write_submission(
         (
             "§4 DSR >= 0.95",
             "MET" if d1["DSR"] >= 0.95 and d2["DSR"] >= 0.95 else "NOT MET",
-            f"family N={d1['N']}: DSR {d1['DSR']:.3f}, SR0 {d1['SR0_ann']:.2f} ann; all-Dave N={d2['N']}: DSR {d2['DSR']:.3f}, SR0 {d2['SR0_ann']:.2f}; T={d1['T']}, skew {d1['skew']:.2f}, kurt {d1['kurt']:.2f}",
+            f"family N={d1['N']}: DSR {d1['DSR']:.3f}, SR0 {d1['SR0_ann']:.2f} ann; all-derivatives-researcher N={d2['N']}: DSR {d2['DSR']:.3f}, SR0 {d2['SR0_ann']:.2f}; T={d1['T']}, skew {d1['skew']:.2f}, kurt {d1['kurt']:.2f}",
         ),
         (
             "§4 t-stat >= 2.8 (replication of published anomaly; NW)",
@@ -894,9 +894,9 @@ def write_submission(
             f"book grid PBO {_f(P['pbo_book_grid'].get('PBO'))} (N={P['pbo_book_grid'].get('N')}); whole family PBO {_f(P['pbo_family'].get('PBO'))} (N={P['pbo_family'].get('N')}). N~11 per grid -> weakly informative",
         ),
         (
-            "§5 costs >= Victor minimums; borrow >= 1%/yr; exclude unborrowable",
+            "§5 costs >= validator minimums; borrow >= 1%/yr; exclude unborrowable",
             "MET (borrow caveat)",
-            f"avg {tr['assumed_avg_cost_bps_per_side']:.1f} bps/side (Tomas-only {tr['tomas_only_avg_cost_bps']:.1f}); borrow 1%/yr; no PIT borrow history exists, so unborrowable names cannot be excluded at signal time",
+            f"avg {tr['assumed_avg_cost_bps_per_side']:.1f} bps/side (TCA-owner-only {tr['tomas_only_avg_cost_bps']:.1f}); borrow 1%/yr; no PIT borrow history exists, so unborrowable names cannot be excluded at signal time",
         ),
         (
             "§6 post-publication haircut",
@@ -917,7 +917,7 @@ def write_submission(
         (
             "§7 legs reported; correlation to book",
             "MET (book history 1 day)",
-            f"long leg gross SR {_f(P['long_leg_gross'].get('sharpe'))}, short leg gross SR {_f(P['short_leg_gross'].get('sharpe'))}; desk book has 1 day of history, so correlations are vs SPY/FF factors and Victor's validation backtests",
+            f"long leg gross SR {_f(P['long_leg_gross'].get('sharpe'))}, short leg gross SR {_f(P['short_leg_gross'].get('sharpe'))}; desk book has 1 day of history, so correlations are vs SPY/FF factors and the validator's validation backtests",
         ),
         (
             "§8 trade size <= 1% of 20d ADV",
@@ -958,7 +958,7 @@ def write_submission(
             f"- Turnover/costs: {json.dumps({k: round(v, 3) for k, v in pk['turn'].items()})}",
             f"- Capacity: {json.dumps({k: round(float(v), 5) for k, v in pk['capacity'].items()})}",
             f"- Walk-forward: SR {_f(pk['wf'].get('sharpe'))}, t_NW {_f(pk['wf'].get('t_nw'))}, folds {pk['wf'].get('folds')}, picks {pk['wf_folds'].pick.tolist() if len(pk['wf_folds']) else []}, 2x SR {_f(pk['wf'].get('sharpe_2x'))}",
-            f"- DSR (family N={pk['dsr_family']['N']}): {pk['dsr_family']['DSR']:.3f}; DSR (all Dave trials N={pk['dsr_all']['N']}): {pk['dsr_all']['DSR']:.3f}",
+            f"- DSR (family N={pk['dsr_family']['N']}): {pk['dsr_family']['DSR']:.3f}; DSR (all derivatives researcher trials N={pk['dsr_all']['N']}): {pk['dsr_all']['DSR']:.3f}",
             f"- PBO grid {_f(pk['pbo_book_grid'].get('PBO'))} (N={pk['pbo_book_grid'].get('N')}), family {_f(pk['pbo_family'].get('PBO'))} (N={pk['pbo_family'].get('N')})",
             f"- Alt trials: next-close fill SR {_f(pk['alt'].get('close_clean'))}; no-clean data SR {_f(pk['alt'].get('open_noclean'))}; delisting returns table/conservative/adverse SR {_f(pk['alt'].get('open_clean+delist_table'))} / {_f(pk['alt'].get('open_clean+delist_conservative'))} / {_f(pk['alt'].get('open_clean+delist_adverse'))}",
             f"- Delisting exits while held: {len(pk['delist'])}"

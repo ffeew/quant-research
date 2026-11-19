@@ -6,7 +6,7 @@ All inputs are read from the immutable v1.3 release pin (common.STORE == release
 
 Availability (binding):
   * 8-K EX-99 GAAP diluted EPS: known at its 8-K acceptance tau (acceptance_datetime_et).
-  * XBRL 3-month GAAP diluted EPS: known only at its own 10-Q/10-K acceptance (else Dmitri available_session
+  * XBRL 3-month GAAP diluted EPS: known only at its own 10-Q/10-K acceptance (else data owner available_session
     09:29 ET, flagged). Never back-dated to the 8-K. No Q4 = FY - 9M anywhere.
   * Every lag in UE / sigma is the value AS KNOWN at tau_q (knowledge <= tau_q); avail_et = max knowledge of the
     numerator and all lags used (asserted == knowledge of the numerator).
@@ -442,10 +442,10 @@ def main() -> None:
         "coverage_complete_reason": "real gaps persist (see gap_classes + coverage mean_n_members - mean_n_sue): 8-K events "
         "without a usable GAAP diluted EPS (none/unlabeled/adjusted-only), events without a PIT "
         "fiscal period, PIT members with no SUE in the 130-session window, ticker-grain membership "
-        "join. AA/EVHC are NOT a gap (outside/before PIT membership; Victor v2 review 2.3). "
-        "Not Victor-reviewed / not Dmitri-promoted.",
+        "join. AA/EVHC are NOT a gap (outside/before PIT membership; validator v2 review 2.3). "
+        "Not validator-reviewed / not data-owner-promoted.",
         "not_a_frozen_complete_sue_input": True,
-        "event_spine": "v1.3 edgar_8k_202 (form 8-K) + earnings_events; Ethan v1/v2 NOT used for values",
+        "event_spine": "v1.3 edgar_8k_202 (form 8-K) + earnings_events; sentiment researcher v1/v2 NOT used for values",
         "input_hashes": {
             "eps8k_full_with_validation": _sha(OUT / "eps8k_full_with_validation.parquet"),
             "xbrl_eps_quarterly": _sha(OUT / "xbrl_eps_quarterly.parquet"),

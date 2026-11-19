@@ -1,4 +1,4 @@
-"""SEC EDGAR fetcher for Dave's derived controls: stdlib only, cached, rate-limited.
+"""SEC EDGAR fetcher for the derivatives researcher's derived controls: stdlib only, cached, rate-limited.
 
 - User-Agent from env SEC_USER_AGENT ("<Org> <contact email>", per SEC fair-access policy).
   The default matches the desk pipeline convention (data/pipelines/earnings.py).

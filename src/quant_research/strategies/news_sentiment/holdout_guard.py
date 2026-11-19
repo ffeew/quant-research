@@ -1,4 +1,4 @@
-"""Hold-out guard for the Benzinga/Alpaca news archive (Victor rulings 2026-10-30: interim #4 and final X1).
+"""Hold-out guard for the Benzinga/Alpaca news archive (validator decisions 2026-10-30: interim #4 and final X1).
 
 Rules enforced in code:
   * SECTOR-LM itself (news_signal.py / prereg_run.py) has its own lock: months < 2025-06 open only with

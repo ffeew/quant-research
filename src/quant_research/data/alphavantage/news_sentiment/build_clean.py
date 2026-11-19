@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import collections
 
-# Builds $QR_DATA_DIR/av_sentiment_20261110/clean per Jeremy's cleaning rules 1-7 (11 Nov 2026).
+# Builds $QR_DATA_DIR/av_sentiment_20261110/clean per the fund manager's cleaning rules 1-7 (11 Nov 2026).
 # Fields READ for decisions: news 'feed', item 'url', item 'time_published'; transcripts 'transcript' (length only).
 # Item objects are copied verbatim; sentiment/relevance/text are never read, aggregated or printed.
 import json

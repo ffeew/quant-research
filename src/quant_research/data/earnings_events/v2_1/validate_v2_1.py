@@ -8,14 +8,15 @@ import os
 import pandas as pd
 
 from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DATA_DIR, ...)
+from quant_research.utils.pins import desk_pin
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(ROOT)
-V1 = "d568a60d19348ad2948083df6a95f64e501f25615d773cdac14ebd9629216d2e"
-V2 = "84af48eb9f4dc8e92ab6f9ca4d4267b711cefc4455b26767b3b0190083b678a8"
-OLD = "d07358318c6b0016afa9b5e3d885b1ce508bdd5af83328e692bcba2653a9fe5f"
-VICTOR = "374dfa41450d72df8dd96e2abfac5e08491aa44cb227e7f2501a6c463de2f857"
-DMITRI = "94921e0e8c95a61b14134a257f48e781d5086f5882f0660d25243b82d26bb926"
+V1 = desk_pin("data.earnings_events.v2_1.validate_v2_1", "V1")
+V2 = desk_pin("data.earnings_events.v2_1.validate_v2_1", "V2")
+OLD = desk_pin("data.earnings_events.v2_1.validate_v2_1", "OLD")
+VICTOR = desk_pin("data.earnings_events.v2_1.validate_v2_1", "VALIDATOR")
+DMITRI = desk_pin("data.earnings_events.v2_1.validate_v2_1", "DATA_OWNER")
 
 
 def sha(p: str) -> str:

@@ -1,4 +1,4 @@
-# DEV_RESULTS — sentiment→returns, prereg v5 (4b045f05…4c91, sealed L293). DEV ONLY. Not verified point-in-time;
+# DEV_RESULTS — sentiment→returns, prereg v5 (4b045f05…4c91, sealed). DEV ONLY. Not verified point-in-time;
 # survivorship upper bound; timestamp zone unconfirmed. No HOLDOUT file opened; no OOS computed; no trading.
 Freeze file: DEV_FREEZE.json (0444). Code: dev_run.py, fiscal_diag.py. Logs: dev_run.log, RUN_LOG.txt, fiscal_diag.log.
 Per-period tables: periods_<H>_<reading>.tsv (date, n, k, IC, L/S raw & beta-adj, turnover).
@@ -19,7 +19,7 @@ Per-period tables: periods_<H>_<reading>.tsv (date, n, k, IC, L/S raw & beta-adj
   scored UTC 299 / ET 304; scored obs UTC 7,282 / ET 7,362; below-min UTC 22,611 / ET 22,590; obs in dropped periods UTC 5,681 / ET 5,622; coverage=0 26; capped 0.
   Missing target 0 (beta warm-up never binds). News: 1,700 DEV files (50 stocks × 2022-03..2024-12) sha-OK; 53,685 items;
   kept 52,441; relevance < 0.50 1,234; unparseable 0; after DEV cutoff 10 dropped; 6 items with duplicate ticker entries (first used).
-- Fiscal diagnostic: INCONCLUSIVE — see FISCAL_DIAGNOSTIC.md (needs Victor).
+- Fiscal diagnostic: INCONCLUSIVE — see FISCAL_DIAGNOSTIC.md (needs the validator).
 
 ## Implementation notes / deviations (prereg silent → conservative choice)
 1. H1a "week" = ISO calendar week; decision = last XNYS session of the week, using the XNYS calendar (no data) to 2025-01-10 so

@@ -1,11 +1,11 @@
 # News-sentiment prototype: results
 
-Returns are per daily cohort, in bp: r1 = open(d)→open(d+1); r5 = open(d)→open(d+5), an overlapping 5-day return, not per day. Net uses Tomas v1.1 at the open by liquidity bucket, one round trip per leg per cohort, plus borrow. t-stats are clustered by calendar month. FF5+Mom alpha uses daily factors for d and d+1 and Newey-West(5).
+Returns are per daily cohort, in bp: r1 = open(d)→open(d+1); r5 = open(d)→open(d+5), an overlapping 5-day return, not per day. Net uses TCA owner v1.1 at the open by liquidity bucket, one round trip per leg per cohort, plus borrow. t-stats are clustered by calendar month. FF5+Mom alpha uses daily factors for d and d+1 and Newey-West(5).
 X posts are excluded: X has no history (archive-forward only).
 
 ## A. Point-in-time S&P 500 universe (PROVISIONAL)
 
-**Provisional.** This uses Dmitri's PIT membership, which has the known issues in the validation `data_issues.json` (SNDK reuse is dropped here). Former members also have no GICS sector, so they drop out of the sector scores.
+**Provisional.** This uses the data owner's PIT membership, which has the known issues in the validation `data_issues.json` (SNDK reuse is dropped here). Former members also have no GICS sector, so they drop out of the sector scores.
 
 Sample: 16 months of news, 2025-06 to 2026-10. Articles with ≤3 tagged symbols: 102307. Symbols: 533. Analyst-headline share: 0.333. Spec families: 9.
 

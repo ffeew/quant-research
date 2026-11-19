@@ -44,7 +44,7 @@ class SignedCostAdapter:
             raise Blocked("cost units mismatch")
         v = s.get("validity", {})
         if (
-            v.get("from") != "Rank1 freeze (Victor pin)"
+            v.get("from") != "Rank1 freeze (validator pin)"
             or v.get("until") != "Rank1 evaluation receipt"
             or v.get("no_expiry_before_evaluation_receipt") is not True
         ):

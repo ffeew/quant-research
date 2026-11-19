@@ -14,6 +14,7 @@ from quant_research.strategies.rank1_single_name import rank1_bootstrap as Boot
 from quant_research.strategies.rank1_single_name import rank1_core as C
 from quant_research.strategies.rank1_single_name import rank1_gates as G
 from quant_research.strategies.rank1_single_name.rank1_sigma import SIGMA_DEFINITION_SHA256 as SIGMA_SHA
+from quant_research.utils.pins import desk_pin
 from tests.strategies.rank1_single_name.test_rank1_v2 import (
     END,
     MOCK_BASIS_SHA,
@@ -366,11 +367,13 @@ class SignedSigmaCorrection(unittest.TestCase):
             hashlib.sha256(S.DEFINITION_BYTES).hexdigest(),
             "75da49ee5c68dd95587f7a26917870dbae3c6ddae81ce77634485e871acd7ef2",
         )
-        self.assertEqual(S.TOMAS_SIGNED_NOTE_SHA256, "b1e2311888a164432a718d27d303c83dd1b67761cb16ef26b033243ca19170d7")
+        self.assertEqual(
+            S.TOMAS_SIGNED_NOTE_SHA256, desk_pin("strategies.rank1_single_name.rank1_sigma", "TCA_SIGNED_NOTE_SHA256")
+        )
         self.assertEqual(cost_adapter().sigma_estimator_pin(), S.SIGMA_DEFINITION_SHA256)
         c = mock_sigma_contract()
         c["definition_bytes"] = S.DEFINITION_BYTES.rstrip(b"\n")
-        with self.assertRaisesRegex(C.Blocked, "exact Tomas signed hash"):
+        with self.assertRaisesRegex(C.Blocked, "exact TCA owner signed hash"):
             S.validate_contract(c)
 
     def test_ddof1_twenty_simple_total_returns_daily_not_log_or_annual(self):
@@ -423,7 +426,7 @@ class SignedSigmaCorrection(unittest.TestCase):
         c = mock_sigma_contract()
         c["tr_basis"] = None
         m = market()
-        with self.assertRaisesRegex(C.Blocked, "Dmitri total-return adjustment BASIS CERTIFICATION MISSING"):
+        with self.assertRaisesRegex(C.Blocked, "data owner total-return adjustment BASIS CERTIFICATION MISSING"):
             S.canonical_sigma20(self.observations(m), 40, m.cal, c, True)
         for key, value in (
             ("price_only_substitute", True),

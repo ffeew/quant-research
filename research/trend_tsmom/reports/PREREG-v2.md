@@ -1,13 +1,13 @@
 # PRE-REGISTRATION v2: unlevered, lower-cost ETF trend sleeve
 
-**Owner:** Maya (Macro Strategist) · **Written:** Fri 30 Oct 2026, ~01:35 SGT, **before any v2 backtest was run** · **Requested by:** CIO (Jeremy)
+**Owner:** Maya (Macro Strategist) · **Written:** Fri 30 Oct 2026, ~01:35 SGT, **before any v2 backtest was run** · **Requested by:** CIO (the fund manager)
 **Status:** FROZEN. Any change to this file after the first v2 run must be logged in §9 with a timestamp and a reason, and the changed spec counts as a new trial.
 **Predecessor:** `RESULTS.md` (v1, ETFs only, 19 trials). Crypto stays excluded by desk decision.
 
 ## 1. Why v2: what v1's cost attribution showed
 The v1 baseline (12m, monthly, 10% book vol, 23 ETFs) earned 6.8% gross and 2.3% net (Sharpe 0.20). The 4.5%/yr gap came from three sources:
 - **FX ETFs** (UUP/FXE/FXY/FXB/FXA/FXC):
-  - These are all in Tomas's L4 bucket (ADV < $50M), at about 45–65 bps one-way.
+  - These are all in the TCA owner's L4 bucket (ADV < $50M), at about 45–65 bps one-way.
   - They earned 0.8% gross against 2.5% of cost, for −1.8%/yr net.
   - They carried about 1.0× NAV of combined notional.
   - FXE and FXB are not shortable today.
@@ -21,7 +21,7 @@ The v1 baseline (12m, monthly, 10% book vol, 23 ETFs) earned 6.8% gross and 2.3%
 v2 therefore:
 - removes leverage (gross ≤ 1.0×);
 - removes SHY and the FX basket, keeping UUP in one variant only;
-- restricts the core universe to ETFs in Tomas's L1/L2 buckets;
+- restricts the core universe to ETFs in the TCA owner's L1/L2 buckets;
 - adds a no-trade band;
 - keeps the paper's 12-month signal fixed rather than re-choosing it.
 
@@ -45,7 +45,7 @@ This is why the v2 trials are added to the v1 count rather than counted fresh (�
 | Cash residual | NAV − Σ(long weights) − short collateral is held as cash at RF (equivalent to a flat, never-traded BIL/SHY position): **zero excess return and zero cost** by construction. No BIL/SHY trading is modelled. |
 | Rebalance timing | Signal at the close of the last session of the rebalance period; fill at the **next session's close** (lag 1). Weights drift between rebalances. |
 | **No-trade band** | At each scheduled rebalance and for each asset, given current drifted weight c and target t: (a) if sign(t) ≠ sign(c), including moves to or from 0, trade fully to t; (b) else if \|t − c\| > max(**0.25·\|t\|**, 0.005), trade fully to t; (c) otherwise do not trade that asset. After banding, if gross > 1.00, apply the pro-rata cap. |
-| Costs | **Tomas v1.1** `cost_model.trade_cost()` (pin: `cost_model.py` sha256 `df67d604…eebf`). Same assumptions as v1: continuous venue, impact k = 1.0, bucket-default spreads and buffer, lagged 20-day σ and ADV, $1M NAV. Borrow is 25 bps/yr on short MV (360-day basis, calendar days). If Tomas releases a newer model before the run, v1.1 stays the pre-registered base and the newer one is reported as a sensitivity. |
+| Costs | **TCA owner v1.1** `cost_model.trade_cost` (pin: `cost_model.py` sha256 `df67d604…eebf`). Same assumptions as v1: continuous venue, impact k = 1.0, bucket-default spreads and buffer, lagged 20-day σ and ADV, $1M NAV. Borrow is 25 bps/yr on short MV (360-day basis, calendar days). If TCA owner releases a newer model before the run, v1.1 stays the pre-registered base and the newer one is reported as a sensitivity. |
 | P&L | Daily excess return over RF; net = gross − trading costs − borrow. Margin interest is not applicable (no leverage). |
 
 ### Universes
@@ -87,19 +87,19 @@ Everything not listed in the table is the common spec in §2. No other variants 
 - per-asset and per-class contributions
 - subperiods and calendar years
 - **net Sharpe excluding calendar 2022**
-- Tomas §6 flag
+- The TCA owner §6 flag
 
 ## 5. Pass/fail criterion: applies to V1 (PRIMARY) only
-**Stage A: "pass to Victor for validation".** V1 must meet ALL of the following over the evaluation window:
+**Stage A: "pass to the validator for validation".** V1 must meet ALL of the following over the evaluation window:
 1. **Net Sharpe ≥ 0.40** at base costs.
-2. **Tomas flag = PASS**: net return > 0 at 2× costs, AND cost drag ≤ 50% of gross return.
+2. **TCA owner flag = PASS**: net return > 0 at 2× costs, AND cost drag ≤ 50% of gross return.
 3. **Max drawdown (net) no worse than −15%.**
 4. **Not a one-year result**: net Sharpe excluding calendar 2022 > 0, AND net return > 0 in at least 2 of the 3 subperiods.
 5. **Deflated Sharpe ≥ 0.50** on V1 net returns (§7 accounting, N = 24). DSR ≥ 0.50 means the deflated evidence is at least better than a coin flip.
 6. **Mechanical**: gross exposure ≤ 1.00 at every close after any forced trim, and no short in an ETF flagged non-shortable.
 
 **Stage B: "validated".**
-- **DSR ≥ 0.95**, with the identical V1 spec (no re-tuning), on an extended history once Dmitri's 2005+ backfill exists.
+- **DSR ≥ 0.95**, with the identical V1 spec (no re-tuning), on an extended history once the data owner's 2005+ backfill exists.
 - Stage A alone cannot reach this: with 9.7 years, a DSR of 0.95 would need a net Sharpe of roughly 0.9+, which is implausible for trend after 2010.
 
 **Failure rules (fixed now):**
@@ -122,7 +122,7 @@ Everything not listed in the table is the common spec in §2. No other variants 
   - V[SR] is the variance of the annualised **gross** Sharpe ratios across all 24 trials. Gross is used because v1's net dispersion is dominated by cost-model effects on the fast variants: it gives SR0 ≈ 1.4, which no trend strategy could clear.
   - I will **also report** the all-net-dispersion DSR for transparency. Only the gross-dispersion version is the Stage A test.
 - Also reported: the probabilistic Sharpe vs 0, and the Harvey-Liu-Zhu t > 3 reference.
-- **Forking paths:** see the §1 caveat. If V1 passes Stage A, Victor should treat the effective N as larger than 24. Stage B on unseen pre-2016 data is the real out-of-sample test.
+- **Forking paths:** see the §1 caveat. If V1 passes Stage A, the validator should treat the effective N as larger than 24. Stage B on unseen pre-2016 data is the real out-of-sample test.
 
 ## 8. Code changes needed before running (implementation only, no new degrees of freedom)
 - `engine.Config`: add `band_rel=0.25`, `band_abs=0.005`, `gross_cap_hard=1.0` with a daily drift check and forced trim, `long_flat_all`, and `rebalance="Q-JAN"`. This must match §2 exactly.
@@ -135,14 +135,14 @@ Everything not listed in the table is the common spec in §2. No other variants 
 ## 9. Change log
 - 2026-10-30 ~01:35 SGT: initial pre-registration. No v2 runs yet.
 
-### Amendment A1: Victor (Signal Validation Lead) sign-off with amendments. Logged 2026-10-30 ~01:35 SGT, BEFORE any v2 run
-Victor signed off on this pre-registration subject to the following. They are recorded here in substance and take precedence over §5–§7 where they conflict:
+### Amendment A1: the validator (Signal Validation Lead) sign-off with amendments. Logged 2026-10-30 ~01:35 SGT, BEFORE any v2 run
+Validator signed off on this pre-registration subject to the following. They are recorded here in substance and take precedence over §5–§7 where they conflict:
 1. **Stage A is a screen, not a pass.**
    - Clearing Stage A earns only **"eligible for Stage B validation"**. It is NOT a PASS or CONDITIONAL PASS, and nothing trades (paper or otherwise) on it.
    - `validation/STANDARD.md` still requires net (OOS) Sharpe > 0.5 and DSR ≥ 0.95 for any pass.
    - 2017–2026 was seen in v1, so it is not out-of-sample. Stage B on the 2005+ backfill is the real test.
 2. **Effective N.**
-   - Victor deflates at **N = 30**.
+   - Validator deflates at **N = 30**.
    - Results report DSR at N = 24, 30 and 50, each in both the gross-dispersion and the all-net-dispersion version. V[SR] always comes from the 24 logged trials; only N varies.
    - The Stage A gate (§5 item 5) stays at **gross-dispersion, N = 24, DSR ≥ 0.50**.
 3. **Stability checks** (V1 only; NOT trials and NOT decision inputs):
@@ -162,8 +162,8 @@ These are reporting additions only. No change to any variant, to the Stage A gat
   - VIX high/low cannot be reported: there is no VIX series in the desk store. This is stated as a gap.
 - §8: annual turnover, average holding period, gross return per unit turnover, and break-even cost vs 2× the assumed cost.
 - §5 cost minimums:
-  - STANDARD's short-borrow floor is 1%/yr general collateral, against Tomas v1.1's 25 bps. A **borrow 1%/yr** non-trial sensitivity is added for V1.
-  - The base stays at Tomas v1.1 as pre-registered. Any later STANDARD verdict must use the higher borrow.
+  - STANDARD's short-borrow floor is 1%/yr general collateral, against TCA owner v1.1's 25 bps. A **borrow 1%/yr** non-trial sensitivity is added for V1.
+  - The base stays at TCA owner v1.1 as pre-registered. Any later STANDARD verdict must use the higher borrow.
 - §2 fills: our fills are at the next session's close (lag 1). That is later than STANDARD's "next-bar open or worse" minimum, but it is not an open fill. Stated as a caveat.
 - §1 artefacts written to `outputs_v2/`:
   - trial log with all 24 trials;

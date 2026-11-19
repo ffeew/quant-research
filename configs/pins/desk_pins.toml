@@ -1,0 +1,142 @@
+# Desk sha256 pins and desk-only literals, one table per module.
+# The public copy holds only PENDING placeholders: every pinned check fails closed.
+# A desk run sets $QR_DESK_PINS to its own copy with the real values (see quant_research.utils.pins).
+
+["data.alphavantage.daily_adjusted.fetch_av_h1h2"]
+"MEMBERSHIP_SHA" = "PENDING"
+
+["data.earnings_events.v2.build_v2"]
+"V1_HASH" = "PENDING"
+"OLD_HASH" = "PENDING"
+"PARENT_V13" = "PENDING"
+"VALIDATOR_PIT" = "PENDING"
+
+["data.earnings_events.v2.validate_v2"]
+"V1" = "PENDING"
+"OLD" = "PENDING"
+
+["data.earnings_events.v2_1.build_recon_aligned"]
+"V1_HASH" = "PENDING"
+"OLD_HASH" = "PENDING"
+
+["data.earnings_events.v2_1.validate_v2_1"]
+"V1" = "PENDING"
+"V2" = "PENDING"
+"OLD" = "PENDING"
+"VALIDATOR" = "PENDING"
+"DATA_OWNER" = "PENDING"
+
+["data.sec_edgar.common"]
+"RELEASE_TOP_HASH" = "PENDING"
+
+["strategies.iv_gap.derive"]
+"EXP.SHA256SUMS" = "PENDING"
+
+["strategies.iv_gap.runner"]
+"PREREG_SHA256" = "PENDING"
+"W1D_CP_SUMS_SHA256" = "PENDING"
+"W1_SCRATCH_SUMS_SHA256" = "PENDING"
+"API_SHA256" = "PENDING"
+"DEV_DATES_SHA256" = "PENDING"
+"EXPECTED_PINS.DESK_CLIENT_SHA256_NEVER_OPENED" = "PENDING"
+"EXPECTED_PINS.SPY_DEV[1]" = "PENDING"
+"EXPECTED_PINS.OPT_INDEX[1]" = "PENDING"
+"EXPECTED_PINS.QQQ_SRC[1]" = "PENDING"
+"EXPECTED_PINS.BARRED[0]" = "PENDING"
+"EXPECTED_PINS.BARRED[1]" = "PENDING"
+"EXPECTED_PINS.VENDORED.open10_dev_reader/__init__.py" = "PENDING"
+"EXPECTED_PINS.VENDORED.open10_dev_reader/constants.py" = "PENDING"
+"EXPECTED_PINS.VENDORED.open10_dev_reader/errors.py" = "PENDING"
+"EXPECTED_PINS.VENDORED.open10_dev_reader/r7_dev_read.py" = "PENDING"
+"EXPECTED_PINS.VENDORED.open10_dev_reader/r7_pins.py" = "PENDING"
+"EXPECTED_PINS.VENDORED.open10_dev_reader/reader.py" = "PENDING"
+"EXPECTED_PINS.VENDORED.bin/qqq_source_dev.py" = "PENDING"
+
+["strategies.news_sentiment.prereg_run"]
+"COST_MODEL_SHA" = "PENDING"
+"COST_DOC_SHA" = "PENDING"
+"TCA_INPUTS_SHA" = "PENDING"
+"EVENTS_SHA" = "PENDING"
+"TCA_FILE_SHA.asset_flags_paper.json" = "PENDING"
+"TCA_FILE_SHA.bucket_costs.csv" = "PENDING"
+"TCA_FILE_SHA.card_costs.json" = "PENDING"
+"TCA_FILE_SHA.card_costs.py" = "PENDING"
+"TCA_FILE_SHA.cost_tables.py" = "PENDING"
+"TCA_FILE_SHA.etf_costs.csv" = "PENDING"
+"TCA_FILE_SHA.open_vs_mid.py" = "PENDING"
+"TCA_FILE_SHA.open_vs_mid_raw.csv" = "PENDING"
+"TCA_FILE_SHA.per_side_costs.csv" = "PENDING"
+"TCA_FILE_SHA.run.log" = "PENDING"
+"TCA_FILE_SHA.sample_meta.json" = "PENDING"
+
+["strategies.portfolio_construction.earnings_gate"]
+"PINNED_SHA256.next_earnings_20261030.parquet" = "PENDING"
+"PINNED_SHA256.next_earnings_20261105.parquet" = "PENDING"
+
+["strategies.rank1_single_name.rank1_sigma"]
+"TCA_SIGNED_NOTE_SHA256" = "PENDING"
+
+["strategies.sentiment_returns.fiscal_diag_s6b"]
+"SHA[0]" = "PENDING"
+"SHA[1]" = "PENDING"
+"SHA[2]" = "PENDING"
+
+["strategies.sentiment_returns.h2_dev"]
+"PIN[1]" = "PENDING"
+"PIN[2]" = "PENDING"
+"PIN[3]" = "PENDING"
+"PIN[4]" = "PENDING"
+"PIN[5]" = "PENDING"
+"PIN[6]" = "PENDING"
+"PIN[7]" = "PENDING"
+"PIN[8]" = "PENDING"
+"PIN[9]" = "PENDING"
+
+["strategies.sentiment_returns.h2c_dev_run"]
+"PINS.COPY_SUMS[1]" = "PENDING"
+"PINS.PRICES_DEV[1]" = "PENDING"
+"PINS.EARNINGS_DEV[1]" = "PENDING"
+"PINS.PURGE[1]" = "PENDING"
+"PINS.TX_DEV_SUMS[1]" = "PENDING"
+"PINS.FYE_MONTH_FROZEN[1]" = "PENDING"
+"PINS.COST_EARNINGS_CLEAN[1]" = "PENDING"
+"PINS.COST_TX_SUMS[1]" = "PENDING"
+
+["strategies.sentiment_returns.h3_dev_runner"]
+"PIN.exe_sha" = "PENDING"
+"PIN.freeze_sha" = "PENDING"
+"REAL.p2sums_sha" = "PENDING"
+"REAL.news_index_sha" = "PENDING"
+"REAL.rsector_sha" = "PENDING"
+"REAL.final100_sha" = "PENDING"
+"REAL.universe_tsv_sha" = "PENDING"
+"REAL.s1c_sums_sha" = "PENDING"
+"REAL.price_csv_sha" = "PENDING"
+"REAL.dev_meta_sha" = "PENDING"
+"REAL.price_dev_sums_sha" = "PENDING"
+"REAL.price_top_sums_sha" = "PENDING"
+"REAL.coverage[0]" = "PENDING"
+"REAL.coverage[1]" = "PENDING"
+"REAL.coverage[2]" = "PENDING"
+"REAL.coverage[3]" = "PENDING"
+"REAL.coverage[4]" = "PENDING"
+"REAL.coverage[5]" = "PENDING"
+"REAL.coverage[6]" = "PENDING"
+
+["strategies.sentiment_returns.oos_runner"]
+"DEV_RUN_SHA" = "PENDING"
+"O.prereg" = "PENDING"
+
+["strategies.trend_tsmom.run_v2"]
+"meta.data_build.prereg_tr_sha256" = "PENDING"
+"meta.cost_model.prereg_sha256" = "PENDING"
+
+["strategies.trend_tsmom.tsmom.v3spec"]
+"COST_MODEL_SHA" = "PENDING"
+"U23_SHA" = "PENDING"
+"PRE2016_SPLITS_SRC_SHA" = "PENDING"
+"REF_SOURCE_TABLE_SHA" = "PENDING"
+"NASDAQ_SNAPSHOT_SHA" = "PENDING"
+
+["tests.strategies.trend_tsmom.test_v3_engine"]
+"live_diff" = "PENDING"

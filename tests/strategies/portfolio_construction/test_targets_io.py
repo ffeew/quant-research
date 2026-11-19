@@ -176,7 +176,7 @@ def test_construct_end_to_end_no_overwrite():
 
 
 def test_cio_hold_suppresses_tradable_write():
-    """Jeremy 2026-11-06: new_trades_allowed=false -> shadow only; no targets/*.json even if empty."""
+    """fund manager 2026-11-06: new_trades_allowed=false -> shadow only; no targets/*.json even if empty."""
     with tempfile.TemporaryDirectory() as d:
         flat = os.path.join(d, "pos.json")
         open(flat, "w").write("[]")

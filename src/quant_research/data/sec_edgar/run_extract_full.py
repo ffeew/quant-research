@@ -35,7 +35,7 @@ def load_events() -> pd.DataFrame:
     ee["cik"] = ee.cik.astype(int)
     ev = ev.merge(ee, on=["symbol", "cik", "announce_date_et"], how="left", suffixes=("", "_ee"))
     # exhibits
-    # Prefer our exhibits map; overlay Ethan's additive ex99_url when accession matches (never filter events by it)
+    # Prefer our exhibits map; overlay the sentiment researcher's additive ex99_url when accession matches (never filter events by it)
     if common.ETHAN_ADDITIVE.exists():
         eth = pd.read_parquet(common.ETHAN_ADDITIVE, columns=["accession", "ex99_url"])
         eth = eth.rename(columns={"ex99_url": "ex99_url_ethan"})
@@ -50,7 +50,7 @@ def load_events() -> pd.DataFrame:
     ev = ev.merge(ex[["accession", "ex99_url", "ex99_type", "ex99_rule"]], on="accession", how="left")
     if eth is not None:
         ev = ev.merge(eth, on="accession", how="left")
-        # fill missing ex99 from Ethan additive only
+        # fill missing ex99 from sentiment researcher additive only
         m = ev.ex99_url.isna() & ev.ex99_url_ethan.notna()
         ev.loc[m, "ex99_url"] = ev.loc[m, "ex99_url_ethan"]
         ev.loc[m, "ex99_rule"] = "ethan_v1_additive"

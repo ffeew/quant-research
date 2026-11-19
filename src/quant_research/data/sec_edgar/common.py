@@ -9,17 +9,18 @@ import numpy as np
 import pandas as pd
 
 from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DATA_DIR, ...)
+from quant_research.utils.pins import desk_pin
 
 HERE = Path(__file__).resolve().parent
 LIVE_STORE = Path(f"{_QR.DATA_DIR}")  # NOT read by the SUE build (live store diverges from v1.3 for xbrl_facts, bars)
 RELEASE = LIVE_STORE / "releases" / "v1.3"
-RELEASE_TOP_HASH = "d137eea39928ec8d27b4e8ace5266c01bf74a81ca7e6d07a9d84f9a71b6dc13a"
+RELEASE_TOP_HASH = desk_pin("data.sec_edgar.common", "RELEASE_TOP_HASH")
 STORE = RELEASE  # 2026-11-06 22:xx: ALL SUE inputs read from the immutable v1.3 pin
 ETHAN_EVENTS_DIR = Path(f"{_QR.DESK_DIR}/equity/earnings_events")  # read-only
 ETHAN_ADDITIVE = LIVE_STORE / "derived" / "earnings_events_8k202_v1.parquet"  # optional ex99/timestamps only
 OUT = HERE / "out"
 OUT.mkdir(exist_ok=True)
-DATA_RELEASE_ID = "v1.3"  # top d137eea3…; SIP methodology settled (Victor 2026-11-06). Ethan v1/v2 not used for any EPS/SUE value (SPEC.md).
+DATA_RELEASE_ID = "v1.3"  # top d137eea3…; SIP methodology settled (validator 2026-11-06). Sentiment researcher v1/v2 not used for any EPS/SUE value (SPEC.md).
 
 
 def sessions() -> pd.DatetimeIndex:

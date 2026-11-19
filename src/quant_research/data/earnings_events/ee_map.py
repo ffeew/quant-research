@@ -1,4 +1,4 @@
-"""Stage 1: PIT S&P 500 member intervals (2015-01-01 onward) -> CIK segments, via Dmitri's ticker_cik_map.
+"""Stage 1: PIT S&P 500 member intervals (2015-01-01 onward) -> CIK segments, via the data owner's ticker_cik_map.
 Output: work/member_cik_segments.parquet, work/unmapped.parquet. Read-only on $QR_DESK_DIR/data."""
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ def load() -> tuple[pd.DataFrame, pd.DataFrame]:
     ref["sr"] = ref.source.map(SRC_RANK).fillna(9)
     ref["cr"] = ref.confidence.map(CONF_RANK).fillna(9)
     # efts_name_search / manual_verified_edgar ranges are bar-store coverage (first..last Alpaca bar, from 2016-01-04),
-    # not ticker-validity dates (Dmitri README s11), so they are treated as open; identity is checked in ee_validate.py.
+    # not ticker-validity dates (data owner README s11), so they are treated as open; identity is checked in ee_validate.py.
     cov = ref.source.isin(["efts_name_search", "manual_verified_edgar"])
     ref.loc[cov, ["vf", "vt"]] = pd.NaT
     ref["dated"] = ref.vf.notna() | ref.vt.notna()

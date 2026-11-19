@@ -1,12 +1,12 @@
-"""Read Risk's state files (owned by Rachel, READ-ONLY for us) with a FAIL-SAFE.
+"""Read Risk's state files (owned by the risk manager, READ-ONLY for us) with a FAIL-SAFE.
 
 Files (paths confirmed by Risk 2026-10-30; overridable via construct.py --panic_path / --breaker_path):
   $QR_DESK_DIR/risk/state/panic_flag.json     -> fields used: as_of_sgt, panic (bool), multiplier_momentum_trend
   $QR_DESK_DIR/risk/state/breaker_state.json  -> fields used: as_of_sgt, state (NORMAL|HALVED|HALTED|RESUMED_DISARMED),
                                                     gross_cap_pct, new_trades_allowed, backstop_equity, halt_armed, current_equity
 LIMITS.md (current header read at run time by limits_version(); v0.3.7 at 2026-10-30 02:28 SGT):
-  * Panic flag (§3) is FINAL since ~02:27 SGT (Victor panic_v2: T6 PASS, T7 PASS, T8 CONDITIONAL; CIO signed off; file
-    computed on Dmitri's S&P 500 official-close history). A flag file WITHOUT a provisional marker is BINDING.
+  * Panic flag (§3) is FINAL since ~02:27 SGT (validator panic_v2: T6 PASS, T7 PASS, T8 CONDITIONAL; CIO signed off; file
+    computed on the data owner's S&P 500 official-close history). A flag file WITHOUT a provisional marker is BINDING.
     A file that still says provisional (provisional: true, or 'PROVISIONAL' in status) is returned with provisional=True
     and construct.py reports it for context only (--panic_provisional context, default; 'apply' forces it).
     §3 responses are taken from the file where present, hard-coded values are FAIL-SAFE DEFAULTS only:
@@ -86,9 +86,7 @@ PANIC_OFF = dict(
     new_loser_shorts_allowed=True,
     net_beta_floor=None,
 )
-T8_STATUS = (
-    "pending_validation"  # Risk (Rachel) 2026-10-30 ~02:28: T8 responses written to the file, validation pending
-)
+T8_STATUS = "pending_validation"  # Risk (the risk manager) 2026-10-30 ~02:28: T8 responses written to the file, validation pending
 LIMITS_PATH = f"{_QR.DESK_DIR}/risk/LIMITS.md"
 
 

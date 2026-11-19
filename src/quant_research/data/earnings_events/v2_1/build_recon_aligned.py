@@ -14,9 +14,10 @@ import numpy as np
 import pandas as pd
 
 from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DATA_DIR, ...)
+from quant_research.utils.pins import desk_pin
 
-V1_HASH = "d568a60d19348ad2948083df6a95f64e501f25615d773cdac14ebd9629216d2e"
-OLD_HASH = "d07358318c6b0016afa9b5e3d885b1ce508bdd5af83328e692bcba2653a9fe5f"
+V1_HASH = desk_pin("data.earnings_events.v2_1.build_recon_aligned", "V1_HASH")
+OLD_HASH = desk_pin("data.earnings_events.v2_1.build_recon_aligned", "OLD_HASH")
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 V2 = os.path.join(ROOT, "v2")
 

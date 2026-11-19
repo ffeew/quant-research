@@ -1,4 +1,4 @@
-"""QA: does `reaction_session` land on the day the market reacts? Re-implements Victor's gap statistic
+"""QA: does `reaction_session` land on the day the market reacts? Re-implements the validator's gap statistic
 (share of |open/prev_close-1| > 4% on announce day d vs next session d+1) and adds close-to-close |ret|>4%
 on reaction_session vs the session after it. Input: earnings/earnings_events.parquet + total_return file.
 Output: qa/earnings_alignment_<date>.md (+ .parquet). Usage: python earnings_alignment.py [--events path] [--tag x]"""

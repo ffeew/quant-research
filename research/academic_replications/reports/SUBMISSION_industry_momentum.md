@@ -1,8 +1,8 @@
 # Validation submission: Industry momentum (Moskowitz & Grinblatt 1999), sector-ETF version
 
-> **Status: FAILED** (Victor, 2026-10-30; validation/replication_checks/2026-10-30-dave-replications.md). Corrections applied 2026-10-30 02:26 SGT after his check.
+> **Status: FAILED** (the validator, 2026-10-30; validation/replication_checks/2026-10-30-dave-replications.md). Corrections applied 2026-10-30 02:26 SGT after his check.
 
-Submitted by Dave (Quant Research) to Victor, 2026-10-30 01:47 SGT. Built against validation/STANDARD.md v1.0. Self-assessment only; the verdict is Victor's.
+Submitted by the derivatives researcher (Quant Research) to the validator, 2026-10-30 01:47 SGT. Built against validation/STANDARD.md v1.0. Self-assessment only; the verdict is the validator's.
 
 **Scope: ETF version only.** This tests 11 SPDR sector ETFs, 3 per side (about 27% of the sectors on each side; XLC only from 2018-06, which also changed the other sectors' composition). The paper uses 20 value-weighted industries, 3 per side (15%). **The paper-faithful 20-industry (stock-level) result on desk data is unknown.** It cannot be built without point-in-time industry codes for former S&P 500 members (0% coverage). Using current GICS would add survivorship bias, so it was not run. The FAIL applies to the ETF implementation only. For context, the FF49 VW J6/K6 public check for 2016 onward is gross SR 0.28 (t 0.93). Book definitions: imom_etf_ls holds 6 overlapping monthly cohorts (J=6/K=6); **imom_etf_long and imom_etf_ls_1m are rebalanced fully each month (no overlapping cohorts)**. That is why their hold_months ±20% rows are identical to base.
 
@@ -11,12 +11,12 @@ Submitted by Dave (Quant Research) to Victor, 2026-10-30 01:47 SGT. Built agains
 $QR_DESK_DIR/research/replication/.venv/bin/python $QR_DESK_DIR/research/replication/run_all.py --only imom
 ```
 Code: `research/replication/moskowitz-grinblatt-1999-industry-momentum/pipeline.py`, `_common/engine.py` (fills, costs, borrow), `_common/validation.py` (DSR, PBO, NW, walk-forward), `run_all.py`. Env: `research/replication/.venv` (`requirements.lock.txt`).
-Data snapshot: Dmitri SIP total_return ret_total_best (clean), fingerprint c50abc068669d327; file mtimes {"daily_total_return.parquet": "2026-10-30 01:32:38 SGT", "sp500_membership.parquet": "2026-10-30 01:31:38 SGT", "ff3_daily.parquet": "2026-10-30 01:10:57 SGT"}. Trial log: `research/replication/TRIAL_LOG.csv`; T x N daily net matrix: `research/replication/results/trials_daily_net_*.parquet`.
+Data snapshot: data owner SIP total_return ret_total_best (clean), fingerprint c50abc068669d327; file mtimes {"daily_total_return.parquet": "2026-10-30 01:32:38 SGT", "sp500_membership.parquet": "2026-10-30 01:31:38 SGT", "ff3_daily.parquet": "2026-10-30 01:10:57 SGT"}. Trial log: `research/replication/TRIAL_LOG.csv`; T x N daily net matrix: `research/replication/results/trials_daily_net_*.parquet`.
 
 ## Codified rules
 See the docstring of `pipeline.py` (copied below). No discretion, no overrides.
 ```
-Industry momentum (Moskowitz & Grinblatt 1999). Dave, 2026-10-30.
+Industry momentum (Moskowitz & Grinblatt 1999). The derivatives researcher, 2026-10-30.
 Paper: 20 value-weighted industries; long top-3 / short bottom-3 by past 6-month return, hold 6 months (overlapping
 portfolios), no skip month in the headline spec.
 Desk versions (same engine / costs / reporting as the other two replications):
@@ -26,12 +26,12 @@ Desk versions (same engine / costs / reporting as the other two replications):
      imom_etf_ls_1m : same ranking, rebalanced monthly (K=1)
      imom_etf_long  : long-only top-3, rebalanced fully every month (1-month hold, no cohorts; excess of rf)
   B) Stock level (GICS sector portfolios of PIT S&P 500 members, EW within sector; trade the member stocks).
-     Requires point-in-time industry codes for former members; gated by coverage (see run_all.py). Dmitri's
+     Requires point-in-time industry codes for former members; gated by coverage (see run_all.py). The data owner's
      universe.parquet has GICS only for current members (as of 2026-10-30) -> blocked unless forced as a diagnostic.
   C) Public pre/post-2016 check: FF 49 industries (VW), J=6/K=6, top-5/bottom-5 (~10% each side), monthly from
-     1926 -> splits pre-2016 vs 2016+ (Dmitri's data starts 2016).
+     1926 -> splits pre-2016 vs 2016+ (the data owner's data starts 2016).
 ```
-Execution: signal at the close of the last session of each month; market-on-open fill at the next session's open; costs Tomas v1.1 max Victor floor; borrow 1.00%/yr; book $100,000; 2x stress doubles costs and borrow. Primary (pre-specified, paper-faithful) book: **imom_etf_ls**; secondary books: imom_etf_long, imom_etf_ls_1m.
+Execution: signal at the close of the last session of each month; market-on-open fill at the next session's open; costs TCA owner v1.1 max validator floor; borrow 1.00%/yr; book $100,000; 2x stress doubles costs and borrow. Primary (pre-specified, paper-faithful) book: **imom_etf_ls**; secondary books: imom_etf_long, imom_etf_ls_1m.
 
 ## Headline (base parameters, next-open fills, full desk sample)
 
@@ -56,15 +56,15 @@ Execution: signal at the close of the last session of each month; market-on-open
 | §3 >= 30 independent OOS rebalance periods | MET | 86 OOS months |
 | §4 OOS Sharpe net > 0.5 | NOT MET | WF-OOS net SR 0.22; full-sample net SR 0.02 |
 | §4/§5 Sharpe > 0 at 2x costs | NOT MET | full -0.08, WF-OOS 0.14 |
-| §4 DSR >= 0.95 | NOT MET | family N=48: DSR 0.012, SR0 0.74 ann; all-Dave N=184: DSR 0.001, SR0 1.06; T=2448, skew -0.50, kurt 9.07 |
+| §4 DSR >= 0.95 | NOT MET | family N=48: DSR 0.012, SR0 0.74 ann; all-derivatives-researcher N=184: DSR 0.001, SR0 1.06; T=2448, skew -0.50, kurt 9.07 |
 | §4 t-stat >= 2.8 (replication of published anomaly; NW) | NOT MET | t_NW 0.05 (iid 0.05) |
 | §4 PBO < 0.20 (<= 0.05 for PASS) | NOT MET | book grid PBO 0.62 (N=9); whole family PBO 0.22 (N=27). N~11 per grid -> weakly informative |
-| §5 costs >= Victor minimums; borrow >= 1%/yr; exclude unborrowable | MET (borrow caveat) | avg 6.5 bps/side (Tomas-only 6.0); borrow 1%/yr; no PIT borrow history exists, so unborrowable names cannot be excluded at signal time |
+| §5 costs >= validator minimums; borrow >= 1%/yr; exclude unborrowable | MET (borrow caveat) | avg 6.5 bps/side (TCA-owner-only 6.0); borrow 1%/yr; no PIT borrow history exists, so unborrowable names cannot be excluded at signal time |
 | §6 post-publication haircut | computed | expected SR for sizing = min(WF-OOS 0.22, 0.40 x 0.51) = 0.20 (set at run time: FF49 VW J6/K6 top5-bot5, 1963-07..1995-07 (MG's sample end), public proxy) |
 | §7 no year > 40% of PnL | NOT MET | max year share 924% (n/a if total PnL <= 0) |
 | §7 no regime Sharpe < -0.5 | MET | worst regime SR -0.30 |
 | §7 +/-20% neighbourhood: SR > 0 and >= 50% of base | NOT MET | 7/9 configs pass on full-sample net SR; 8/9 on 2022+ net SR |
-| §7 legs reported; correlation to book | MET (book history 1 day) | long leg gross SR 0.69, short leg gross SR -0.54; desk book has 1 day of history, so correlations are vs SPY/FF factors and Victor's validation backtests |
+| §7 legs reported; correlation to book | MET (book history 1 day) | long leg gross SR 0.69, short leg gross SR -0.54; desk book has 1 day of history, so correlations are vs SPY/FF factors and the validator's validation backtests |
 | §8 trade size <= 1% of 20d ADV | MET | max 0.0190% at $100,000; at 10x book max 0.190% |
 | §8 break-even cost >= 2x assumed | MET | break-even 23.8 bps/side vs assumed 6.5 |
 
@@ -81,7 +81,7 @@ Execution: signal at the close of the last session of each month; market-on-open
 - Turnover/costs: {"traded_per_yr_x_nav": 6.148, "avg_gross_exposure": 1.699, "oneway_turnover_per_yr_of_gross": 1.809, "avg_holding_months": 6.633, "gross_ret_per_unit_traded_bps": 23.833, "breakeven_cost_bps_per_side": 23.833, "assumed_avg_cost_bps_per_side": 6.497, "tomas_only_avg_cost_bps": 6.043, "breakeven_over_assumed": 3.669, "cost_drag_ann": 0.004, "borrow_drag_ann": 0.009, "avg_long_mv": 0.849, "avg_short_mv": 0.85}
 - Capacity: {"book_usd": 100000.0, "max_participation": 0.00019, "p99_participation": 8e-05, "share_trades_over_1pct_adv": 0.0, "max_participation_at_10x_book": 0.0019, "share_over_1pct_at_10x": 0.0}
 - Walk-forward: SR 0.22, t_NW 0.66, folds 8, picks ['topn_m20', 'topn_m20', 'all_m20', 'all_m20', 'all_m20', 'all_m20', 'all_m20', 'all_m20'], 2x SR 0.14
-- DSR (family N=48): 0.012; DSR (all Dave trials N=184): 0.001
+- DSR (family N=48): 0.012; DSR (all derivatives researcher trials N=184): 0.001
 - PBO grid 0.62 (N=9), family 0.22 (N=27)
 - Alt trials: next-close fill SR 0.04; no-clean data SR 0.02; delisting returns table/conservative/adverse SR 0.02 / 0.02 / 0.02
 - Delisting exits while held: 0
@@ -136,7 +136,7 @@ Regimes (labels lagged 1 day):
 - Turnover/costs: {"traded_per_yr_x_nav": 7.68, "avg_gross_exposure": 1.0, "oneway_turnover_per_yr_of_gross": 3.84, "avg_holding_months": 3.125, "gross_ret_per_unit_traded_bps": 111.943, "breakeven_cost_bps_per_side": 111.943, "assumed_avg_cost_bps_per_side": 6.823, "tomas_only_avg_cost_bps": 6.507, "breakeven_over_assumed": 16.406, "cost_drag_ann": 0.005, "borrow_drag_ann": 0.0, "avg_long_mv": 1.0, "avg_short_mv": 0.0}
 - Capacity: {"book_usd": 100000.0, "max_participation": 0.01765, "p99_participation": 0.00026, "share_trades_over_1pct_adv": 0.00413, "max_participation_at_10x_book": 0.1765, "share_over_1pct_at_10x": 0.00413}
 - Walk-forward: SR 0.72, t_NW 2.17, folds 8, picks ['form_months_p20', 'all_p20', 'form_months_p20', 'all_p20', 'form_months_p20', 'form_months_p20', 'form_months_p20', 'all_p20'], 2x SR 0.70
-- DSR (family N=48): 0.178; DSR (all Dave trials N=184): 0.028
+- DSR (family N=48): 0.178; DSR (all derivatives researcher trials N=184): 0.028
 - PBO grid 0.28 (N=9), family 0.22 (N=27)
 - Alt trials: next-close fill SR 0.45; no-clean data SR 0.45; delisting returns table/conservative/adverse SR 0.45 / 0.45 / 0.45
 - Delisting exits while held: 0
@@ -192,7 +192,7 @@ Regimes (labels lagged 1 day):
 - Turnover/costs: {"traded_per_yr_x_nav": 16.332, "avg_gross_exposure": 2.017, "oneway_turnover_per_yr_of_gross": 4.049, "avg_holding_months": 2.963, "gross_ret_per_unit_traded_bps": -18.869, "breakeven_cost_bps_per_side": -18.869, "assumed_avg_cost_bps_per_side": 6.935, "tomas_only_avg_cost_bps": 6.648, "breakeven_over_assumed": -2.721, "cost_drag_ann": 0.011, "borrow_drag_ann": 0.01, "avg_long_mv": 1.006, "avg_short_mv": 1.01}
 - Capacity: {"book_usd": 100000.0, "max_participation": 0.01776, "p99_participation": 0.00039, "share_trades_over_1pct_adv": 0.0021, "max_participation_at_10x_book": 0.17757, "share_over_1pct_at_10x": 0.0021}
 - Walk-forward: SR 0.32, t_NW 0.95, folds 8, picks ['form_months_p20', 'form_months_p20', 'form_months_p20', 'form_months_p20', 'form_months_p20', 'form_months_p20', 'form_months_p20', 'form_months_p20'], 2x SR 0.21
-- DSR (family N=48): 0.000; DSR (all Dave trials N=184): 0.000
+- DSR (family N=48): 0.000; DSR (all derivatives researcher trials N=184): 0.000
 - PBO grid 0.25 (N=9), family 0.22 (N=27)
 - Alt trials: next-close fill SR -0.31; no-clean data SR -0.33; delisting returns table/conservative/adverse SR -0.33 / -0.33 / -0.33
 - Delisting exits while held: 0
@@ -256,9 +256,9 @@ Stock-level version: **BLOCKED**: GICS codes cover 0% of former S&P 500 members 
 
 ### 1. Missing delisting returns (material for long books)
 
-Dmitri's `data/universe/delisting_returns.parquet` has terminal returns only for deals matched in Alpaca's corporate-action feed (which starts 2020-04). Of the 120 stocks whose bars end before the sample end, 47 have a terminal return and 73 do not (they cannot be told apart as merger vs performance delisting from the data available, so they are treated as performance-related in the stress). Base runs treat a held position whose bars stop as cash at the last close (0%). Sensitivity (base params, next-open fills, each logged as a data_alt trial):
+The data owner's `data/universe/delisting_returns.parquet` has terminal returns only for deals matched in Alpaca's corporate-action feed (which starts 2020-04). Of the 120 stocks whose bars end before the sample end, 47 have a terminal return and 73 do not (they cannot be told apart as merger vs performance delisting from the data available, so they are treated as performance-related in the stress). Base runs treat a held position whose bars stop as cash at the last close (0%). Sensitivity (base params, next-open fills, each logged as a data_alt trial):
 - **table**: matched terminal return where known, else 0%;
-- **conservative**: matched terminal return where known, else **-30% on both legs** (Victor's suggested assumption; shorts gain);
+- **conservative**: matched terminal return where known, else **-30% on both legs** (the validator's suggested assumption; shorts gain);
 - **adverse**: matched where known, else -30% on longs and **+30% on shorts** (takeover-premium case; worst for every book).
 
 | book | delisting events while held (long / short) | net SR base | table | conservative | adverse | net ann base | ann conservative | ann adverse |
@@ -267,7 +267,7 @@ Dmitri's `data/universe/delisting_returns.parquet` has terminal returns only for
 | imom_etf_long | 0 (0 / 0) | 0.45 | 0.45 | 0.45 | 0.45 | 8.08% | 8.08% | 8.08% |
 | imom_etf_ls_1m | 0 (0 / 0) | -0.33 | -0.33 | -0.33 | -0.33 | -5.23% | -5.23% | -5.23% |
 
-Per-event detail (symbol, weight held, last bar, return applied in the base run = 0): `delisting_exits_<book>.csv`. Victor's file lists 120 delisting rows (47 matched, 70 no deal, 3 acquirer price missing); pre-2020 delistings have no terminal return at all, so the 2016-2019 part of every book is the most exposed.
+Per-event detail (symbol, weight held, last bar, return applied in the base run = 0): `delisting_exits_<book>.csv`. The validator's file lists 120 delisting rows (47 matched, 70 no deal, 3 acquirer price missing); pre-2020 delistings have no terminal return at all, so the 2016-2019 part of every book is the most exposed.
 
 ### 2. Ticker reuse (SNDK and others)
 
@@ -275,13 +275,13 @@ Per-event detail (symbol, weight held, last bar, return applied in the base run 
 - FOSL membership interval 2016-01-04 to 2016-01-05: excluded. no bars for this interval
 - Q membership interval 2017-08-29 to 2017-11-15: excluded. member 2017-08..11 was Quintiles IMS; the Q bars (from 2025-11) are a different company. Interval excluded.
 - SNDK membership interval 2016-01-04 to 2016-05-13: excluded. old SanDisk (member until 2016-05-13) has no bars; SNDK bars are the new Sandisk (listed 2025-02, member from 2025-11-28). Old interval excluded, new interval kept.
-- Every membership interval is mapped to the symbol's bars (`_common/desk_data.validate_intervals`, output `results/membership_intervals_coverage.csv`); a name is eligible at a signal date only if it is a PIT member in a kept interval AND has a bar on that date. The SNDK interval from 2025-11-28 maps to the new Sandisk bars and is kept. Dmitri's fixes for POM, SPLS, NFX, APC, CA, CSRA, DNB, TE (former members cut at the first gap > 10 sessions) are inherited.
+- Every membership interval is mapped to the symbol's bars (`_common/desk_data.validate_intervals`, output `results/membership_intervals_coverage.csv`); a name is eligible at a signal date only if it is a PIT member in a kept interval AND has a bar on that date. The SNDK interval from 2025-11-28 maps to the new Sandisk bars and is kept. The data owner's fixes for POM, SPLS, NFX, APC, CA, CSRA, DNB, TE (former members cut at the first gap > 10 sessions) are inherited.
 
 ### 3. Former / renamed members missing price history while in the index (verified 2026-10-30 02:26 SGT)
 
 Source: `results/membership_intervals_coverage.csv` (return basis) and `results/membership_intervals_coverage_bars.csv` (bar basis).
 
-**Membership source.** PIT membership is Dmitri's rebuild from Wikipedia's crowd-sourced "Historical components of the S&P 500" change log (plus the current-constituents snapshot). It has **not** been checked against S&P DJI's official constituent history, which is paid. Dmitri logs 26 internal inconsistencies, mostly unrecorded ticker renames (`universe/sp500_membership_anomalies.parquet`).
+**Membership source.** PIT membership is the data owner's rebuild from Wikipedia's crowd-sourced "Historical components of the S&P 500" change log (plus the current-constituents snapshot). It has **not** been checked against S&P DJI's official constituent history, which is paid. Data owner logs 26 internal inconsistencies, mostly unrecorded ticker renames (`universe/sp500_membership_anomalies.parquet`).
 
 **Member-days without data (return basis, which is what the strategies see).**
 - 7,186 of 1,375,021 PIT member-sessions are missing (0.52%), spread over **538** kept membership intervals (538 different symbols).

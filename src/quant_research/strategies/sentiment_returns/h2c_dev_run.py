@@ -14,6 +14,8 @@ import re
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, BinaryIO, Literal, TextIO, cast, overload
 
+from quant_research.utils.pins import desk_pin
+
 if TYPE_CHECKING:
     import numpy.typing as npt
 
@@ -24,7 +26,7 @@ if TYPE_CHECKING:
 # Exit codes: 0 ok | 2 sha mismatch | 3 mapping cross-check | 4 schema | 5 LOCK slots unfilled | 6 allowlist/forbidden path
 #             7 purge mismatch | 8 partition (row outside DEV) | 9 interpreter/flags/version/import | 10 argv/config | 11 calendar
 #             12 uncaught exception BEFORE any output (coded STOP, FD-6) | 13 any STOP/exception AFTER RUN_DIR/STATS exist (FD-6, final)
-# FREEZE r2 (FD-1..FD-8, FI-4/FI-7 AMEND per Victor L702 0adf1120): real input shapes from schema walks 548f8646 / 9a6e7ba4.
+# FREEZE r2 (FD-1..FD-8, FI-4/FI-7 AMEND per validator 0adf1120): real input shapes from schema walks 548f8646 / 9a6e7ba4.
 import sys
 
 from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DATA_DIR, ...)
@@ -40,37 +42,40 @@ except BaseException as _e:
 # ============================ CONSTANTS BLOCK (all paths + shas; LOCK edits only this block) ============================
 FREEZE_DIR = f"{_QR.DESK_DIR}/research/original/h2c_freeze_r2_20261114"
 SYNTH_ROOT = FREEZE_DIR + "/synthetic_test/"
-PULL_ROOT = f"{_QR.DESK_DIR}/validation/dmitri/h2c_av_pull_20261114_r1_inc70b"  # FD-4: INC-70b copy (no scratch path)
+PULL_ROOT = f"{_QR.DESK_DIR}/validation/dmitri/h2c_av_pull_20261114_r1_inc70b"  # FD-4: copy (no scratch path)
 PINS = {
-    "COPY_SUMS": (PULL_ROOT + "/COPY_SUMS", "b6b7b7cc033b58a081ebb0130da4881a50d25adcdee7b388603241a8ca238afa"),  # FD-4
+    "COPY_SUMS": (
+        PULL_ROOT + "/COPY_SUMS",
+        desk_pin("strategies.sentiment_returns.h2c_dev_run", "PINS.COPY_SUMS[1]"),
+    ),  # FD-4
     "PRICES_DEV": (
         PULL_ROOT + "/DEV/PRICES_DEV.json",
-        "f4744137623d6ba886eb82ecab1bea59b224afd9612186e2bc29a0ec75513b25",
+        desk_pin("strategies.sentiment_returns.h2c_dev_run", "PINS.PRICES_DEV[1]"),
     ),
     "EARNINGS_DEV": (
         PULL_ROOT + "/DEV/EARNINGS_DEV.json",
-        "d2ed319e1e1bc58870d92ecd88a4915d1d48ec0738ca3bfa99404e45cbf60f5f",
+        desk_pin("strategies.sentiment_returns.h2c_dev_run", "PINS.EARNINGS_DEV[1]"),
     ),
     "PURGE": (
         f"{_QR.DESK_DIR}/validation/dmitri/h2c_av_pull_20261114_r1_inc70/PURGE.tsv",
-        "bb57bdb1d865c810af17bd02ae25d6a94dade7221a8a574c855c31df9704cc76",
+        desk_pin("strategies.sentiment_returns.h2c_dev_run", "PINS.PURGE[1]"),
     ),
     "TX_DEV_SUMS": (
         f"{_QR.DESK_DIR}/validation/dmitri/h2c_tx_route_20261114_r1_inc70/TRANSCRIPTS_DEV/SHA256SUMS",
-        "0947105e741ad0db7eb37d35d7f6948259c91f422f4adf3d378919d67427a928",
+        desk_pin("strategies.sentiment_returns.h2c_dev_run", "PINS.TX_DEV_SUMS[1]"),
     ),
     "FYE_MONTH_FROZEN": (
         f"{_QR.DESK_DIR}/research/original/sentiment_returns_fiscal_diag_s6b_20261111/FYE_MONTH_FROZEN.tsv",
-        "67d7eab8140fb62a64983df54b2ca775acae0ad39d5d3d185fd96aed705ec326",
-    ),  # path+sha as pinned in h2_dev.py L18/L32
-    # ---- LOCK SLOTS (COST, Jeremy ruling): filled at LOCK only ----
+        desk_pin("strategies.sentiment_returns.h2c_dev_run", "PINS.FYE_MONTH_FROZEN[1]"),
+    ),  # path+sha as pinned in h2_dev.py/L32
+    # ---- LOCK SLOTS (COST, fund manager decision): filled at LOCK only ----
     "COST_EARNINGS_CLEAN": (
         f"{_QR.DESK_DIR}/validation/dmitri/h2c_cost_clean_20261114_r4_inc70/COST_EARNINGS_DEV_CLEAN.json",
-        "2305f63cbd674191fa142c8ca29cb464aa9af65e005fc7f65016fb7d49554ba5",
-    ),  # Dmitri's DEV-only H4 clean output for COST (after Victor readback)
+        desk_pin("strategies.sentiment_returns.h2c_dev_run", "PINS.COST_EARNINGS_CLEAN[1]"),
+    ),  # The data owner's DEV-only H4 clean output for COST (after validator readback)
     "COST_TX_SUMS": (
         f"{_QR.DESK_DIR}/validation/dmitri/h2c_cost_delta_route_20261114_r2_inc70/TRANSCRIPTS_DEV/SHA256SUMS",
-        "0d6d996ced5608a6e14e368e10b2b99ab74b25299ec602e4198bb4e6c8bb482b",
+        desk_pin("strategies.sentiment_returns.h2c_dev_run", "PINS.COST_TX_SUMS[1]"),
     ),  # SHA256SUMS of COST's TRANSCRIPTS_DEV delta-route partition
 }
 COPY_SUMS_REL = {
@@ -88,7 +93,7 @@ EXPECTED_PURGE_2020 = {
     "purged": 6,
     "kept": 7,
     "excl_no_reporttime": 0,
-}  # Jeremy FI-8; FD-3 column names
+}  # Fund manager FI-8; FD-3 column names
 PURGE_WINDOW_START, PURGE_WINDOW_END = "2020-11-01", "2020-12-31"  # FI-7 AMEND: mirrors route.py (BRIEF_H2C_d4 c16)
 EXPECTED_PURGE_HEADER = ["boundary", "in_window_rows", "purged", "kept", "excl_no_reporttime"]  # FD-3 (walk 1)
 PURGE_BOUNDARY_DEV = "2020"
@@ -103,7 +108,7 @@ EXPECTED_PRICE_KEYS = {
     "7. dividend amount",
     "8. split coefficient",
 }  # FD-2/FI-4: walk 2 key set
-PRICE_ADJ_KEY = "5. adjusted close"  # FD-2: route.py L229 PF / walk 2
+PRICE_ADJ_KEY = "5. adjusted close"  # FD-2: route.py PF / walk 2
 EXPECTED_EARN_KEYS = {
     "fiscalDateEnding",
     "reportedDate",
@@ -113,13 +118,13 @@ EXPECTED_EARN_KEYS = {
     "surprisePercentage",
     "reportTime",
 }  # FD-1/FI-4: 7 keys, NO 'symbol' (walk 1)
-EXPECTED_TX_KEYS = {"symbol", "quarter", "transcript"}  # h2_dev.py L156-158; FI-4 (walk 1)
+EXPECTED_TX_KEYS = {"symbol", "quarter", "transcript"}  # h2_dev.py; FI-4 (walk 1)
 EXPECTED_TX_ENTRY_KEYS = {"content", "sentiment", "speaker", "title"}  # FI-4 (walk 1); only `sentiment` read
-FYE_REQUIRED_COLS = {"symbol", "fye_month", "status"}  # h2_dev.py L76-77
+FYE_REQUIRED_COLS = {"symbol", "fye_month", "status"}  # h2_dev.py
 VERSIONS = {"python": "3.13.5", "numpy": "2.5.4", "scipy": "1.18.1", "exchange_calendars": "4.13.2"}
 VENV_PY = f"{_QR.DATA_DIR}/.venv/bin/python"  # LOCK runtime (unchanged)
-ACCEPT_PY = f"{_QR.SCRATCH_DIR}/scratch/v_fd8_stage_20261114/venv/bin/python"  # FD-8 (Victor L705 note f0040cc3 L12): accept interpreter, SYNTHETIC only
-ACCEPT_IN_ROOT = f"{_QR.SCRATCH_DIR}/scratch/v_fd8_stage_20261114/in/"  # FD-8 (note L11, L22): Victor's stage in/ copies, SYNTHETIC only
+ACCEPT_PY = f"{_QR.SCRATCH_DIR}/scratch/v_fd8_stage_20261114/venv/bin/python"  # FD-8 (validator note f0040cc3 L12): accept interpreter, SYNTHETIC only
+ACCEPT_IN_ROOT = f"{_QR.SCRATCH_DIR}/scratch/v_fd8_stage_20261114/in/"  # FD-8 (note L11, L22): the validator's stage in/ copies, SYNTHETIC only
 # =====================================================================================================================
 UNIVERSE = sorted(
     [
@@ -303,7 +308,7 @@ def parse_sums(b: bytes) -> dict[str, str]:
     return d
 
 
-# ------------------------------ fiscal mapping (h2_dev.py L73-108, EDGE adapted to DEV) ------------------------------
+# ------------------------------ fiscal mapping (h2_dev.py, EDGE adapted to DEV) ------------------------------
 def me(y: int, m: int) -> dt.date:
     return dt.date(y, m, calendar.monthrange(y, m)[1])
 
@@ -347,7 +352,7 @@ def fy_map(rows: list[dict[str, Any]], m: int, Y: int) -> tuple[dict[int, dict[s
     return out, ";".join(why)
 
 
-# ------------------------------ stats helpers (h2_dev.py L65-70, L198-215) ------------------------------
+# ------------------------------ stats helpers (h2_dev.py,) ------------------------------
 def nw_t(x: npt.ArrayLike, L: int) -> float:
     x = np.asarray(x, float)
     T = len(x)
@@ -427,14 +432,14 @@ def main(argv: list[str]) -> int:
         sys.flags.dont_write_bytecode,
         vers,
     )
-    # FD-8: real mode = LOCK runtime VENV_PY only; synthetic mode also accepts Victor's stage ACCEPT_PY (read-only bind of the
+    # FD-8: real mode = LOCK runtime VENV_PY only; synthetic mode also accepts the validator's stage ACCEPT_PY (read-only bind of the
     # same venv; under the tmpfs mask VENV_PY does not exist, so it is matched by its literal path, never resolved via cio/data).
     py_ok = os.path.realpath(sys.executable) == os.path.realpath(VENV_PY) or (
         S["synthetic"] and os.path.abspath(sys.executable) == ACCEPT_PY
     )
     if not (sys.flags.isolated and sys.flags.dont_write_bytecode) or vers != VERSIONS or not py_ok:
         raise Stop(9, "interpreter/flags/version mismatch")
-    # ---- LOCK slots BEFORE any data byte (Jeremy COST ruling) ----
+    # ---- LOCK slots BEFORE any data byte (fund manager COST decision) ----
     unfilled = []
     if S["RUN_DIR"] is None:
         unfilled.append("RUN_DIR")
@@ -451,7 +456,7 @@ def main(argv: list[str]) -> int:
         raise Stop(5, "LOCK slots unfilled: " + ",".join(unfilled))
     if os.path.exists(S["RUN_DIR"]):
         raise Stop(10, "RUN_DIR exists")
-    # FD-8: never write next to the runner's own file or into the venv (read-only venv mount at Victor's real call)
+    # FD-8: never write next to the runner's own file or into the venv (read-only venv mount at the validator's real call)
     rdp = os.path.realpath(S["RUN_DIR"])
     own = os.path.dirname(os.path.realpath(__file__))
     bad_roots = [
@@ -487,7 +492,7 @@ def main(argv: list[str]) -> int:
     # ---- pinned reads: every sha verified before parse ----
     if S["COST_EXCLUDED_BY_ERRATUM"]:
         read_pinned(*S["COST_ERRATUM_PIN"])
-    pull = parse_sums(read_pinned(*P["COPY_SUMS"]))  # FD-4: INC-70b COPY_SUMS, relative lines
+    pull = parse_sums(read_pinned(*P["COPY_SUMS"]))  # FD-4: COPY_SUMS, relative lines
     for k, rel in S["COPY_SUMS_REL"].items():
         if pull.get(rel) != P[k][1]:
             raise Stop(2, f"{k} sha not equal to its COPY_SUMS line {rel}")
@@ -549,8 +554,8 @@ def main(argv: list[str]) -> int:
             raise Stop(4, f"{what}: non-float string")
 
     def prices_of(b: bytes) -> list[dict[str, Any]]:
-        """FD-2: dict symbol -> list of [date 'YYYY-MM-DD', {8 AV keys: str}] (BRIEF_H2C_d4 L243 iterate 'Time Series (Daily)',
-        L245 d.append([k,dict(v)]), L313 json.dumps(PD,sort_keys=True); key set from walk 2). Rows arrive DESCENDING -> sorted
+        """FD-2: dict symbol -> list of [date 'YYYY-MM-DD', {8 AV keys: str}] (BRIEF_H2C_d4 iterate 'Time Series (Daily)',
+        d.append([k,dict(v)]), json.dumps(PD,sort_keys=True); key set from walk 2). Rows arrive DESCENDING -> sorted
         ascending here. Returns flat rows {symbol, date, adjusted_close} (only '5. adjusted close' is used)."""
         D_ = json.loads(b)
         if not isinstance(D_, dict) or set(D_) != set(UNIVERSE) | {HEDGE}:
@@ -672,7 +677,7 @@ def main(argv: list[str]) -> int:
             raise Stop(4, f"unparseable fiscalDateEnding {e['symbol']}")
         if e["r"] is not None and not (D_LO <= e["r"] <= D_HI):
             raise Stop(8, f"EARNINGS row outside DEV {e['symbol']} {e['r']}")
-    # ---- §6.1 mapping transcript label -> EARNINGS row; cross-check vs Dmitri's DEV routing ----
+    # ---- §6.1 mapping transcript label -> EARNINGS row; cross-check vs the data owner's DEV routing ----
     by_sym: dict[str, list[dict[str, Any]]] = {}
     for e in ER:
         if e["r"] is not None:
@@ -758,7 +763,7 @@ def main(argv: list[str]) -> int:
             ev["status"] = "excl_dup_symbol_quarter"
         else:
             seenq[qkey] = ev
-    # PURGE counts (2020 boundary only; 2013 row checked at holdout run per Jeremy ruling)
+    # PURGE counts (2020 boundary only; 2013 row checked at holdout run per fund manager decision)
     # FI-7 AMEND: mirror route.py c16 exactly: window reportedDate 2020-11-01..2020-12-31; excl = reportTime not pre/post ONLY;
     # OQ-18 duplicates are NOT excl (classified by timing like route.py); purged = session(day0+21) > 2020-12-31; kept = rest.
     pw = [
@@ -1076,7 +1081,7 @@ def _one_line(x: object) -> str:
 
 
 def run(argv: list[str]) -> int:
-    """FD-6/FD-8 entry point: callable after import (Victor's stage accept call) or as __main__. Returns the exit code."""
+    """FD-6/FD-8 entry point: callable after import (the validator's stage accept call) or as __main__. Returns the exit code."""
     try:
         install_guard()
         rc = main(argv)

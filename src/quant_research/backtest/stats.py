@@ -1,4 +1,4 @@
-"""Shared performance stats (Dave). Returns are simple periodic returns (decimal)."""
+"""Shared performance stats (the derivatives researcher). Returns are simple periodic returns (decimal)."""
 
 from __future__ import annotations
 

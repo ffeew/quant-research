@@ -1,4 +1,4 @@
-"""BAB / low volatility (Frazzini & Pedersen 2014) on Dmitri's SIP total returns, PIT S&P 500. Dave, 2026-10-30 (v2).
+"""BAB / low volatility (Frazzini & Pedersen 2014) on the data owner's SIP total returns, PIT S&P 500. The derivatives researcher, 2026-10-30 (v2).
 Codified rules (base params; perturbed +/-20% in the sensitivity grid):
   Universe at month-end t: PIT S&P 500 members with a bar on t. Market = SPY total return.
   Beta (FP sec. 3.1): sigma_i, sigma_m = std of daily log returns over vol_days (252, >= 120 obs);

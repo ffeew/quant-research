@@ -30,10 +30,10 @@ NON_ALPHA = {"SPY", "QQQ", "IWM", "DIA", "EEM", "EFA", "TLT", "HYG", "GLD", "SLV
 SECTOR_ETF = {"XLB", "XLC", "XLE", "XLF", "XLI", "XLK", "XLP", "XLRE", "XLU", "XLV", "XLY", "SMH"}
 CRYPTO = {"BTC/USD", "ETH/USD", "SOL/USD"}
 CUTOFF = "2026-10-29"   # 2026-10-29 bar is partial at run time (market open)
-# DESK_RULES #5 (2026-10-30 02:12 SGT): history ONLY from Dmitri's store, via $QR_DATA_DIR/lib/desk_data_client.py.
+# DESK_RULES #5 (2026-10-30 02:12 SGT): history ONLY from the data owner's store, via $QR_DATA_DIR/lib/desk_data_client.py.
 # src="store" (default) = desk universe (construct.DESK_UNIVERSE, alpha names only) from bars/daily/adjusted (SIP, adjustment=all),
 # allow_api=False (history only; no live calls in research). "datajson"/"statarb" are RETIRED sources kept only so earlier
-# outputs can be reproduced/audited: they raise unless allow_retired=True (CLI --allow_retired). statarb -> Dave's audit copy.
+# outputs can be reproduced/audited: they raise unless allow_retired=True (CLI --allow_retired). statarb -> the derivatives researcher's audit copy.
 RETIRED = {"datajson": f"{_QR.DESK_DIR}/data.json", "statarb": f"{_QR.DESK_DIR}/statarb/data/_deprecated/daily_bars.json"}
 STORE_START = "2016-01-01"
 
@@ -323,7 +323,7 @@ if __name__ == "__main__":
         s["lw_delta_range"] = (float(res[m]["delta"].min()), float(res[m]["delta"].max())) if len(res[m]["delta"]) else None
         table[m] = s
     ci, dci = bootstrap(res, methods, B=a.boot)
-    meta = dict(src=a.src, data_provenance=("Dmitri's store via desk_data_client (DESK_RULES #5)" if a.src == "store" else "RETIRED source (audit reproduction)"), universe_n=C.shape[1], dropped_incomplete=dropped, first_bar=str(C.index[0].date()), last_bar=str(C.index[-1].date()),
+    meta = dict(src=a.src, data_provenance=("the data owner's store via desk_data_client (DESK_RULES #5)" if a.src == "store" else "RETIRED source (audit reproduction)"), universe_n=C.shape[1], dropped_incomplete=dropped, first_bar=str(C.index[0].date()), last_bar=str(C.index[-1].date()),
                 lookback=a.lookback, step=a.step, oos_start=str(res["IV"]["ret"].index[0].date()), oos_end=str(res["IV"]["ret"].index[-1].date()),
                 oos_days=oos_days, n_rebal=int(len(res["IV"]["cost"])), tc_bps_oneway=10, big_moves_gt30pct=jumps,
                 tca_cost_model=tca_meta, bootstrap=dict(type="stationary (Politis-Romano), joint across methods", mean_block_days=10, reps=a.boot))

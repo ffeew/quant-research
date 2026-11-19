@@ -93,7 +93,7 @@ def loo_sector_regressor(W: pd.DataFrame, sectors: pd.Series) -> tuple[pd.DataFr
 def mxd_signal(
     R: pd.DataFrame, t: pd.Timestamp, stocks: Sequence[str], regressor: str = "loo"
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
-    """regressor: 'loo' (primary, Victor) or 'spdr' (diagnostic only)."""
+    """regressor: 'loo' (primary, the validator) or 'spdr' (diagnostic only)."""
     assert regressor in ("loo", "spdr")
     sectors, info = assign_sectors(R, t, stocks)
     i = cast(int, R.index.get_loc(t))

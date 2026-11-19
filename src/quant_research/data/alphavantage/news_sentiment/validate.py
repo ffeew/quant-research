@@ -5,7 +5,7 @@ import json
 import os
 from typing import Any
 
-# Metadata-only validation (Jeremy ruling B, 10 Nov 23:41... see README). Fields touched: news -> 'feed' (list length),
+# Metadata-only validation (fund manager decision B, 10 Nov 23:41... see README). Fields touched: news -> 'feed' (list length),
 # item 'url', item 'time_published'; transcripts -> 'symbol', 'quarter', 'transcript' (entry count, total len of 'content'
 # as a character count only). Never reads/prints sentiment, relevance, text or prices.
 from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DATA_DIR, ...)

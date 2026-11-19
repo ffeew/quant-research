@@ -1,5 +1,5 @@
-"""Daily portfolio simulator: Tomas's cost model v1.1 (read-only import) with Victor's STANDARD.md v1.0 minimums.
-Dave, 2026-10-30 (v2).
+"""Daily portfolio simulator: the TCA owner's cost model v1.1 (read-only import) with the validator's STANDARD.md v1.0 minimums.
+The derivatives researcher, 2026-10-30 (v2).
 
 Conventions
 - Targets: {signal_date: pd.Series(weight per $1 NAV)}; the signal uses data up to the close of signal_date only.
@@ -7,16 +7,16 @@ Conventions
   leg (close t -> open t+1) and the new book earns the intraday leg (open -> close). Alternative fill="close" =
   next session's close (MOC), logged as a separate trial.
 - Names with no bar (delisted / halted) earn rf (cash at the last close) and pay no exit cost. Delisting returns are
-  NOT yet in Dmitri's data (in progress), so a bankrupt name's last-print-to-zero is missed. sim() counts these events.
+  NOT yet in the data owner's data (in progress), so a bankrupt name's last-print-to-zero is missed. sim counts these events.
 - Returns are excess over rf per $1 NAV: sum_i h_i (r_i - rf). Dollar-neutral books are unaffected by rf; long-only and
   FP-levered BAB books are excess returns (financing at rf).
-- Cost per name per trade (one way, bps) = max(Tomas trade_cost total_bps, Victor floor), where
-    Tomas: fees + half-spread x venue + k*sigma*sqrt(Q/ADV) x venue + paper buffer; venue "open" (MOO) or "close" (MOC);
+- Cost per name per trade (one way, bps) = max(TCA owner trade_cost total_bps, validator floor), where
+    The TCA owner: fees + half-spread x venue + k*sigma*sqrt(Q/ADV) x venue + paper buffer; venue "open" (MOO) or "close" (MOC);
            price = raw close of the previous session, ADV = 20d mean SIP volume, sigma = 20d std, both lagged 1 day;
            spread = bucket default (no quote history).
-    Victor §5 floor: stock L1/L2 (>= $200M ADV) 5 bps + half-spread; L3 10 + half-spread; L4 20 + half-spread;
-           liquid ETFs 2 bps + half-spread (half-spread = Tomas bucket default, paid in full).
-- Borrow: short MV x 1.00%/yr / 360 per calendar day (Victor GC minimum; Tomas ETB default is 0.25%). No point-in-time
+    The validator §5 floor: stock L1/L2 (>= $200M ADV) 5 bps + half-spread; L3 10 + half-spread; L4 20 + half-spread;
+           liquid ETFs 2 bps + half-spread (half-spread = TCA owner bucket default, paid in full).
+- Borrow: short MV x 1.00%/yr / 360 per calendar day (validator GC minimum; TCA owner ETB default is 0.25%). No point-in-time
   borrow/ETB history exists (snapshots start 2026-10-29), so unborrowable names cannot be excluded at signal time.
 - Stress: costs x2 and borrow x2.
 """
@@ -35,7 +35,7 @@ sys.path.insert(0, f"{_QR.COSTS_DIR}")
 from quant_research.backtest.costs import cost_model as cm
 
 BOOK_USD = 100_000.0  # desk paper account equity ~ $100k (risk/2026-10-30-pilot-positions-review.md)
-BORROW_RATE = 0.01  # Victor §5 GC minimum
+BORROW_RATE = 0.01  # The validator §5 GC minimum
 VICTOR_FLOOR = {"L1": 5.0, "L2": 5.0, "L3": 10.0, "L4": 20.0}
 ETF_FLOOR = 2.0
 

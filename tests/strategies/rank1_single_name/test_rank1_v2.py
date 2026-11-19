@@ -54,7 +54,7 @@ def cost_adapter(change=None):
         statement="FABRICATED ONLY raise-only",
         units="bp per leg (one-way); round trip = actual entry leg + actual exit leg",
         validity={
-            "from": "Rank1 freeze (Victor pin)",
+            "from": "Rank1 freeze (validator pin)",
             "until": "Rank1 evaluation receipt",
             "no_expiry_before_evaluation_receipt": True,
         },

@@ -2,12 +2,12 @@
 
 Point-in-time S&P 500 earnings-event table built from SEC EDGAR 8-K / 8-K/A filings that list **Item 2.02** (Results of Operations and Financial Condition).
 
-- **Owner:** Ethan (Equity Analyst)
+- **Owner:** the sentiment researcher (Equity Analyst)
 - **File:** `earnings_events_8k202.parquet` (zstd)
-- **Version string:** `earnings_events_8k202 v1 (Ethan, 2026-11-06)`
+- **Version string:** `earnings_events_8k202 v1 (the sentiment researcher, 2026-11-06)`
 - **Window:** acceptance times from 2015-01-01 through 2026-10-29 (ET)
 - **Rows:** 31,467 unique accessions (24,963 while the issuer was a PIT S&P 500 member)
-- **No prices, returns, or EPS are in this table.** See `SUE_NOTE.md` for how Dave can build SUE on top.
+- **No prices, returns, or EPS are in this table.** See `SUE_NOTE.md` for how the derivatives researcher can build SUE on top.
 
 ## Event definition
 
@@ -85,4 +85,4 @@ SEC fair access: User-Agent from env `SEC_USER_AGENT` (default set in `ee_fetch.
 
 ## Hand-off
 
-Ready for Dave (event spine + `ex99_url` for any later EX-99.1 parse; SUE method in `SUE_NOTE.md`) and Victor (timestamp integrity, no returns in this artifact). Pin `SHA256SUMS` before joining outcomes.
+Ready for the derivatives researcher (event spine + `ex99_url` for any later EX-99.1 parse; SUE method in `SUE_NOTE.md`) and the validator (timestamp integrity, no returns in this artifact). Pin `SHA256SUMS` before joining outcomes.

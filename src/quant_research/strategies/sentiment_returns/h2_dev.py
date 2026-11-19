@@ -1,5 +1,5 @@
 # h2_dev.py - H2 (earnings-call tone surprise -> post-event drift +2..+21), EXPLORATORY, DEV ONLY, per sealed prereg v5
-# (4b045f05...). Rulings: erratum 7584b5b5 (S3/S4 due-quarter rule), S6b readback b4652cef (H2 may proceed on DEV only).
+# (4b045f05...). Decisions: erratum 7584b5b5 (S3/S4 due-quarter rule), S6b readback b4652cef (H2 may proceed on DEV only).
 # Inputs: DEV partition only (b835e488), clean transcripts (SUMS ed284d37) opened only for due labels mapped to
 # day 0 <= 2024-11-29 (scored window end) - never any other transcript; S6b labels (SUMS 076f6af1).
 # Helper logic (XNYS sessions, adjusted_close ratios, 252-return beta ending t-1, NW t, Student-t p) is COPIED from
@@ -22,9 +22,10 @@ import pandas as pd
 from scipy import stats
 
 from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DATA_DIR, ...)
+from quant_research.utils.pins import desk_pin
 
 NOTE = "50 DEV calls excluded as not-yet-due (erratum 7584b5b5, S6b readback b4652cef)"
-HDR = "EXPLORATORY: cannot PASS; DEV only; for Victor"
+HDR = "EXPLORATORY: cannot PASS; DEV only; for the validator"
 OUT = f"{_QR.DESK_DIR}/research/original/sentiment_returns_h2_dev_20261111"
 RET = f"{_QR.DATA_DIR}/av_returns_events_20261111/partitioned/dev"
 CLEAN = f"{_QR.DATA_DIR}/av_sentiment_20261110/clean"
@@ -72,15 +73,19 @@ def sha(p: str) -> str:
 
 PIN = {
     f"{RET}/daily_dev.csv": None,
-    f"{RET}/earnings_dev.csv": "cb6a4e6fa7ba0a98850f38a717f6510a8ef9b80c91076edb8815beb96b473982",
-    PA: "c6b8a9507e9d27255e1ecbe767f8f8538da7023175662b7fff73f01dd347f351",
-    f"{S6B}/FYE_MONTH_FROZEN.tsv": "67d7eab8140fb62a64983df54b2ca775acae0ad39d5d3d185fd96aed705ec326",
-    f"{RET}/SHA256SUMS": "b835e4881883b8581ee362bbe207d2f885393fceca1297ca1ce13dd09e56c713",
-    f"{S6B}/SHA256SUMS": "076f6af1de5b04ea7410a0e18a5af6245297c128e6f0d1b7e3e7a60aab08ebde",
-    f"{CLEAN}/SHA256SUMS": "ed284d3751656def917ee5116e2b5efbf96ebec24fbc86f792692ca628442834",
-    f"{_QR.DESK_DIR}/research/original/sentiment_returns_prereg_20261111/PREREG_DRAFT_v5.md": "4b045f05da541175624946865ab695ed2f2c2fc1484554c065d940a2ec284c91",
-    A6: "fc3053909274c1c386e23cffa2f7b2cb9ecd395804878a8a0151575544d7d4c4",
-    f"{_QR.DESK_DIR}/research/original/sentiment_returns_dev_20261111/dev_run.py": "80f4bb71485d2e20741f76a5a2197d64cdb05afeaf7f4d11ba7ac565d462329f",
+    f"{RET}/earnings_dev.csv": desk_pin("strategies.sentiment_returns.h2_dev", "PIN[1]"),
+    PA: desk_pin("strategies.sentiment_returns.h2_dev", "PIN[2]"),
+    f"{S6B}/FYE_MONTH_FROZEN.tsv": desk_pin("strategies.sentiment_returns.h2_dev", "PIN[3]"),
+    f"{RET}/SHA256SUMS": desk_pin("strategies.sentiment_returns.h2_dev", "PIN[4]"),
+    f"{S6B}/SHA256SUMS": desk_pin("strategies.sentiment_returns.h2_dev", "PIN[5]"),
+    f"{CLEAN}/SHA256SUMS": desk_pin("strategies.sentiment_returns.h2_dev", "PIN[6]"),
+    f"{_QR.DESK_DIR}/research/original/sentiment_returns_prereg_20261111/PREREG_DRAFT_v5.md": desk_pin(
+        "strategies.sentiment_returns.h2_dev", "PIN[7]"
+    ),
+    A6: desk_pin("strategies.sentiment_returns.h2_dev", "PIN[8]"),
+    f"{_QR.DESK_DIR}/research/original/sentiment_returns_dev_20261111/dev_run.py": desk_pin(
+        "strategies.sentiment_returns.h2_dev", "PIN[9]"
+    ),
 }
 
 

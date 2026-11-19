@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Plug-in per-trade cost model for backtests (US equities/ETFs, Alpaca).  v1.2
 
-v1.2 (7 Nov 2026, Tomas): rounding/numeric plumbing only. Exact penny ceiling for fees (v1.1 pre-rounded with
+v1.2 (7 Nov 2026, the TCA owner): rounding/numeric plumbing only. Exact penny ceiling for fees (v1.1 pre-rounded with
 round(x*100,6), undercharging e.g. raw 0.010000001). Opt-in: import cost_model_v1_2; cost_model.py (v1.1) unchanged.
 
-Owner: Tomas (Execution & TCA). Spec, sources and assumptions: $QR_DESK_DIR/tca/cost_model.md
+Owner: the TCA owner (Execution & TCA). Spec, sources and assumptions: $QR_DESK_DIR/tca/cost_model.md
 Pure functions: no network, no broker calls, no orders.
 
 one-way cost_bps = fees + half_spread*venue_mult + impact*venue_mult + paper_buffer

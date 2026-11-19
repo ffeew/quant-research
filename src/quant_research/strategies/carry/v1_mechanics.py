@@ -1,8 +1,8 @@
 """Pure synthetic V1 VIX overlay mechanics engine (isolated reference).
 
 Deterministic fixture-only implementation of parent addendum §5 + binding
-erratum E1–E4, amended per Victor preflight
-`validation/prereg_rulings/2026-11-06-maya-vix-mechanics-preflight.md`
+erratum E1–E4, amended per validator preflight
+the internal review record
 sha256 `3bed621e668f8d42e7eae33f6a99efe5341c986e98c351b8d3d7f48ddb9e3f56`.
 
 No market data, no production construct/risk_state imports as mutable engines,

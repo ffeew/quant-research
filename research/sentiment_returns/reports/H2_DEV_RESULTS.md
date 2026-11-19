@@ -1,9 +1,9 @@
-# EXPLORATORY: cannot PASS; DEV only; for Victor
+# EXPLORATORY: cannot PASS; DEV only; for the validator
 **50 DEV calls excluded as not-yet-due (erratum 7584b5b5, S6b readback b4652cef).**
 H2 = earnings-call tone surprise -> post-event drift, sessions +2..+21, beta-adjusted (prereg v5 4b045f05, §2/§5).
 Exploratory - not a confirmatory test (A5): never PASS, not in the Holm family, N stays 2. DEV only (closes <= 2024-12-31).
 Event date = AV EARNINGS reportedDate + reportTime PROXY, not a verified call timestamp. Survivorship-biased universe
-(any positive result is an upper bound). Scores not verified point-in-time (§7). No trading. No results to Daniel until Victor validates.
+(any positive result is an upper bound). Scores not verified point-in-time (§7). No trading. No results to Daniel until validator validates.
 Script h2_dev.py; log h2_dev.log; stats H2_DEV_STATS.json; per-quarter H2_DEV_periods.tsv; per-event H2_DEV_events.tsv (no transcript text).
 
 ## Headline DEV stats (identical under the UTC and ET readings - H2 uses no news timestamps; A4: delta IC = 0, not material)
