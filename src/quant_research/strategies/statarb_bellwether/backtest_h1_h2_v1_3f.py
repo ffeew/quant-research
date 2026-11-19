@@ -1,48 +1,35 @@
 #!/usr/bin/env python3
-"""Stage A / sealed-holdout backtest runner for Sofia original ideas H1 and H2.
+"""Stage A / sealed-holdout backtest runner for the statarb ideas H1 and H2 (frozen v1.3f).
 
-Owner: Sofia (Stat Arb). Written 2026-11-06 SGT for PREREG_ORIGINAL v3.
-v1.3 DRAFT 2026-11-10 SGT (successor of v1.2 sha256 1ea3d146...6ad). Exactly three changes:
-  (1) prices = AV raw close x desk adjustment factor via the desk data client (declared
-      interface; client not yet delivered; pins PENDING -> refuses to load);
-  (2) H1 v0.2 adverse terminal bound (accepted amendment 373c3e5d / readback 79217ca7);
-  (3) required declared --pyarrow-site + --pyarrow-site-sha (refuse by default).
-NOT ACCEPTED. The acceptance Victor binds will be this file's new sha256; the PREREG hash
-check below is unchanged.
-v1.3a DRAFT 2026-11-10 SGT (scoped amendment of v1.3 sha256 7fb8be7d...64bb):
-  (a) PIT universe via declared DeskClientUniverseInterface + pinned R18 / M14 inputs
-      (5e fill rule = future hook, not implemented; earnings stay on v1.2 store = deviation);
-  (b) H2 delisting base for raw prices = v1.2 implicit treatment, made explicit + receipts;
-  (c) H1 last-close base / -30%/0% stress NOT implemented (withdrawn by accepted v0.2).
-Implements the exact primary rules from:
-  research/ideas/orig-sofia-subind-bellwether-lag.md
-  research/ideas/orig-sofia-earnings-peer-readthrough.md
-governed by statarb/PREREG_ORIGINAL.md.
+H1 = sub-industry bellwether lag; H2 = earnings peer read-through. Implements the primary
+rules of the pre-registration (see research/statarb_bellwether/reports/PREREG_v3.md).
+
+Every input path and sha256 pin is read from the [pins] section of
+configs/statarb_bellwether.toml (or the file named by $QR_STATARB_BELLWETHER_CONFIG).
+Values may use ${QR_DATA_DIR}, ${QR_DESK_DIR}, ${HOME_DIR} and ${QR_COSTS_DIR}. The repo's
+copy holds only PENDING placeholders, so the runner refuses: the vendored-numpy check
+below exits 17 at import until its pins are filled in.
 
 HARD RULES:
-  - Read-time pyarrow date filters only (X14). DEV never loads post-2021-12-31 rows.
+  - Read-time pyarrow date filters only. DEV never loads post-2021-12-31 rows.
     Holdout loads only its own window, and only when --stage holdout is accepted.
   - --stage holdout REFUSES to run without --acceptance-hash equal to sha256 of
-    the current PREREG_ORIGINAL.md (frozen accepted hash).
-  - --stage dev that would compute returns likewise requires --acceptance-hash
-    (no DEV return trial before Victor accepts the prereg at a recorded sha256).
-  - Quarantined stops_dev outputs under
-    out/QUARANTINE_stops_dev_DO_NOT_USE are never read (Victor waiver 2026-11-06).
+    the current pre-registration file (frozen accepted hash).
+  - --stage dev that would compute returns likewise requires --acceptance-hash.
+  - Quarantined outputs under QUARANTINE are never read.
   - Holdout rows 2022-03-30 onward are never touched in --stage dev.
   - Costs: costs_original.CostConfig; required path borrow >=10%/yr on EVERY
     historically unknown short including H2 sector-ETF hedges (no ETF exemption).
     The 1%/yr path is a labelled GC counterfactual only.
-  - Impact k = cost_model.K_IMPACT_DEFAULT = 1.0 (base; Tomas 2026-11-06).
-    k = 0.75 is a lighter sensitivity, not a stress.
+  - Impact k = cost_model.K_IMPACT_DEFAULT = 1.0 (base); k = 0.75 is a lighter
+    sensitivity, not a stress.
 
 This file MAY compute returns when invoked with a valid acceptance hash.
-Do NOT invoke return paths until Victor accepts v3 and Stage A dependencies
-(v1.3 earnings freeze, desk 8-K 2.02 SUE) are present. A --help or syntax check
-is always safe and computes no returns.
+A --help or syntax check is always safe and computes no returns.
 
 Run examples (safe):
-  python3 -I -B backtest_h1_h2_v1_3a.py --help
-  python3 -I -B backtest_h1_h2_v1_3a.py --syntax-check
+  python3 -I -B backtest_h1_h2_v1_3f.py --help
+  python3 -I -B backtest_h1_h2_v1_3f.py --syntax-check
 """
 
 from __future__ import annotations
@@ -52,26 +39,60 @@ import hashlib
 import json
 import math
 import os
+import string
 import sys
+import tomllib
 from collections.abc import Callable
 from datetime import date, datetime
 from pathlib import Path
 from types import ModuleType
 from typing import Any, cast
 
+from quant_research.utils import config as _QRC
 from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DATA_DIR, ...)
 
-# ---- v1.3b C7 BEGIN (Rachel E7 r2, amendment C7, decisions log 5a2fc464): vendored numpy ----
-# RECORD raw sha is checked BEFORE sys.path is touched; only hashlib/os/sys (already imported).
-NP_SITE = f"{_QR.DATA_DIR}/lib/deskclient_h1h2_v1/vendor/site"
-NP_RECORD_SHA256 = (
-    "b841d0763e8ea41066a573882b3cdcd74a2d5505f5e43d46e755d244319ebe29"  # gitleaks:allow (sha256 digest, not a secret)
-)
-RC_C7_NUMPY_PIN = 17  # new exit code; distinct from 0 (ok), 1 (SystemExit/Blocked), 2 (argparse)
-_np_rec_sha: str | None
+PENDING = "PENDING"
+CONFIG_ENV = "QR_STATARB_BELLWETHER_CONFIG"
+
+
+def _load_pin_table() -> dict[str, Any]:
+    """[pins] of the trial config. Missing file/section/key -> PENDING (fail closed)."""
+    cfg = Path(os.environ.get(CONFIG_ENV) or (_QRC.CONFIG_DIR / "statarb_bellwether.toml"))
+    try:
+        with open(cfg, "rb") as fh:
+            return dict(tomllib.load(fh).get("pins", {}))
+    except OSError:
+        return {}
+
+
+_PINS = _load_pin_table()
+_ROOTS = {
+    "QR_DATA_DIR": _QR.DATA_DIR,
+    "QR_DESK_DIR": _QR.DESK_DIR,
+    "HOME_DIR": _QR.HOME_DIR,
+    "QR_COSTS_DIR": _QR.COSTS_DIR,
+}
+
+
+def _pin(name: str, default: Any = PENDING) -> Any:
+    """One config value; strings get ${ROOT} expansion. Absent -> default."""
+    v = _PINS.get(name, default)
+    if isinstance(v, str):
+        return string.Template(v).safe_substitute(_ROOTS)
+    if isinstance(v, dict):
+        return {str(k): (string.Template(x).safe_substitute(_ROOTS) if isinstance(x, str) else x) for k, x in v.items()}
+    return v
+
+
+# ---- Vendored numpy pin: RECORD raw sha is checked BEFORE sys.path is touched ----
+NP_SITE = _pin("NP_SITE")
+NP_RECORD_REL = _pin("NP_RECORD_REL")
+NP_VERSION = _pin("NP_VERSION")
+NP_RECORD_SHA256 = _pin("NP_RECORD_SHA256")
+RC_C7_NUMPY_PIN = 17  # exit code; distinct from 0 (ok), 1 (SystemExit/Blocked), 2 (argparse)
 try:
-    with open(NP_SITE + "/numpy-2.5.4.dist-info/RECORD", "rb") as _np_rec_fh:
-        _np_rec_sha = hashlib.sha256(_np_rec_fh.read()).hexdigest()
+    with open(NP_SITE + "/" + NP_RECORD_REL, "rb") as _np_rec_fh:
+        _np_rec_sha: str | None = hashlib.sha256(_np_rec_fh.read()).hexdigest()
 except OSError:
     _np_rec_sha = None
 if _np_rec_sha != NP_RECORD_SHA256:
@@ -79,13 +100,16 @@ if _np_rec_sha != NP_RECORD_SHA256:
 sys.path.insert(0, NP_SITE)
 import numpy as np
 
-if not (os.path.realpath(np.__file__).startswith(os.path.realpath(NP_SITE) + "/numpy/") and np.__version__ == "2.5.4"):
+if not (
+    os.path.realpath(np.__file__).startswith(os.path.realpath(NP_SITE) + "/numpy/") and np.__version__ == NP_VERSION
+):
     raise SystemExit(RC_C7_NUMPY_PIN)
-# ---- v1.3b C7 END ----
+# ---- vendored numpy pin END ----
 import pandas as pd
 
+COSTS_ORIGINAL_DIR = _pin("COSTS_ORIGINAL_DIR")  # directory holding the frozen costs_original module
 sys.path.insert(0, f"{_QR.COSTS_DIR}")
-sys.path.insert(0, f"{_QR.DESK_DIR}/statarb/original")
+sys.path.insert(0, f"{COSTS_ORIGINAL_DIR}")
 from costs_original import (
     BORROW_UNKNOWN_REQUIRED,
     EARLY_CLOSE_DAYS_2026,
@@ -98,143 +122,86 @@ from costs_original import (
 
 from quant_research.backtest.costs import cost_model as cm
 
-# ---- Paths / pins ----
+# ---- Paths / pins (all from config) ----
 ROOT = Path(f"{_QR.DESK_DIR}")
-PREREG_PATH = ROOT / "statarb" / "PREREG_ORIGINAL.md"
-RELEASE = ROOT / "data" / "releases" / "v1.2"
-EARNINGS = Path(f"{_QR.DATA_DIR}/h1h2_dev_cuts_20261111_r2/earnings_dev_through_20220329.parquet")  # v1.3b X1 DEV cut
-QUARANTINE = ROOT / "statarb" / "original" / "out" / "QUARANTINE_stops_dev_DO_NOT_USE"
-OUT_DIR = ROOT / "statarb" / "original" / "out"
+PREREG_PATH = Path(_pin("PREREG_PATH"))
+PREREG_TR_PIN_LINE = int(_pin("PREREG_TR_PIN_LINE", 38))  # 1-based line of the pre-registration holding the TR pin
+RELEASE = Path(_pin("RELEASE"))
+EARNINGS = Path(_pin("EARNINGS"))  # earnings DEV cut
+QUARANTINE = Path(_pin("QUARANTINE"))  # quarantined outputs: never read
+OUT_DIR = Path(_pin("OUT_DIR"))
 
-# ---- v1.3 pins (change 1: desk client; change 2: H1 terminal roster; change 3: pyarrow) ----
-PENDING = "PENDING"
-# Change 1: desk data client (Dmitri). No module exists at $QR_DESK_DIR/data_client.py or
-# $QR_DATA_DIR/client.py as of 2026-11-10 19:17 SGT. Interface declared in
-# DeskClientInterface below; path and pins are placeholders and the runner refuses while PENDING.
-DESK_CLIENT_PATH = f"{_QR.DATA_DIR}/lib/deskclient_h1h2_v1/deskclient_h1h2_v1.py"  # v1.3b: Victor L347 / d43e3826
-DESK_CLIENT_SHA256 = (
-    "0310e473ab8a320cbbec9f74dbfc0d54ef064d999c46a9167b16c880974e76da"  # gitleaks:allow (sha256 digest, not a secret)
-)
-PIN_RECONCILIATION_SEAL_SHA256 = PENDING  # sealed SHA256SUMS of the reconciliation root
-PIN_CA_LEDGER_SHA256 = PENDING  # reconciled corporate-action ledger
-PIN_FACTOR_TABLE_SHA256 = PENDING  # cumulative PIT desk factor table
-PIN_FACTOR_CODE_SHA256 = PENDING  # factor code (tested on synthetic fixtures)
-PIN_AV_RAW_BARS_SHA256 = PENDING  # pinned AV raw bar file (--av-factor-sensitivity only; primary tau runs on the TR cut fc852152 bars since v1.3c, L401)
-# Change 2: H1 terminal roster (unresolved delisting rows; v06 ledger extract), pinned.
-H1_TERMINAL_ROSTER_PATH = (
-    f"{_QR.DESK_DIR}/validation/dmitri/h1_v06_roster_pin_20261111_r1/H1_TERMINAL_ROSTER_v06_DEV.json"
-)
-H1_TERMINAL_ROSTER_SHA256 = (
-    "c3c834dad21ae2109feb71b1939d17043a0f714a9bf969db43ae151ae5974a8d"  # gitleaks:allow (sha256 digest, not a secret)
-)
+# Desk data client: declared interface in DeskClientInterface below; the runner refuses while PENDING.
+DESK_CLIENT_PATH = _pin("DESK_CLIENT_PATH")
+DESK_CLIENT_SHA256 = _pin("DESK_CLIENT_SHA256")
+PIN_RECONCILIATION_SEAL_SHA256 = _pin("PIN_RECONCILIATION_SEAL_SHA256")  # sealed SHA256SUMS of the reconciliation root
+PIN_CA_LEDGER_SHA256 = _pin("PIN_CA_LEDGER_SHA256")  # reconciled corporate-action ledger
+PIN_FACTOR_TABLE_SHA256 = _pin("PIN_FACTOR_TABLE_SHA256")  # cumulative PIT desk factor table
+PIN_FACTOR_CODE_SHA256 = _pin("PIN_FACTOR_CODE_SHA256")  # factor code (tested on synthetic fixtures)
+PIN_AV_RAW_BARS_SHA256 = _pin("PIN_AV_RAW_BARS_SHA256")  # AV raw bar file (--av-factor-sensitivity only)
+# H1 terminal roster (unresolved delisting rows), pinned.
+H1_TERMINAL_ROSTER_PATH = _pin("H1_TERMINAL_ROSTER_PATH")
+H1_TERMINAL_ROSTER_SHA256 = _pin("H1_TERMINAL_ROSTER_SHA256")
 H1_TERMINAL_PATHS = ("A", "B")
-# Change 3: declared interpreter site for pyarrow (Jeremy-approved for Dmitri; not yet
-# extended by Victor to this runner). Pin = sha256 of the dist-info RECORD file.
-PYARROW_SITE_APPROVED = f"{_QR.HOME_DIR}/.local/lib/python3.13/site-packages"
-PYARROW_RECORD_REL = "pyarrow-26.0.0.dist-info/RECORD"
-PYARROW_RECORD_SHA256 = (
-    "d4dc368ee2e1af6ac5ddbb023a20266015037679a6369af37e7de7cb1207b545"  # gitleaks:allow (sha256 digest, not a secret)
-)
-# ---- v1.3a pins: (a) universe inputs ----
-V13A_DIR = ROOT / "statarb" / "original" / "runner_v1_3a_20261110"
-R18_INPUT_PATH = V13A_DIR / "INPUT_R18_REUSED_TICKERS.json"
-R18_INPUT_SHA256 = (
-    "4caddc0831faa881e5893b3fd9d3bffcfc84c10eb757fd67ff3c09777d665da0"  # gitleaks:allow (sha256 digest, not a secret)
-)
-M14_INPUT_PATH = V13A_DIR / "INPUT_M14_MISSING_NAMES.json"
-M14_INPUT_SHA256 = (
-    "791483e35b5f5a4b578c8100f24dcc22d6186531bfce82b31b3fdce7b7032fba"  # gitleaks:allow (sha256 digest, not a secret)
-)
-PIN_PIT_MEMBERSHIP_SHA256 = (
-    "a3766d6262bb6a09cd4a46c050ab4f04faa47dc4317fc1d45d8545b06ba1b60d"  # v1.3b: r2 membership cut
-)
-PIN_LISTING_STATUS_SHA256 = (
-    "ab9891b208bc1e51a803055e810330dd5d03e7ff8af755bd0630a47914ef31f6"  # v1.3b: client _LISTING_PAIR_SHA
-)
-# Victor 5e fill rule (FUTURE HOOK, NOT IMPLEMENTED): desk path or pinned snapshot only; one
-# source per name; >= 252 DEV sessions to 2022-03-29; lineage on every row. Any fill input
-# passed to v1.3a is refused.
+# Declared interpreter site for pyarrow. Pin = sha256 of the dist-info RECORD file.
+PYARROW_SITE_APPROVED = _pin("PYARROW_SITE_APPROVED")
+PYARROW_RECORD_REL = _pin("PYARROW_RECORD_REL")
+PYARROW_RECORD_SHA256 = _pin("PYARROW_RECORD_SHA256")
+# Universe inputs
+V13A_DIR = Path(_pin("V13A_DIR"))
+R18_INPUT_PATH = Path(_pin("R18_INPUT_PATH"))  # reused tickers: original member periods
+R18_INPUT_SHA256 = _pin("R18_INPUT_SHA256")
+M14_INPUT_PATH = Path(_pin("M14_INPUT_PATH"))  # names with no usable history
+M14_INPUT_SHA256 = _pin("M14_INPUT_SHA256")
+PIN_PIT_MEMBERSHIP_SHA256 = _pin("PIN_PIT_MEMBERSHIP_SHA256")
+PIN_LISTING_STATUS_SHA256 = _pin("PIN_LISTING_STATUS_SHA256")
+# Fill rule (FUTURE HOOK, NOT IMPLEMENTED): any fill input is refused.
 FILL_INPUT_PATH = None
-# Deviation (a): earnings remain on the v1.2 release store (EARNINGS above), unchanged.
 
-# Splits (PREREG §9); holdout starts 2022-03-30 — never load in DEV
+# Splits (pre-registered); holdout starts 2022-03-30 — never load in DEV
 DEV0, DEV1 = date(2017, 1, 3), date(2021, 12, 31)
 EMBARGO0, EMBARGO1 = date(2022, 1, 3), date(2022, 3, 29)
 HOLDOUT0, HOLDOUT1 = date(2022, 3, 30), date(2026, 10, 28)
 LOAD0 = date(2015, 12, 31)  # warm-up only; still filtered by stage end
-# ---- v1.3c return source (Jeremy ruling citing Victor L395 / 8523e323): PREREG f3b2b1be L38 ----
-# PRIMARY returns = releases/v1.2/bars/daily/total_return/daily_total_return.parquet (sha 0590692d),
-# read ONLY through a sealed DEV-only cut of Dmitri's byte-exact rebuild (rows <= 2022-03-29, X1-style).
-# The parent file holds post-2022-03-29 rows and is never opened, not even with a filter (E7 C3).
-TR_PARENT_SHA256 = "0590692d765515e0f76f4f6b7360c5ed7be38e2e85a5f91562dbfebcf8a129db"  # PREREG L38 literal
-TR_DEV_CUT_PATH = f"{_QR.DESK_DIR}/validation/dmitri/x1_dev_cut_20261115_r1/daily_total_return_dev.parquet"  # sealed DEV-only cut of the rebuilt L38 file (Dmitri; Victor review)
-TR_DEV_CUT_SHA256 = "fc852152d38bc3b5b60a5731a7cfdd8115bf754f1e7f44ba36dd3ad5589337a6"  # raw-byte sha256 of that cut
-# v1.3d A4 (Victor 7ba03e18): the cut's ACCEPTED SHA256SUMS (path + raw sha), from Victor's acceptance of the cut.
-TR_DEV_CUT_SUMS_PATH = f"{_QR.DESK_DIR}/validation/dmitri/x1_dev_cut_abs_sums_20261115/SHA256SUMS_abs"
-TR_DEV_CUT_SUMS_SHA256 = (
-    "e5121148c872fd25c46f553d12ed6f55180a0b4f7658f411e3d97634a813df7b"  # gitleaks:allow (sha256 digest, not a secret)
-)
-# ---- v1.3e scope 2 (Victor L368/L369, readback L826): identity-map FINAL_LIST (Dmitri), re-checked at use ----
-# v1.3f F1/F2 (Victor L830): pin = Victor's L367 literal (also copy SUMS e797911c); path = the INC-70 copy.
-FINAL_LIST_PATH = f"{_QR.DESK_DIR}/validation/dmitri/h1h2_idmap_delta_20261111_r1/IDENTITY_FINAL_LIST_delta1.tsv"
-FINAL_LIST_SHA256 = (
-    "acc76c775da49ff75ad3576d78e65744deed4baafac1ec6b6ac68626ee57ad9d"  # gitleaks:allow (sha256 digest, not a secret)
-)
-# v1.3f F3 (Victor L830; Dmitri owner header read, Jeremy OK): header is exactly these 36 bytes, TAB-separated, LF, no CR.
+# PRIMARY returns = the pre-registered daily total-return file, read ONLY through a sealed
+# DEV-only cut (rows <= 2022-03-29). The parent file is never opened, not even with a filter.
+TR_PARENT_SHA256 = _pin("TR_PARENT_SHA256")  # pre-registration TR pin literal
+TR_DEV_CUT_PATH = _pin("TR_DEV_CUT_PATH")  # sealed DEV-only cut
+TR_DEV_CUT_SHA256 = _pin("TR_DEV_CUT_SHA256")  # raw-byte sha256 of that cut
+TR_DEV_CUT_SUMS_PATH = _pin("TR_DEV_CUT_SUMS_PATH")  # the cut's accepted SHA256SUMS
+TR_DEV_CUT_SUMS_SHA256 = _pin("TR_DEV_CUT_SUMS_SHA256")
+# Identity-map FINAL_LIST, re-checked at use.
+FINAL_LIST_PATH = _pin("FINAL_LIST_PATH")
+FINAL_LIST_SHA256 = _pin("FINAL_LIST_SHA256")
+# Header is exactly these 36 bytes, TAB-separated, LF, no CR.
 FINAL_LIST_HEADER = b"symbol\tdecision\treasons\tissuer_name\n"
 FINAL_LIST_COLUMNS = ("symbol", "decision", "reasons", "issuer_name")  # 4 fields on every row; issuer_name unused
-FINAL_LIST_DECISIONS = {"KEPT": "kept", "EXCLUDED": "excluded"}  # v1.3f F3: vocabulary confirmed by Dmitri's owner read
-RC_FINAL_LIST_MISMATCH = 18  # new exit code; distinct from 0 (ok), 1 (Blocked), 2 (argparse), 17 (C7)
-# ---- v1.3e scope 3 (Victor L368: H1/H2 refuse until B1c is accepted): v1.3d had no B1c pin or gate ----
-B1C_ACCEPTED_SUMS_PATH = PENDING  # SHA256SUMS of the B1c identity basis as accepted by Victor
-B1C_ACCEPTED_SUMS_SHA256 = PENDING
-# ---- v1.3b input binding (DEV inputs, addendum1, X1 DEV cuts) ----
-DEV_INPUTS_DIR = f"{_QR.DESK_DIR}/statarb/original/dev_inputs_20261111"
-DEV_INPUTS_SUMS_SHA256 = (
-    "4f5b23c9e43a62a7446a9f7ced8332bbed0aa10b55325323c8216d2004303df8"  # gitleaks:allow (sha256 digest, not a secret)
-)
-ADDENDUM1_DIR = f"{_QR.DESK_DIR}/statarb/original/dev_inputs_20261111_addendum1"
-ADDENDUM1_SUMS_SHA256 = (
-    "e38da672a128cc672b137c4e89c0f7c2ddb90d0a7813c1e3b013e62033bec745"  # gitleaks:allow (sha256 digest, not a secret)
-)
-LINEAGE_EXCL_FILE, LINEAGE_EXCL_SHA256 = (
-    "EXCLUDED_24.tsv",
-    "36981628dcf7b43987b249e17eb02d9d550af19a6771ec2666f4b02c58602ddc",
-)
-DEV_CUTS_DIR = f"{_QR.DATA_DIR}/h1h2_dev_cuts_20261111_r2"
-DEV_CUTS_SUMS_PATH = f"{_QR.SCRATCH_DIR}/scratch/h1h2_devcut_run_20261111_r2/OUT_SHA256SUMS.txt"
-DEV_CUTS_SUMS_SHA256 = (
-    "108045e725beb2671530291f5c457f6dcd96b2832db4f7d0c61217fe8ac0599d"  # gitleaks:allow (sha256 digest, not a secret)
-)
-DEV_CUT_PINS = {  # every parquet the runner (or its client) may open; sha as listed in DEV_CUTS_SUMS
-    "earnings_dev_through_20220329.parquet": "1bf672efdbf6e76fa82f91276944a8edf38f199d51ee561ee2bc17328f441e51",
-    "actions_dev_through_20220329.parquet": "180398661a5276569aef32be392348df27ab9dbf9c353f5025c3d31cf5383f63",
-    "universe_dev_through_20220329.parquet": "b7f02ecef3520e8c60bed4080cbb9214d47599fbcea34efda36d53a3dcbdd4a9",
-    "membership_dev_through_20220329.parquet": "a3766d6262bb6a09cd4a46c050ab4f04faa47dc4317fc1d45d8545b06ba1b60d",
-    "listing_active_dev_through_20220329.parquet": "2a4df495f069cadadeaa2a3b57aad53a3efca7eba0ec94e917acaf0e729485a4",
-    "listing_delisted_dev_through_20220329.parquet": "33f09184aa52be4857053629cdc034f2a50bc05cdd1ade93eadadea6d1b49f2b",
-    "bars_ADS_dev_through_20220329.parquet": "64d50d37c9f58acf67abbcc2f2ac1b0a93182a12bd8ed404080f83e81f838c10",
-    "bars_BBBY_dev_through_20220329.parquet": "b05926ddc568e8ba6b350d9a4ec0e597742484f679d40484fdca70ea01f453d3",
-    "bars_CCE_dev_through_20220329.parquet": "4fe97b1b16b69a2ff51e4e6a47e04e4ad603215f7c77f36b880ab50515a16823",
-    "bars_ENDP_dev_through_20220329.parquet": "d18f118254e85f2da5fe288414d28121e78393cb3ee777fc3cf49cfa424d4b53",
-    "bars_FBHS_dev_through_20220329.parquet": "9a2768517d2aa89deb060d1350e44aeaa30a8d6bb74b0d416021d52fa0318efd",
-    "bars_FRC_dev_through_20220329.parquet": "68d1e8950328a637af6e1587d309d6bec14bffbf11aaa1159288d072db931076",
-    "bars_GPS_dev_through_20220329.parquet": "609f220f603dabdb11327863e6e6e9f54d6edfa0f0d7c2ce39659117aa3115d9",
-    "bars_HFC_dev_through_20220329.parquet": "eab21deb759cc1d20fab50d7091ac5bf22862f8046c5d2f6c7770c79b8e72d1c",
-    "bars_WLTW_dev_through_20220329.parquet": "e1d1a10fb34cca8d58c2e1f89df7e52e0f78082f791ec377d2fb7a0006fc17ad",
-}
-EARNINGS_SHA256 = DEV_CUT_PINS["earnings_dev_through_20220329.parquet"]
-UNIVERSE_CUT = Path(DEV_CUTS_DIR) / "universe_dev_through_20220329.parquet"
-UNIVERSE_CUT_SHA256 = DEV_CUT_PINS["universe_dev_through_20220329.parquet"]
+FINAL_LIST_DECISIONS = {"KEPT": "kept", "EXCLUDED": "excluded"}
+RC_FINAL_LIST_MISMATCH = 18  # exit code; distinct from 0 (ok), 1 (Blocked), 2 (argparse), 17 (numpy pin)
+# H1/H2 refuse until the identity basis (B1c) is accepted.
+B1C_ACCEPTED_SUMS_PATH = _pin("B1C_ACCEPTED_SUMS_PATH")  # SHA256SUMS of the accepted identity basis
+B1C_ACCEPTED_SUMS_SHA256 = _pin("B1C_ACCEPTED_SUMS_SHA256")
+# ---- DEV input binding ----
+DEV_INPUTS_DIR = _pin("DEV_INPUTS_DIR")
+DEV_INPUTS_SUMS_SHA256 = _pin("DEV_INPUTS_SUMS_SHA256")
+ADDENDUM1_DIR = _pin("ADDENDUM1_DIR")
+ADDENDUM1_SUMS_SHA256 = _pin("ADDENDUM1_SUMS_SHA256")
+LINEAGE_EXCL_FILE, LINEAGE_EXCL_SHA256 = _pin("LINEAGE_EXCL_FILE"), _pin("LINEAGE_EXCL_SHA256")
+LINEAGE_EXCL_COUNT = int(_pin("LINEAGE_EXCL_COUNT", -1))  # expected lineage exclusions (-1 = PENDING: refuses)
+DEV_UNIVERSE_FILES = tuple(_pin("DEV_UNIVERSE_FILES", []))  # CSVs (symbol column) in DEV_INPUTS_DIR
+DEV_CUTS_DIR = _pin("DEV_CUTS_DIR")
+DEV_CUTS_SUMS_PATH = _pin("DEV_CUTS_SUMS_PATH")
+DEV_CUTS_SUMS_SHA256 = _pin("DEV_CUTS_SUMS_SHA256")
+# every parquet the runner (or its client) may open; name -> sha in DEV_CUTS_SUMS
+DEV_CUT_PINS = _pin("DEV_CUT_PINS", {})
+EARNINGS_SHA256 = DEV_CUT_PINS.get(EARNINGS.name, PENDING)
+UNIVERSE_CUT = Path(_pin("UNIVERSE_CUT"))
+UNIVERSE_CUT_SHA256 = DEV_CUT_PINS.get(UNIVERSE_CUT.name, PENDING)
 # Listing overlap (symbol in both AV active and delisted sources): fail closed unless a pinned
-# treatment covers it. Treatments are Victor's (item 5); none ruled -> empty.
-LISTING_OVERLAP_IN_UNIVERSE_PATH = (
-    f"{_QR.DESK_DIR}/statarb/original/runner_v1_3b_20261111/INPUT_LISTING_OVERLAP_IN_UNIVERSE.tsv"
-)
-LISTING_OVERLAP_IN_UNIVERSE_SHA256 = (
-    "01821af703281563df855af94d4b620f7511526b529b00ff5c277c8b4a0ef49f"  # gitleaks:allow (sha256 digest, not a secret)
-)
-LISTING_OVERLAP_TREATMENT: dict[str, Any] = {}
+# treatment covers it. None configured -> empty.
+LISTING_OVERLAP_IN_UNIVERSE_PATH = _pin("LISTING_OVERLAP_IN_UNIVERSE_PATH")
+LISTING_OVERLAP_IN_UNIVERSE_SHA256 = _pin("LISTING_OVERLAP_IN_UNIVERSE_SHA256")
+LISTING_OVERLAP_TREATMENT: dict[str, Any] = _pin("LISTING_OVERLAP_TREATMENT", {})
 
 SECTOR_ETF = {
     "Information Technology": "XLK",
@@ -253,11 +220,11 @@ ETFS = set(SECTOR_ETF.values()) | {"SPY", "AGG", "BND"}
 
 AUM = 10e6
 NAME_CAP = 0.095 / 0.58  # 9.5% of equity at 58% gross
-ATR_STOP_MULT = 3.0  # Rachel max; fixed ex ante
+ATR_STOP_MULT = 3.0  # risk max; fixed ex ante
 BASKET_STOP_EQUITY = 0.01  # 1% of equity
 PARTICIPATION_CAP = 0.01  # 1% ADV; remainder carries
-MARGIN = 2  # H7 2-session margin
-# v1.3b: H2 counted delisting stress, PREREG f3b2b1be §5.4 (line 161) / §7 per-idea row (line 226)
+MARGIN = 2  # 2-session earnings margin
+# H2 counted delisting stress (pre-registered)
 H2_DELISTING_STRESS_LONG = -0.30
 H2_DELISTING_STRESS_SHORT = 0.0
 
@@ -282,19 +249,19 @@ def assert_quarantine_untouched() -> None:
 
 
 def require_acceptance_hash(provided: str | None, stage: str) -> str:
-    """Holdout (and any return-computing stage) requires --acceptance-hash == sha256(PREREG)."""
+    """Holdout (and any return-computing stage) requires --acceptance-hash == sha256(pre-registration)."""
     if not provided:
         raise SystemExit(
-            f"REFUSING --stage {stage}: pass --acceptance-hash <sha256 of PREREG_ORIGINAL.md>. "
-            "No return trial runs until Victor accepts the prereg at a recorded sha256."
+            f"REFUSING --stage {stage}: pass --acceptance-hash <sha256 of the pre-registration>. "
+            "No return trial runs until the prereg is accepted at a recorded sha256."
         )
     actual = sha256_file(PREREG_PATH)
     if provided.strip().lower() != actual.lower():
         raise SystemExit(
-            f"REFUSING --stage {stage}: --acceptance-hash does not match sha256(PREREG_ORIGINAL.md).\n"
+            f"REFUSING --stage {stage}: --acceptance-hash does not match sha256(pre-registration).\n"
             f"  provided: {provided.strip().lower()}\n"
             f"  actual:   {actual}\n"
-            "Re-hash after any prereg edit; Victor must accept the new hash before a run."
+            "Re-hash after any prereg edit; the new hash must be accepted before a run."
         )
     return actual
 
@@ -310,16 +277,13 @@ def stage_date_bounds(stage: str) -> tuple[date, date, date]:
 
 
 class Blocked(SystemExit):
-    """Fail-closed refusal (v1.3). Subclass of SystemExit: nothing runs after it."""
+    """Fail-closed refusal. Subclass of SystemExit: nothing runs after it."""
 
 
 def verify_pyarrow_site(site: str | None, expected_sha: str | None) -> str:
-    """Change 3. Insert the declared pyarrow site (append, read-only) only if passed and pinned."""
+    """Insert the declared pyarrow site (append, read-only) only if passed and pinned."""
     if not site:
-        raise Blocked(
-            "REFUSING: --pyarrow-site not passed. v1.3 never auto-inserts a site path "
-            "(Victor has not extended Jeremy's approval to this runner)."
-        )
+        raise Blocked("REFUSING: --pyarrow-site not passed. The runner never auto-inserts a site path.")
     if os.path.normpath(site) != PYARROW_SITE_APPROVED:
         raise Blocked(f"REFUSING: --pyarrow-site {site!r} is not the declared approved path.")
     if not expected_sha or expected_sha.strip().lower() != PYARROW_RECORD_SHA256:
@@ -341,8 +305,8 @@ def verify_pyarrow_site(site: str | None, expected_sha: str | None) -> str:
 
 def require_data_pins(
     av_factor_sensitivity: bool = True,
-) -> dict[str, Any]:  # v1.3f avmove (A2 L401): default True = fail closed
-    """Change 1. Refuse while any desk-client / reconciliation / factor pin is PENDING."""
+) -> dict[str, Any]:  # default True = fail closed
+    """Refuse while any desk-client / reconciliation / factor pin is PENDING."""
     pins = {
         "DESK_CLIENT_PATH": DESK_CLIENT_PATH,
         "DESK_CLIENT_SHA256": DESK_CLIENT_SHA256,
@@ -352,15 +316,15 @@ def require_data_pins(
         "PIN_FACTOR_CODE_SHA256": PIN_FACTOR_CODE_SHA256,
         "PIN_AV_RAW_BARS_SHA256": PIN_AV_RAW_BARS_SHA256,
         "TR_DEV_CUT_PATH": TR_DEV_CUT_PATH,
-        "TR_DEV_CUT_SHA256": TR_DEV_CUT_SHA256,  # v1.3c
+        "TR_DEV_CUT_SHA256": TR_DEV_CUT_SHA256,
         "TR_PARENT_SHA256": TR_PARENT_SHA256,
         "TR_DEV_CUT_SUMS_PATH": TR_DEV_CUT_SUMS_PATH,
-        "TR_DEV_CUT_SUMS_SHA256": TR_DEV_CUT_SUMS_SHA256,  # v1.3d A4
-        "FINAL_LIST_SHA256": FINAL_LIST_SHA256,  # v1.3e scope 2
+        "TR_DEV_CUT_SUMS_SHA256": TR_DEV_CUT_SUMS_SHA256,
+        "FINAL_LIST_SHA256": FINAL_LIST_SHA256,
         "B1C_ACCEPTED_SUMS_PATH": B1C_ACCEPTED_SUMS_PATH,
-        "B1C_ACCEPTED_SUMS_SHA256": B1C_ACCEPTED_SUMS_SHA256,  # v1.3e scope 3
+        "B1C_ACCEPTED_SUMS_SHA256": B1C_ACCEPTED_SUMS_SHA256,
         "H1_TERMINAL_ROSTER_PATH": H1_TERMINAL_ROSTER_PATH,
-        "H1_TERMINAL_ROSTER_SHA256": H1_TERMINAL_ROSTER_SHA256,  # v1.3f roster (L889 O-1 fail-fast; primary)
+        "H1_TERMINAL_ROSTER_SHA256": H1_TERMINAL_ROSTER_SHA256,  # primary; fail fast
     }
     av_only = (
         "PIN_RECONCILIATION_SEAL_SHA256",
@@ -368,7 +332,7 @@ def require_data_pins(
         "PIN_FACTOR_TABLE_SHA256",
         "PIN_FACTOR_CODE_SHA256",
         "PIN_AV_RAW_BARS_SHA256",
-    )  # v1.3f avmove: gate only under --av-factor-sensitivity
+    )  # gate only under --av-factor-sensitivity
     pending = [k for k, v in pins.items() if v == PENDING and (av_factor_sensitivity or k not in av_only)]
     if pending:
         raise Blocked(f"REFUSING: data pins PENDING (reconciliation not sealed / desk client not delivered): {pending}")
@@ -376,7 +340,7 @@ def require_data_pins(
 
 
 def verify_tr_cut_sums() -> None:
-    """v1.3d A4 (Victor 7ba03e18). The cut's line in its ACCEPTED SHA256SUMS (one pinned file: path + raw sha)
+    """The cut's line in its ACCEPTED SHA256SUMS (one pinned file: path + raw sha)
     must be exactly '<TR_DEV_CUT_SHA256>  <TR_DEV_CUT_PATH>'. Hash and text only; the cut is not opened here."""
     if PENDING in (TR_DEV_CUT_SUMS_PATH, TR_DEV_CUT_SUMS_SHA256, TR_DEV_CUT_PATH, TR_DEV_CUT_SHA256):
         raise Blocked(
@@ -391,20 +355,18 @@ def verify_tr_cut_sums() -> None:
 
 
 def verify_b1c_accepted() -> None:
-    """v1.3e scope 3 (Victor L368). H1/H2 refuse until B1c is accepted: the accepted B1c SUMS must exist and
+    """H1/H2 refuse until B1c is accepted: the accepted B1c SUMS must exist and
     match its pin. Hash only; nothing in it is parsed."""
     if PENDING in (B1C_ACCEPTED_SUMS_PATH, B1C_ACCEPTED_SUMS_SHA256):
-        raise Blocked(
-            "REFUSING: B1c not accepted (B1C_ACCEPTED_SUMS_PATH / B1C_ACCEPTED_SUMS_SHA256 PENDING; Victor L368)."
-        )
+        raise Blocked("REFUSING: B1c not accepted (B1C_ACCEPTED_SUMS_PATH / B1C_ACCEPTED_SUMS_SHA256 PENDING).")
     p = Path(B1C_ACCEPTED_SUMS_PATH)
     if not p.is_file() or sha256_file(p) != B1C_ACCEPTED_SUMS_SHA256:
         raise Blocked(f"REFUSING: accepted B1c SUMS absent or sha != B1C_ACCEPTED_SUMS_SHA256 at {p}.")
 
 
 class FinalListMismatch(Blocked):
-    """v1.3e scope 2 / v1.3f F3. FINAL_LIST absent, sha != pin, or any header/row violation -> exit code
-    RC_FINAL_LIST_MISMATCH (18), silent (Victor L830 (4))."""
+    """FINAL_LIST absent, sha != pin, or any header/row violation -> exit code
+    RC_FINAL_LIST_MISMATCH (18), silent."""
 
     def __init__(self, msg: str):
         super().__init__(RC_FINAL_LIST_MISMATCH)
@@ -415,7 +377,7 @@ class FinalListMismatch(Blocked):
 
 
 def verify_final_list_sha() -> None:
-    """v1.3f F4 (Victor L830). FINAL_LIST sha pre-check before any loader; hash only, nothing parsed.
+    """FINAL_LIST sha pre-check before any loader; hash only, nothing parsed.
     PENDING -> Blocked (rc 1); absent / unreadable / sha != pin -> FinalListMismatch (rc 18)."""
     if FINAL_LIST_SHA256 == PENDING:
         raise Blocked("REFUSING: FINAL_LIST_SHA256 PENDING.")
@@ -431,7 +393,7 @@ def verify_final_list_sha() -> None:
 
 
 def load_final_list() -> dict[str, Any]:
-    """v1.3e scope 2 (Victor L368/L369), v1.3f F3. Identity-map FINAL_LIST, re-checked at use: the bytes read are
+    """Identity-map FINAL_LIST, re-checked at use: the bytes read are
     the bytes hashed. The ONLY source of identity exclusions and their reasons. PENDING -> Blocked (rc 1); absent,
     sha mismatch, header bytes != FINAL_LIST_HEADER (a CR or any other byte), a non-UTF-8 body, a row without exactly 4 fields, a decision outside
     FINAL_LIST_DECISIONS, empty reasons on EXCLUDED, or a duplicate symbol -> FinalListMismatch (rc 18).
@@ -469,7 +431,7 @@ def load_final_list() -> dict[str, Any]:
 
 
 class DeskClientInterface:
-    """Change 1. DECLARED interface the desk client must provide (Dmitri). Not implemented here.
+    """DECLARED interface the desk client must provide. Not implemented here.
 
     load_av_raw_with_factor(start: date, end: date, *, seal_sha: str, ledger_sha: str,
                             factor_sha: str) -> pd.DataFrame
@@ -487,7 +449,7 @@ class DeskClientInterface:
 
 
 def load_desk_client(path: str | None = None, expected_sha: str | None = None) -> ModuleType:
-    """Change 1. Import the accepted desk client by exact path, after its sha256 check."""
+    """Import the accepted desk client by exact path, after its sha256 check."""
     path = DESK_CLIENT_PATH if path is None else path
     expected_sha = DESK_CLIENT_SHA256 if expected_sha is None else expected_sha
     if PENDING in (path, expected_sha):
@@ -506,12 +468,12 @@ def load_desk_client(path: str | None = None, expected_sha: str | None = None) -
 
 
 class DeskClientUniverseInterface:
-    """v1.3a (a). DECLARED extra client methods (Dmitri). Not implemented here.
+    """DECLARED extra client methods. Not implemented here.
 
     pit_membership_sha256() -> str
     pit_membership() -> pd.DataFrame  columns: symbol, start_date_filled, end_date (NaT = open)
         PIT S&P 500 intervals incl. delisted/former members (effective at open of start;
-        end exclusive, same semantics as v1.2 sp500_membership).
+        end exclusive, same semantics as the release sp500_membership).
     listing_status_sha256() -> str
     listing_status() -> pd.DataFrame  AV LISTING_STATUS rows (active + delisted):
         symbol, name, exchange, assetType, ipoDate, delistingDate (null = still listed), status
@@ -521,7 +483,7 @@ class DeskClientUniverseInterface:
 
 
 def load_pinned_json(path: str | Path, expected_sha: str) -> dict[str, Any]:
-    """v1.3a (a). Refuse unless the input file exists and matches its pin."""
+    """Refuse unless the input file exists and matches its pin."""
     if not Path(path).is_file():
         raise Blocked(f"REFUSING: pinned input absent: {path}")
     actual = sha256_file(Path(path))
@@ -564,10 +526,10 @@ def load_universe_v13a(
     dev_universe: pd.DataFrame | None = None,
     final_list: dict[str, Any] | None = None,
 ) -> tuple[pd.DataFrame, pd.Series, pd.Series, dict[str, Any]]:
-    """v1.3a (a). PIT membership via client, clipped to AV listing windows, minus R18 original
+    """PIT membership via client, clipped to AV listing windows, minus R18 original
     member periods, minus M14, minus ETFs. Returns (mem, subind, sector, receipt)."""
     if fill_input is not None or FILL_INPUT_PATH is not None:
-        raise Blocked("REFUSING: fills (Victor 5e) are a future hook; not implemented in v1.3a.")
+        raise Blocked("REFUSING: fills are a future hook; not implemented.")
     missing = [f for f in DeskClientUniverseInterface.REQUIRED if not hasattr(client, f)]
     if missing:
         raise Blocked(f"REFUSING: desk client lacks declared universe methods {missing}.")
@@ -583,23 +545,20 @@ def load_universe_v13a(
     }
     m14_set = {t["ticker"] for t in m14["tickers"]}
     ls = client.listing_status().copy()
-    # v1.3b: listing overlap (symbol in both AV sources) fails closed unless excluded or treated.
+    # listing overlap (symbol in both AV sources) fails closed unless excluded or treated.
     lineage_excl = set(lineage_excl or ())
     pm = client.pit_membership()
     both = set(ls.loc[ls["listing_source"] == "active", "symbol"]) & set(
         ls.loc[ls["listing_source"] == "delisted", "symbol"]
     )
     in_uni = both & set(pm["symbol"]) & (set(dev_universe) if dev_universe is not None else set(pm["symbol"]))
-    fl_excl, fl_kept = (
-        dict((final_list or {}).get("excluded", {})),
-        set((final_list or {}).get("kept", ())),
-    )  # v1.3e scope 2
+    fl_excl, fl_kept = dict((final_list or {}).get("excluded", {})), set((final_list or {}).get("kept", ()))
     in_uni -= set(r18_cuts) | m14_set | lineage_excl | ETFS | set(fl_excl)
     uncovered = sorted(in_uni - set(LISTING_OVERLAP_TREATMENT) - fl_kept)
     if uncovered:
         raise Blocked(
             f"REFUSING: {len(uncovered)} in-universe symbols in both AV listing sources with no "
-            f"pinned treatment (Victor item 5; {LISTING_OVERLAP_IN_UNIVERSE_SHA256[:8]}): {uncovered}"
+            f"pinned treatment ({LISTING_OVERLAP_IN_UNIVERSE_SHA256[:8]}): {uncovered}"
         )
     ls["ipo"] = pd.to_datetime(ls["ipoDate"].replace({"null": None}), errors="coerce")
     ls["dl"] = pd.to_datetime(ls["delistingDate"].replace({"null": None}), errors="coerce")
@@ -616,9 +575,9 @@ def load_universe_v13a(
         "listing_clipped": [],
         "lineage_excl_dropped": [],
         "final_list_sha256": (final_list or {}).get("sha256"),
-        "final_list_excluded": [],  # v1.3e scope 2
+        "final_list_excluded": [],
         "final_list_kept": sorted(fl_kept),
-        "final_list_kept_covered_overlap": sorted(in_uni & fl_kept),  # v1.3f (2)
+        "final_list_kept_covered_overlap": sorted(in_uni & fl_kept),
         "after_boundary_member_rows": sorted(pm.loc[pm["after_boundary"].astype(bool), "symbol"])
         if "after_boundary" in pm.columns
         else [],
@@ -628,7 +587,7 @@ def load_universe_v13a(
         if s in lineage_excl:
             rec["lineage_excl_dropped"].append(s)
             continue
-        if s in fl_excl:  # v1.3e scope 2: reason read from FINAL_LIST only
+        if s in fl_excl:  # reason read from FINAL_LIST only
             rec["final_list_excluded"].append({"symbol": s, "reason": fl_excl[s]})
             continue
         iv = (pd.Timestamp(r.start_date_filled), pd.Timestamp(r.end_date) if pd.notna(r.end_date) else pd.NaT)
@@ -674,10 +633,10 @@ def load_universe_v13a(
 
 
 def h2_delisting_receipts(bars: dict[str, Any], positions: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """v1.3a (b). PREREG 5.4 base for H2 on raw prices, as v1.2 implied: a position whose name
+    """Pre-registered base for H2 on raw prices: a position whose name
     stops printing before its planned exit is closed at its last close (R is NaN after the
     last bar, so apply_costs_and_returns adds 0; no exit cost at a NaN price; the ETF hedge
-    leg and short borrow run to the planned exit exactly as in v1.2). Reporting only: this
+    leg and short borrow run to the planned exit). Reporting only: this
     function changes no weight and no return. Supplied delisting returns: none (raw prices)."""
     out = []
     PX = bars["PX"]
@@ -707,13 +666,13 @@ def h2_delisting_receipts(bars: dict[str, Any], positions: list[dict[str, Any]])
     return out
 
 
-# v1.3a: declared method -> real desk_data_client function (CLIENT_MAPPING.md). None = MISSING.
-# v1.3b: repinned to deskclient_h1h2_v1 (Phase A only; Phase B and acquirer closes MISSING).
+# Declared method -> real desk client function. None = MISSING.
+# Phase A only; Phase B and acquirer closes are MISSING.
 CLIENT_MAPPING = {
     "load_av_raw_with_factor": "load_av_raw_with_factor",  # Phase B: not in module -> MISSING
     "bar_file_sha256": "bar_file_sha256",  # Phase B: not in module -> MISSING
     "xnys_sessions": "xnys_sessions",
-    "accepted_acquirer_closes": None,  # not in deskclient_h1h2_v1 -> MISSING
+    "accepted_acquirer_closes": None,  # not in the client -> MISSING
     "pit_membership_sha256": "pit_membership_sha256",
     "pit_membership": "pit_membership",
     "listing_status_sha256": "listing_status_sha256",
@@ -722,7 +681,7 @@ CLIENT_MAPPING = {
 
 
 def client_static_check(path: str | None = None, expected_sha: str | None = None) -> dict[str, Any]:
-    """v1.3a. Static (AST) check of the pinned client: no import, no execution. Refuses while any
+    """Static (AST) check of the pinned client: no import, no execution. Refuses while any
     declared method is MISSING (unmapped or absent from the client's top-level functions)."""
     path = DESK_CLIENT_PATH if path is None else path
     expected_sha = DESK_CLIENT_SHA256 if expected_sha is None else expected_sha
@@ -736,12 +695,12 @@ def client_static_check(path: str | None = None, expected_sha: str | None = None
     status = {m: (real if real and real in defs else "MISSING") for m, real in CLIENT_MAPPING.items()}
     missing = sorted(m for m, v in status.items() if v == "MISSING")
     if missing:
-        raise Blocked(f"REFUSING: desk client lacks declared methods (MISSING, for Dmitri): {missing}")
+        raise Blocked(f"REFUSING: desk client lacks declared methods (MISSING): {missing}")
     return status
 
 
 def ddc_accepted_acquirer_closes(ddc: Any, acquirer_id: str, start: date, end: date) -> pd.Series:
-    """v1.3a adapter: accepted_acquirer_closes -> ddc.get_daily_bars(..., adjustment='raw',
+    """Adapter: accepted_acquirer_closes -> ddc.get_daily_bars(..., adjustment='raw',
     allow_api=False). Local store only (no API); returns close indexed by session Timestamp."""
     df = ddc.get_daily_bars([acquirer_id], start, end, adjustment="raw", allow_api=False)
     if df is None or len(df) == 0:
@@ -753,7 +712,7 @@ def ddc_accepted_acquirer_closes(ddc: Any, acquirer_id: str, start: date, end: d
 
 
 def _to_date(x: Any) -> date:
-    """v1.3b adapter: pandas Timestamp / datetime / date -> datetime.date (client refuses datetime)."""
+    """Adapter: pandas Timestamp / datetime / date -> datetime.date (client refuses datetime)."""
     if isinstance(x, pd.Timestamp):
         if x.tzinfo is not None:
             raise Blocked("REFUSING: tz-aware Timestamp passed to desk client adapter.")
@@ -766,9 +725,9 @@ def _to_date(x: Any) -> date:
 
 
 class DeskClientH1H2Adapter:
-    """v1.3b adapter over deskclient_h1h2_v1 (Phase A). Converts arguments to datetime.date, calls
+    """Adapter over the desk client (Phase A). Converts arguments to datetime.date, calls
     .to_pandas() on returned pa.Tables, keeps after_boundary for audit, converts xnys_sessions to a
-    DatetimeIndex (v1.3a contract), and turns client "REFUSE ..." RuntimeErrors into Blocked.
+    DatetimeIndex, and turns client "REFUSE ..." RuntimeErrors into Blocked.
     Phase B (load_av_raw_with_factor, bar_file_sha256) and accepted_acquirer_closes are not
     provided by the module; calling them refuses."""
 
@@ -819,7 +778,7 @@ class DeskClientH1H2Adapter:
 
 
 def load_bars(filter_end: date, load_start: date = LOAD0, *, client: Any = None) -> dict[str, pd.DataFrame]:
-    """v1.3: AV raw close x desk factor via the desk client, read-time end filter.
+    """AV raw close x desk factor via the desk client, read-time end filter.
 
     No hand-rolled reads of AV CSVs. No rows after filter_end.
     """
@@ -865,7 +824,7 @@ def load_bars(filter_end: date, load_start: date = LOAD0, *, client: Any = None)
 
 
 def _parquet_after_site() -> Any:
-    """v1.3d (Rachel E7 r3 P1 / Victor A1(b)): the ONE new import, local, only after verify_pyarrow_site
+    """The ONE pyarrow.parquet import, local, only after verify_pyarrow_site
     has loaded pyarrow from the declared site; then pyarrow.parquet must resolve under that site."""
     _pa = sys.modules.get("pyarrow")
     if _pa is None or not os.path.realpath(cast(str, _pa.__file__)).startswith(
@@ -880,20 +839,18 @@ def _parquet_after_site() -> Any:
 
 
 def load_bars_tr(filter_end: date, load_start: date = LOAD0) -> dict[str, pd.DataFrame]:
-    """v1.3c PRIMARY return source: PREREG L38 total return, via the sealed DEV-only cut.
+    """PRIMARY return source: the pre-registered total return, via the sealed DEV-only cut.
 
-    Body below the guards is RESTORED from v1.2 load_bars (backtest_h1_h2.py 1ea3d146 L140-160,
-    the '-' lines of runner_v1_3 DIFF_v1_2_to_v1_3.patch 13865818), verbatim except 3 lines: the opened
-    path (the DEV cut, never the L38 parent) and the v1.3d P1 read call (pq.read_table(...).to_pandas()
-    replacing the pandas parquet reader). All guards run before the cut is opened as parquet.
+    Opens the DEV cut, never the parent file, with pq.read_table(...).to_pandas().
+    All guards run before the cut is opened as parquet.
     """
     if filter_end > EMBARGO1:
-        raise Blocked("REFUSING: v1.3c TR source is the DEV cut only; no holdout TR source pinned.")
-    verify_tr_cut_sums()  # v1.3d A4
+        raise Blocked("REFUSING: TR source is the DEV cut only; no holdout TR source pinned.")
+    verify_tr_cut_sums()
     if PENDING in (TR_DEV_CUT_PATH, TR_DEV_CUT_SHA256, TR_PARENT_SHA256):
         raise Blocked("REFUSING: TR pins PENDING (TR_DEV_CUT_PATH / TR_DEV_CUT_SHA256 / TR_PARENT_SHA256).")
-    if f"`{TR_PARENT_SHA256}`" not in PREREG_PATH.read_text().splitlines()[37]:
-        raise Blocked("REFUSING: TR_PARENT_SHA256 is not the PREREG L38 total-return pin.")
+    if f"`{TR_PARENT_SHA256}`" not in PREREG_PATH.read_text().splitlines()[PREREG_TR_PIN_LINE - 1]:
+        raise Blocked("REFUSING: TR_PARENT_SHA256 is not the pre-registered total-return pin.")
     cut = Path(TR_DEV_CUT_PATH)
     if not cut.is_file() or sha256_file(cut) != TR_DEV_CUT_SHA256:
         raise Blocked(f"REFUSING: TR DEV cut absent or sha != TR_DEV_CUT_SHA256 at {cut}.")
@@ -922,7 +879,7 @@ def load_bars_tr(filter_end: date, load_start: date = LOAD0) -> dict[str, pd.Dat
 def load_earnings(filter_end: date) -> pd.DataFrame:
     """Earnings with read-time announce_date_et filter."""
     if filter_end > EMBARGO1:
-        raise Blocked("REFUSING: v1.3b earnings source is the DEV cut only; no holdout source pinned.")
+        raise Blocked("REFUSING: earnings source is the DEV cut only; no holdout source pinned.")
     if sha256_file(EARNINGS) != EARNINGS_SHA256:
         raise Blocked("REFUSING: earnings DEV cut sha != pin.")
     return cast(
@@ -937,7 +894,7 @@ def load_earnings(filter_end: date) -> pd.DataFrame:
 
 
 def load_universe() -> tuple[None, pd.Series, pd.Series]:
-    # v1.3b: no direct membership read (mixed-period v1.2 file removed; membership = client).
+    # no direct membership read (membership = client).
     if sha256_file(UNIVERSE_CUT) != UNIVERSE_CUT_SHA256:
         raise Blocked("REFUSING: universe DEV cut sha != pin.")
     uni = cast(pd.DataFrame, _parquet_after_site().read_table(UNIVERSE_CUT).to_pandas())
@@ -950,7 +907,7 @@ def load_universe() -> tuple[None, pd.Series, pd.Series]:
 
 
 def _verify_sums_dir(d: str, sums_sha: str) -> dict[str, str]:
-    """v1.3b binding. sha256(d/SHA256SUMS) must equal the pin, then every listed file must match."""
+    """Binding. sha256(d/SHA256SUMS) must equal the pin, then every listed file must match."""
     sums = Path(d) / "SHA256SUMS"
     if not sums.is_file() or sha256_file(sums) != sums_sha:
         raise Blocked(f"REFUSING: {sums} absent or sha != pin {sums_sha}.")
@@ -964,10 +921,9 @@ def _verify_sums_dir(d: str, sums_sha: str) -> dict[str, str]:
 
 
 def bind_dev_inputs(path: str | Path) -> dict[str, Any]:
-    """v1.3b --dev-inputs. Accepts ONLY DEV_INPUTS_DIR with SHA256SUMS sha 4f5b23c9; binds addendum1
-    (SUMS e38da672) the same way; returns the 24 lineage exclusions (EXCLUDED_24.tsv, as is; rename
-    track closed) and the DEV universe symbol set (effective + pending-5e). Reads only these
-    metadata files; no price data."""
+    """--dev-inputs. Accepts ONLY DEV_INPUTS_DIR with its pinned SHA256SUMS; binds ADDENDUM1_DIR
+    the same way; returns the LINEAGE_EXCL_COUNT lineage exclusions (LINEAGE_EXCL_FILE, as is) and the
+    DEV universe symbol set (union of DEV_UNIVERSE_FILES). Reads only these metadata files; no price data."""
     if not path or os.path.normpath(str(path)) != DEV_INPUTS_DIR:
         raise Blocked(f"REFUSING: --dev-inputs must be exactly {DEV_INPUTS_DIR}/ (got {path!r}).")
     import csv
@@ -978,10 +934,12 @@ def bind_dev_inputs(path: str | Path) -> dict[str, Any]:
         raise Blocked("REFUSING: lineage exclusion file not pinned in addendum1 SUMS.")
     with open(Path(ADDENDUM1_DIR) / LINEAGE_EXCL_FILE, newline="") as f:
         lineage = {r["symbol"] for r in csv.DictReader(f, delimiter="\t")}
-    if len(lineage) != 24:
-        raise Blocked(f"REFUSING: expected 24 lineage exclusions, got {len(lineage)}.")
+    if len(lineage) != LINEAGE_EXCL_COUNT:
+        raise Blocked(f"REFUSING: expected {LINEAGE_EXCL_COUNT} lineage exclusions, got {len(lineage)}.")
+    if not DEV_UNIVERSE_FILES:
+        raise Blocked("REFUSING: DEV_UNIVERSE_FILES PENDING.")
     uni = set()
-    for name in ("DEV_UNIVERSE_EFFECTIVE.csv", "BASE_DEV_MEMBERS_PENDING_5E.csv"):
+    for name in DEV_UNIVERSE_FILES:
         with open(Path(DEV_INPUTS_DIR) / name, newline="") as f:
             uni |= {r["symbol"] for r in csv.DictReader(f)}
     return {
@@ -1000,11 +958,13 @@ def bind_dev_inputs(path: str | Path) -> dict[str, Any]:
 def verify_dev_cuts(
     cuts_dir: str | None = None, sums_path: str | None = None, sums_sha: str | None = None
 ) -> dict[str, Any]:
-    """v1.3b binding. Hash only (never parse): OUT_SHA256SUMS must match its pin, every DEV_CUT_PINS
+    """Binding. Hash only (never parse): OUT_SHA256SUMS must match its pin, every DEV_CUT_PINS
     entry must be listed there with the same sha, and each cut's raw bytes must match."""
     cuts_dir = DEV_CUTS_DIR if cuts_dir is None else cuts_dir
     sums_path = DEV_CUTS_SUMS_PATH if sums_path is None else sums_path
     sums_sha = DEV_CUTS_SUMS_SHA256 if sums_sha is None else sums_sha
+    if not DEV_CUT_PINS:
+        raise Blocked("REFUSING: DEV_CUT_PINS PENDING (no DEV cut pinned).")
     if not Path(sums_path).is_file() or sha256_file(Path(sums_path)) != sums_sha:
         raise Blocked(f"REFUSING: {sums_path} absent or sha != pin {sums_sha}.")
     listed = {}
@@ -1042,7 +1002,7 @@ def build_elig(bars: dict[str, Any], mem: pd.DataFrame) -> pd.DataFrame:
 
 
 def earliest_possible_index(ev: pd.DataFrame, dates: pd.DatetimeIndex) -> pd.DataFrame:
-    """Map each earnings row to earliest-possible session index (PREREG §5.3)."""
+    """Map each earnings row to earliest-possible session index (pre-registered rule)."""
     ev = ev[ev.source != "nasdaq_scheduled"].copy()
     ev["d0"] = pd.to_datetime(ev.reaction_session.fillna(ev.first_tradable_session))
     _ann = pd.to_datetime(ev.announce_date_et)
@@ -1357,7 +1317,7 @@ def apply_costs_and_returns(bars: dict[str, Any], W: pd.DataFrame, cfg: Any, *, 
     DV = PX * VOL
     ADV20 = DV.rolling(20, min_periods=10).mean().shift(1)
     dW = W_exec.diff().fillna(W_exec)
-    # Exclude / hard-cap L4 at capacity stress (Tomas §5): flag only here; full multi-day
+    # Exclude / hard-cap L4 at capacity stress: flag only here; full multi-day
     # carry is applied in the sealed sitting implementation detail.
     rets = []
     dates = W_exec.index
@@ -1404,7 +1364,7 @@ def apply_costs_and_returns(bars: dict[str, Any], W: pd.DataFrame, cfg: Any, *, 
     }
 
 
-# ---- v1.3 change 2: H1 v0.2 adverse terminal bound (accepted 373c3e5d / 79217ca7) ----
+# ---- H1 adverse terminal bound ----
 
 
 def load_h1_terminal_roster(path: str | None = None, expected_sha: str | None = None) -> list[Any]:
@@ -1461,7 +1421,7 @@ def h1_terminal_bound(
     client: Any = None,
     path: str = "A",
 ) -> tuple[pd.DataFrame, pd.Series, list[dict[str, Any]]]:
-    """Apply the accepted H1 v0.2 rule to positions stranded in unresolved terminal rows.
+    """Apply the H1 adverse terminal rule to positions stranded in unresolved terminal rows.
 
     Returns (W_adj, overlay, receipts). W_adj zeroes the stranded leg from tau so the frozen
     execution lag closes it at tau+1 with no exit-cost credit; overlay[d] is the fractional
@@ -1551,7 +1511,7 @@ def h1_terminal_bound(
             )
         W_adj.iloc[t:, cast(int, W_adj.columns.get_loc(s))] = 0.0
         receipts.append(rec)
-    # Path B: identical charge as an equity overlay; v1.2 has no stop / basket-stop / H8-H9 /
+    # Path B: identical charge as an equity overlay; the runner has no stop / basket-stop / H8-H9 /
     # NAV-sizing code, so what the risk logic "sees" cannot differ: A and B coincide here.
     return W_adj, overlay, receipts
 
@@ -1570,7 +1530,7 @@ def h2_delisting_stress(
     positions: list[dict[str, Any]],
     supplied_delist_returns: dict[str, Any] | None = None,
 ) -> tuple[pd.Series, list[dict[str, Any]]]:
-    """v1.3b. PREREG §5.4 counted stress for H2, pure computation: on any NULL delisting return,
+    """Pre-registered counted stress for H2, pure computation: on any NULL delisting return,
     -30% for longs and 0% for shorts. Applied to every position h2_delisting_receipts flags (name
     stops printing before its planned exit). The charge is the weight held over the session after
     the last close (W[last] executes over last+1) times the shock, booked at last+1 as an equity
@@ -1611,7 +1571,7 @@ def h2_delisting_stress(
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="backtest_h1_h2_v1_3a.py",
-        description="Sofia H1/H2 Stage A / sealed-holdout runner v1.3a DRAFT (PREREG_ORIGINAL v3).",
+        description="H1/H2 Stage A / sealed-holdout runner v1.3a DRAFT (pre-registration v3).",
     )
     p.add_argument(
         "--stage", choices=["dev", "holdout"], help="dev = Stage A window; holdout = sealed 2022-03-30..2026-10-28."
@@ -1619,7 +1579,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--acceptance-hash",
         default=None,
-        help="sha256 of PREREG_ORIGINAL.md; REQUIRED for holdout and for any return run.",
+        help="sha256 of the pre-registration; REQUIRED for holdout and for any return run.",
     )
     p.add_argument("--idea", choices=["H1", "H2", "both"], default="both")
     p.add_argument(
@@ -1630,13 +1590,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--delisting-stress",
         action="store_true",
-        help="H2 only: counted delisting-stress rerun (PREREG 5.4: -30%% long / 0%% short on null delisting return).",
+        help="H2 only: counted delisting-stress rerun (-30%% long / 0%% short on null delisting return).",
     )
     p.add_argument(
         "--av-factor-sensitivity",
         action="store_true",
         help="DECLARED SENSITIVITY, off by default: AV raw x desk factor returns instead of the "
-        "PREREG L38 total return. Never primary, never gates; refused until its own pins exist.",
+        "pre-registered total return. Never primary, never gates; refused until its own pins exist.",
     )
     p.add_argument(
         "--cost-path",
@@ -1686,23 +1646,23 @@ def main(argv: list[str] | None = None) -> int:
     stage = args.stage
     # Holdout always requires acceptance-hash. Dev return runs do too.
     # dry-run-signals on dev may proceed without hash ONLY if we still refuse holdout rows;
-    # PREREG says no DEV return trial before acceptance — signal-only on DEV is already
+    # The prereg says no DEV return trial before acceptance — signal-only on DEV is already
     # covered by turnover_dev.py. This runner requires the hash for both stages.
     prereg_sha = require_acceptance_hash(args.acceptance_hash, stage)
     pyarrow_record_sha = verify_pyarrow_site(args.pyarrow_site, args.pyarrow_site_sha)
     if stage != "dev":
-        raise Blocked("REFUSING: v1.3b binds DEV-only inputs; no holdout inputs are pinned.")
+        raise Blocked("REFUSING: this runner binds DEV-only inputs; no holdout inputs are pinned.")
     if args.delisting_stress and args.idea != "H2":
-        raise Blocked("REFUSING: --delisting-stress is H2 only (H1 stress withdrawn by 373c3e5d); pass --idea H2.")
+        raise Blocked("REFUSING: --delisting-stress is H2 only (H1 stress withdrawn); pass --idea H2.")
     if args.delisting_stress and args.av_factor_sensitivity:
         raise Blocked(
-            "REFUSING: --delisting-stress is a counted rerun on the PRIMARY (L38 TR) source, not on the AV sensitivity."
+            "REFUSING: --delisting-stress is a counted rerun on the PRIMARY (TR) source, not on the AV sensitivity."
         )
     dev = bind_dev_inputs(args.dev_inputs)
     dev["receipt"].update(verify_dev_cuts())
-    data_pins = require_data_pins(av_factor_sensitivity=args.av_factor_sensitivity)  # v1.3f avmove (A2 L401)
-    verify_b1c_accepted()  # v1.3e scope 3
-    verify_final_list_sha()  # v1.3f F4: pre-check before any loader (at-use re-check kept below)
+    data_pins = require_data_pins(av_factor_sensitivity=args.av_factor_sensitivity)
+    verify_b1c_accepted()
+    verify_final_list_sha()  # pre-check before any loader (at-use re-check kept below)
     client_mapping = client_static_check()
 
     filter_end, eval_start, eval_end = stage_date_bounds(stage)
@@ -1716,14 +1676,14 @@ def main(argv: list[str] | None = None) -> int:
         pass  # ok
     # Load with read-time filters
     if args.av_factor_sensitivity:
-        bars = load_bars(filter_end)  # v1.3c: AV raw x desk factor = DECLARED SENSITIVITY only
+        bars = load_bars(filter_end)  # AV raw x desk factor = DECLARED SENSITIVITY only
     else:
-        bars = load_bars_tr(filter_end)  # v1.3c: PRIMARY = PREREG L38 total return (DEV cut)
+        bars = load_bars_tr(filter_end)  # PRIMARY = pre-registered total return (DEV cut)
     # Extra guard: no holdout rows in DEV
     if stage == "dev" and (bars["R"].index >= pd.Timestamp(HOLDOUT0)).any():
         raise RuntimeError("DEV leakage: holdout rows present after filters")
-    _mem_v12_unused, subind, sector = load_universe()  # GICS only (v1.2 store; deviation)
-    final_list = load_final_list()  # v1.3e scope 2: re-checked at use, fail closed
+    _mem_v12_unused, subind, sector = load_universe()  # GICS only (release store; deviation)
+    final_list = load_final_list()  # re-checked at use, fail closed
     mem, subind, sector, universe_receipt = load_universe_v13a(
         DeskClientH1H2Adapter(load_desk_client()),
         subind,
@@ -1769,7 +1729,7 @@ def main(argv: list[str] | None = None) -> int:
         "return_source": (
             "SENSITIVITY (declared): AV raw x desk factor; not primary; never gates"
             if args.av_factor_sensitivity
-            else "PRIMARY: PREREG L38 total return, DEV cut"
+            else "PRIMARY: pre-registered total return, DEV cut"
         ),
         "tr_dev_cut_sha256": TR_DEV_CUT_SHA256,
         "tr_parent_sha256": TR_PARENT_SHA256,
@@ -1777,9 +1737,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.delisting_stress:
         results["v13b"]["trial_accounting"] = {
             "mode": "H2 delisting-stress rerun (counted)",
-            "prereg": "f3b2b1be §5.4 line 161; §7 table line 226 'Per idea: ... delisting-stress rerun' (5 x 2 = 10)",
+            "prereg": "pre-registered per-idea delisting-stress rerun (5 x 2 = 10)",
             "N_effect": "inside N = 212 (v3) / 214 (with H1 v0.2); no increment for this one counted run; any repeat adds to N and is logged in §12",
-            "H1": "not run: H1 stress withdrawn by 373c3e5d",
+            "H1": "not run: H1 stress withdrawn",
         }
 
     ideas = ["H1", "H2"] if args.idea == "both" else [args.idea]
