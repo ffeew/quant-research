@@ -1,9 +1,13 @@
 """End-to-end H2-C over one partition, on in-memory inputs. No file, network or environment access.
 
 The H2-C HOLDOUT partition is spent: ``run_h2c`` refuses it (``HoldoutRefusedError``) before touching any input.
-It also refuses, before computing anything, any input dated inside the spent holdout window 2011-01-01 to
-2013-12-31 (inclusive), whatever the partition label: partition bounds, calendar and price sessions, price rows,
-and earnings report/fiscal dates. This library must not be used to run the holdout.
+Whatever the partition label, it also refuses observations dated inside the spent holdout window 2011-01-01 to
+2013-12-31 (inclusive): partition bounds overlapping it, earnings rows whose ``reportedDate`` falls in it,
+transcripts dated in it, and any return/outcome row in it that would feed a target or a score. ``fiscalDateEnding``
+is a label, not an observation date, and is not checked. In-window price history (price rows, price sessions,
+calendar sessions) is allowed only as beta warm-up: dated before the partition start and among the last
+``beta_n + 1`` sessions before it (the prices behind the ``beta_n`` returns of a beta estimated at the first partition
+session). This library must not be used to run the holdout.
 """
 
 from __future__ import annotations
@@ -34,7 +38,9 @@ SPENT_WINDOW_REFUSED_MSG = (
     f"H2-C holdout window {SPENT_HOLDOUT_LO.isoformat()} to {SPENT_HOLDOUT_HI.isoformat()} is spent; "
     "this library must not be used on inputs dated inside it"
 )
-EARNINGS_DATE_FIELDS = ("reportedDate", "fiscalDateEnding")
+EARNINGS_DATE_FIELDS = ("reportedDate",)  # observation dates only; fiscalDateEnding is a label
+TRANSCRIPT_DATE_FIELDS = ("date", "reportedDate")  # date keys a loaded transcript object may carry
+WARMUP_EXTRA_SESSIONS = 1  # beta_n returns need beta_n + 1 prices
 
 
 def _as_date(v: Any) -> dt.date | None:
@@ -63,6 +69,32 @@ def _refuse_spent_window(what: str, values: Iterable[Any]) -> None:
             raise HoldoutRefusedError(f"{SPENT_WINDOW_REFUSED_MSG} ({what}: {v})")
 
 
+def _warmup_allowance(sessions: Iterable[Any], part_lo: dt.date, lookback: int) -> frozenset[dt.date]:
+    """The last ``lookback`` distinct session dates strictly before ``part_lo``: the only dates where in-window
+    price history may appear (beta warm-up)."""
+    before = sorted({d for d in map(_as_date, sessions) if d is not None and d < part_lo})
+    return frozenset(before[-lookback:]) if lookback > 0 else frozenset()
+
+
+def _refuse_spent_window_except_warmup(what: str, values: Iterable[Any], allowed: frozenset[dt.date]) -> None:
+    """Like ``_refuse_spent_window``, but an in-window date in ``allowed`` (pre-partition beta warm-up) passes."""
+    for v in values:
+        if _in_spent_window(v) and _as_date(v) not in allowed:
+            raise HoldoutRefusedError(
+                f"{SPENT_WINDOW_REFUSED_MSG} ({what}: {v}; in-window dates are allowed only as pre-partition beta"
+                " warm-up within beta_n + 1 sessions before the partition start)"
+            )
+
+
+def _refuse_outcome_window(what: str, sessions: Sequence[Any], i0: int, h1: int) -> None:
+    """Raise ``HoldoutRefusedError`` if any session from ``sessions[i0]`` (day0) through ``sessions[i0 + h1]`` (the
+    horizon end) is inside the spent window: those dates carry the prices of the outcome/target return rows and the
+    scoring entry session, which may never be in-window (warm-up allowance covers beta estimation only)."""
+    for d in sessions[max(i0, 0) : i0 + h1 + 1]:
+        if _in_spent_window(d):
+            raise HoldoutRefusedError(f"{SPENT_WINDOW_REFUSED_MSG} ({what} outcome row: {d})")
+
+
 def run_h2c(
     p: H2CParams,
     partition: str,
@@ -87,12 +119,20 @@ def run_h2c(
     gate is evaluated, else the DEV gate (G1).
 
     The HOLDOUT partition is refused: a ``partition`` naming it (any case) raises ``HoldoutRefusedError`` before any
-    input is read. Whatever the label, ``HoldoutRefusedError`` is also raised before any computation when anything
-    is dated inside the spent window 2011-01-01 to 2013-12-31 (inclusive): the partition's ``lo``..``hi`` range
-    (any overlap), any ``calendar_sessions`` or ``price_sessions`` date, any ``price_rows`` ``date``, or any
-    ``earnings_rows`` ``reportedDate`` / ``fiscalDateEnding``. Dates may be ISO strings or ``date`` objects. As a
-    last guard, no transcript is loaded for an event dated inside that window. The holdout is spent and this
-    library must not be used to run it.
+    input is read. Whatever the label, ``HoldoutRefusedError`` is also raised for observations dated inside the
+    spent window 2011-01-01 to 2013-12-31 (inclusive):
+
+    - before any input is read: the partition's ``lo``..``hi`` range overlapping the window;
+    - before any computation: an ``earnings_rows`` ``reportedDate`` in the window (``fiscalDateEnding`` is a label
+      and is not checked); a ``calendar_sessions``, ``price_sessions`` or ``price_rows`` ``date`` in the window
+      unless it is beta warm-up, i.e. before ``lo`` and among the last ``beta_n + 1`` sessions of that sequence
+      before ``lo``;
+    - per transcript: before ``load_transcript``, an event whose ``reportedDate`` or ``day0`` is in the window; after
+      loading, a transcript object carrying an in-window ``date`` / ``reportedDate``;
+    - per target and score: any session from ``day0`` through ``day0 + h1`` (price panel and calendar) in the
+      window, so no in-window return row ever feeds an outcome.
+
+    Dates may be ISO strings or ``date`` objects. The holdout is spent and this library must not be used to run it.
     """
     if partition.strip().upper() == HOLDOUT_PARTITION:
         raise HoldoutRefusedError(HOLDOUT_REFUSED_MSG)
@@ -103,10 +143,13 @@ def run_h2c(
     psess = list(price_sessions)
     prows = list(price_rows)
     erows = list(earnings_rows)
-    _refuse_spent_window("calendar_sessions", allsess)
-    _refuse_spent_window("price_sessions", psess)
-    _refuse_spent_window("price_rows date", (x.get("date") for x in prows))
+    lookback = p.beta_n + WARMUP_EXTRA_SESSIONS
+    cal_ok = _warmup_allowance(allsess, part.d_lo, lookback)
+    px_ok = _warmup_allowance(psess, part.d_lo, lookback)
     _refuse_spent_window("earnings_rows", (x.get(k) for x in erows for k in EARNINGS_DATE_FIELDS))
+    _refuse_spent_window_except_warmup("calendar_sessions", allsess, cal_ok)
+    _refuse_spent_window_except_warmup("price_sessions", psess, px_ok)
+    _refuse_spent_window_except_warmup("price_rows date", (x.get("date") for x in prows), px_ok)
     syms = list(p.universe) + [p.hedge]
     panel = build_return_panel(prows, psess, syms)
     ER = _ev.prepare_earnings(erows, part, p.universe)
@@ -126,8 +169,15 @@ def run_h2c(
         if ev["status"] == "excl_no_reporttime" and not window_ok(ev["info_i0"]):
             continue
         if _in_spent_window(ev["reportedDate"]) or _in_spent_window(ev["day0"]):
-            raise HoldoutRefusedError(f"{SPENT_WINDOW_REFUSED_MSG} (event {ev['symbol']} {ev['reportedDate']})")
-        entries = validate_transcript(load_transcript(ev["symbol"], ev["label"]), ev["symbol"], ev["label"])
+            raise HoldoutRefusedError(
+                f"{SPENT_WINDOW_REFUSED_MSG} (transcript {ev['symbol']} {ev['label']} for event {ev['reportedDate']})"
+            )
+        obj = load_transcript(ev["symbol"], ev["label"])
+        if isinstance(obj, dict):
+            _refuse_spent_window(
+                f"transcript {ev['symbol']} {ev['label']}", (obj.get(k) for k in TRANSCRIPT_DATE_FIELDS)
+            )
+        entries = validate_transcript(obj, ev["symbol"], ev["label"])
         ev["n_parseable"], ev["tone"] = call_tone(entries, p.tone_min)
 
     avail: dict[str, list[dict[str, Any]]] = {}
@@ -138,7 +188,11 @@ def run_h2c(
     def surprise(ev: dict[str, Any], d0: str) -> tuple[int, float]:
         return tone_surprise(ev["tone"], avail.get(ev["symbol"], []), d0, p.nprior_max, p.nprior_min)
 
+    pidx = panel.index
+
     def target(sym: str, d0: str) -> tuple[str, float, float, float]:
+        if d0 in pidx:
+            _refuse_outcome_window(f"price {sym} {d0}", panel.sessions, pidx[d0], p.h1)
         return beta_adjusted_target(panel, sym, p.hedge, d0, p.beta_n, p.h0, p.h1)
 
     for ev in EV:
@@ -154,6 +208,7 @@ def run_h2c(
         elif not math.isfinite(ev["surprise"]):
             ev["status"] = "excl_lt_min_prior_calls"
         else:
+            _refuse_outcome_window(f"calendar {ev['symbol']} {ev['day0']}", allsess, ev["a0"], p.h1)
             st, ev["beta"], ev["ret_raw"], ev["target"] = target(ev["symbol"], ev["day0"])
             ev["status"] = st or "candidate"
 
@@ -162,6 +217,7 @@ def run_h2c(
         if ev["status"] != "excl_no_reporttime" or ev["reportedDate"] < part.score_lo or not window_ok(ev["info_i0"]):
             continue
         d0 = allsess[ev["info_i0"]]
+        _refuse_outcome_window(f"calendar {ev['symbol']} {d0}", allsess, ev["info_i0"], p.h1)
         if (
             not ev["label"]
             or not math.isfinite(ev["tone"])

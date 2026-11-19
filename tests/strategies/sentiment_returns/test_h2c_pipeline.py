@@ -212,18 +212,95 @@ def test_run_h2c_refuses_spent_window_input_dates_outside_partition() -> None:
     cal = list(kw["calendar_sessions"])
     prow = dict(kw["price_rows"][0], date="2012-06-01")
     er = list(kw["earnings_rows"])
+    # In-window session/price dates here are years before the partition start (2018-01-01): outside the beta
+    # warm-up allowance, so still refused.
     cases = (
         dict(price_sessions=["2012-06-01", *ps]),
         dict(price_sessions=[dt.date(2012, 6, 1), *ps]),
         dict(calendar_sessions=["2013-12-31", *cal]),
         dict(price_rows=[*kw["price_rows"], prow]),
         dict(earnings_rows=[*er, dict(er[0], reportedDate="2012-02-01")]),
-        dict(earnings_rows=[*er, dict(er[0], fiscalDateEnding="2011-12-31")]),
         dict(earnings_rows=[*er, dict(er[0], reportedDate=dt.date(2012, 2, 1))]),
-        dict(earnings_rows=iter([*er, dict(er[0], fiscalDateEnding=dt.date(2011, 1, 1))])),
     )
     for over in cases:
         _spent(run_h2c, p, "T", **dict(kw, **over))
+    # fiscalDateEnding is a label, not an observation date: an in-window fiscal label alone is not refused.
+    for fde_rows in (
+        [*er, dict(er[0], fiscalDateEnding="2011-12-31")],
+        iter([*er, dict(er[0], fiscalDateEnding="2011-01-01")]),
+    ):
+        r = run_h2c(p, "T", **dict(kw, earnings_rows=fde_rows))
+        assert r["partition"] == "T" and r["stats"]["periods"] >= 6
+
+
+def test_dev_call_with_2013_fiscal_label_and_2013_warmup_passes() -> None:
+    p, kw = world(seed=3, dev=True)
+    part = p.partition("T")
+    assert part.lo == "2014-01-01"
+    warm = [d for d in kw["price_sessions"] if d < part.lo]
+    assert len(warm) == p.beta_n + 1 and all(d.startswith("2013-1") for d in warm)
+    assert [d for d in kw["calendar_sessions"] if d < part.lo] == warm
+    assert any(r["date"] in warm for r in kw["price_rows"])
+    q4 = [e for e in kw["earnings_rows"] if e["fiscalDateEnding"] == "2013-12-31"]
+    assert len(q4) == len(SYMS) and all(e["reportedDate"].startswith("2014-01") for e in q4)
+    r = run_h2c(p, "T", **kw)
+    assert r["counts"]["mapping"]["mapped"] == 12 * len(SYMS)  # the fiscal-2013 Q4 transcripts map too
+    assert {ev["status"] for ev in r["events"] if ev["fiscalDateEnding"] == "2013-12-31"} == {"warmup_not_scored"}
+    assert r["stats"]["periods"] == len(r["periods"]) >= 6
+    assert all(ev["day0"] >= part.lo for ev in r["events"] if ev["day0"])
+    # The earliest event day0 sits fewer than beta_n sessions into the partition, so a beta estimated at it draws
+    # on the 2013 warm-up sessions.
+    first = min(ev["day0"] for ev in r["events"] if ev["day0"])
+    assert kw["price_sessions"].index(first) - p.beta_n < len(warm)
+
+
+def test_2013_price_date_outside_warmup_lookback_is_refused() -> None:
+    p, kw = world(seed=3, dev=True)
+    early = "2013-06-03"  # before the partition start but far more than beta_n + 1 sessions before it
+    ps = sorted([early, *kw["price_sessions"]])
+    rows = [*kw["price_rows"], *(dict(symbol=s, date=early, adjusted_close=100.0) for s in [*SYMS, "HEDGE"])]
+    for over in (
+        dict(price_sessions=ps),
+        dict(price_sessions=ps, price_rows=rows),
+        dict(calendar_sessions=sorted([early, *kw["calendar_sessions"]])),
+    ):
+        msg = _spent(run_h2c, p, "T", **dict(kw, **over))
+        assert early in msg and "warm-up" in msg
+    # One session more than the lookback, prepended in order: the oldest one falls outside the allowance.
+    extra = "2013-10-01"
+    assert extra < kw["price_sessions"][0]
+    msg = _spent(run_h2c, p, "T", **dict(kw, price_sessions=[extra, *kw["price_sessions"]]))
+    assert extra in msg
+
+
+def test_2013_return_row_feeding_outcome_is_refused() -> None:
+    from quant_research.strategies.sentiment_returns.h2c import pipeline as pl
+
+    # Helper: any session from day0 through day0 + h1 in the spent window is refused; in-window sessions before
+    # day0 (beta estimation) are not checked by it.
+    sess = ["2013-12-30", "2013-12-31", "2014-01-02", "2014-01-03", "2014-01-06", "2014-01-07", "2014-01-08"]
+    pl._refuse_outcome_window("t", sess, 2, 4)
+    try:
+        pl._refuse_outcome_window("t", sess, 1, 4)
+    except errors.HoldoutRefusedError as e:
+        assert "outcome row: 2013-12-31" in str(e)
+    else:
+        raise AssertionError("in-window outcome row not refused")
+    crafted = ["2014-01-02", "2014-01-03", "2013-12-31", "2014-01-06"]  # a 2013 row inside the horizon
+    _spent(pl._refuse_outcome_window, "t", crafted, 0, 2)
+    pl._refuse_outcome_window("t", crafted, 3, 5)  # window past the end is clipped
+
+    # Through run_h2c: a DEV-style call whose price panel carries a 2013 warm-up session (allowed by the input
+    # guard: before the partition start and within the lookback) moved so that its return row sits inside a
+    # scored event's outcome window. The outcome guard must refuse it.
+    p, kw = world(seed=3, dev=True)
+    r = run_h2c(p, "T", **kw)
+    d0 = min(ev["day0"] for ev in r["events"] if ev["status"] == "included")
+    ps = list(kw["price_sessions"])
+    moved = ps.pop(ps.index("2013-12-31"))
+    ps.insert(ps.index(d0) + 2, moved)
+    msg = _spent(run_h2c, p, "T", **dict(kw, price_sessions=ps))
+    assert "outcome row: 2013-12-31" in msg
 
 
 def test_spent_window_bounds_are_inclusive() -> None:
