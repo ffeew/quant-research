@@ -1,4 +1,4 @@
-"""Synthetic tests for the review fixes to the bellwether runner (B1 look-ahead, B2 ADV cap,
+"""Synthetic tests for the fixes to the bellwether runner (B1 look-ahead, B2 ADV cap,
 B3 calendar-day borrow). Each test fails on the pre-fix runner and passes on the fixed one.
 
 The runner is loaded with a config built from the pre-cleanup pins, exactly as in the
@@ -170,6 +170,11 @@ def test_round2_h2_stress_applies_to_held_position(mod: Any) -> None:
 
 
 def _terminal_short(mod: Any, n: int, h_i: int) -> tuple[pd.DatetimeIndex, pd.Series, Any]:
+    d, ov, rec, _b, _wa = _terminal_short_full(mod, n, h_i)
+    return d, ov, rec
+
+
+def _terminal_short_full(mod: Any, n: int, h_i: int) -> tuple[pd.DatetimeIndex, pd.Series, Any, Any, pd.DataFrame]:
     from .test_config_equivalence import FakeClient
 
     b = _delisting(n=n, vol=1e9)
@@ -182,8 +187,8 @@ def _terminal_short(mod: Any, n: int, h_i: int) -> tuple[pd.DatetimeIndex, pd.Se
     }
     roster = [{"symbol": "A", "identity_ok": True, "short_terms": terms}]
     cfg = mod.build_cost_config("unknown_borrow_required")
-    _, ov, rec = mod.h1_terminal_bound(b, W, roster, cfg, client=FakeClient(), path="A")
-    return d, ov, rec
+    Wa, ov, rec = mod.h1_terminal_bound(b, W, roster, cfg, client=FakeClient(), path="A")
+    return d, ov, rec, b, Wa
 
 
 def test_round2_terminal_borrow_three_days_over_a_weekend(mod: Any) -> None:
@@ -199,8 +204,10 @@ def test_round2_terminal_borrow_over_a_year_is_about_ten_percent(mod: Any) -> No
     n = 300
     d0 = pd.bdate_range("2018-01-01", periods=n)
     h_i = int(np.searchsorted(d0.values, (d0[19] + pd.Timedelta(days=365)).to_datetime64()))
-    d, ov, _ = _terminal_short(mod, n, h_i)
-    borrow = -float(ov.sum()) - 0.05 * (65.0 / 50.0 - 1.0)  # minus the V_max liability
+    d, ov, _, b, Wa = _terminal_short_full(mod, n, h_i)
+    base = mod.apply_costs_and_returns(b, Wa, mod.build_cost_config("unknown_borrow_required"), idea="H1")
+    base_after_tau = float(base["daily"]["borrow"].loc[d[20] :].sum())  # tau -> tau+1, on the held short
+    borrow = -float(ov.sum()) - 0.05 * (65.0 / 50.0 - 1.0) + base_after_tau  # minus the V_max liability
     days = (d[h_i] - d[19]).days  # tau close -> h close
     assert days >= 365 and np.isclose(borrow, 0.05 * 0.10 * days / 360)
     assert 0.10 <= borrow / 0.05 < 0.1025  # ~10% of the short over a year (360-day basis)
@@ -231,7 +238,7 @@ def test_round2_no_adv_history_means_no_trade(mod: Any) -> None:
     assert mod.held_positions(b, W)["A"].eq(0).all()
 
 
-# ---- review round 3 (from #10) ----
+# ---- execution, settlement and print rules ----
 
 
 def test_round4_one_tradable_print_definition(mod: Any) -> None:
@@ -424,11 +431,11 @@ def test_round4_weights_off_the_price_index_fail_closed(mod: Any) -> None:
     W = pd.DataFrame({"A": 0.0}, index=extra)
     W.iloc[12:, 0] = 0.1
     cfg = mod.build_cost_config("unknown_borrow_required")
-    with pytest.raises(SystemExit, match="not in the price index"):
+    with pytest.raises(SystemExit, match="weight index != price index"):
         mod.apply_costs_and_returns(b, W, cfg, idea="H1")
-    with pytest.raises(SystemExit, match="not in the price index"):
+    with pytest.raises(SystemExit, match="weight index != price index"):
         mod.held_positions(b, W)
-    with pytest.raises(SystemExit, match="not in the price index"):
+    with pytest.raises(SystemExit, match="weight index != price index"):
         mod.h1_terminal_bound(b, W, [{"symbol": "A", "identity_ok": True}], cfg)
 
 
@@ -448,3 +455,31 @@ def test_round4_adv20_counts_non_print_sessions_as_zero_dollars(mod: Any) -> Non
     W2 = pd.DataFrame({"A": 0.0}, index=d)
     W2.iloc[2:, 0] = 0.1
     assert mod.held_positions(pre, W2)["A"].iloc[:16].eq(0).all()  # 10 sessions of history first
+
+
+def test_round5_weights_must_equal_the_price_index(mod: Any) -> None:
+    b = _flat()
+    d = b["R"].index
+    cfg = mod.build_cost_config("unknown_borrow_required")
+    short = pd.DataFrame({"A": 0.1}, index=d[:-3])  # a strict subset: 3 price sessions skipped
+    flipped = pd.DataFrame({"A": 0.1}, index=d[::-1])  # same sessions, different order
+    for W in (short, flipped):
+        with pytest.raises(SystemExit, match="weight index != price index"):
+            mod.apply_costs_and_returns(b, W, cfg, idea="H1")
+        with pytest.raises(SystemExit, match="weight index != price index"):
+            mod.held_positions(b, W)
+    assert mod.held_positions(b, pd.DataFrame({"A": 0.1}, index=d)).shape == (len(d), 1)
+
+
+def test_round5_tau_to_tau1_borrow_is_charged_once(mod: Any) -> None:
+    d, ov, rec, b, Wa = _terminal_short_full(mod, 30, 27)  # short 0.05 from close 12, tau = 19
+    cfg = mod.build_cost_config("unknown_borrow_required")
+    per_day = 0.05 * 0.10 / 360
+    liability = 0.05 * (65.0 / 50.0 - 1.0)
+    assert np.isclose(ov.iloc[20], -liability)  # tau+1 overlay: the liability only, no borrow
+    base = mod.apply_costs_and_returns(b, Wa, cfg, idea="H1")["daily"]["borrow"]
+    assert np.isclose(base.loc[d[20]], per_day * (d[20] - d[19]).days)  # base borrow covers tau -> tau+1
+    assert base.loc[d[21] :].eq(0).all()  # settled: no base borrow after tau+1
+    total = float(base.loc[d[20] :].sum()) - float(ov.sum()) - liability
+    assert np.isclose(total, per_day * (d[27] - d[19]).days)  # every day from tau to h, once
+    assert rec[0]["borrow_rate"] == 0.10
