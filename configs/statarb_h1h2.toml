@@ -1,0 +1,81 @@
+# Trial config. Strategy parameters are frozen (pre-registered) constants in the code.
+# The [harness] section is an EXAMPLE: every path/sha is a placeholder (PENDING), so the harness
+# refuses to run. Copy it outside the repo, fill in real paths and sha256 pins, and pass it with
+# --config or $QR_STATARB_H1H2_CONFIG. Never commit filled-in paths or pins.
+
+[trial]
+title = "Statarb H1/H2 harness (bellwether lag, earnings peer read-through)"
+status = "in_progress"
+verdict = "harness code-reviewed; no DEV run yet; no results"
+entry = "quant_research.strategies.statarb_h1h2.run"
+findings = "research/statarb_h1h2/FINDINGS.md"
+
+[data]
+root_env = "QR_DATA_DIR"
+requires = ["daily total return (DEV cut)", "earnings events", "PIT index membership", "listing status", "GICS"]
+
+[harness]
+# Relative paths resolve under $QR_DATA_DIR; ${QR_DATA_DIR} / ${QR_DESK_DIR} are expanded.
+out_dir = "outputs/statarb_h1h2"
+# expected_lineage_exclusions = 0       # optional row-count check on lineage_exclusions
+[harness.listing_overlap_treatment]     # symbol = "treatment"; empty = fail closed on any overlap
+
+[harness.inputs.prereg]   # pre-registration document
+path = "PENDING"
+sha256 = "PENDING"
+
+[harness.inputs.tr_dev_cut]   # DEV-only total-return cut (parquet)
+path = "PENDING"
+sha256 = "PENDING"
+
+[harness.inputs.tr_dev_cut_sums]   # SHA256SUMS listing the cut
+path = "PENDING"
+sha256 = "PENDING"
+
+[harness.inputs.earnings_dev_cut]   # earnings events, DEV-only cut (parquet)
+path = "PENDING"
+sha256 = "PENDING"
+
+[harness.inputs.universe_gics]   # GICS sub-industry / sector by symbol (parquet)
+path = "PENDING"
+sha256 = "PENDING"
+
+[harness.inputs.membership]   # PIT index membership (parquet)
+path = "PENDING"
+sha256 = "PENDING"
+
+[harness.inputs.listing_status]   # listing status, active + delisted (parquet)
+path = "PENDING"
+sha256 = "PENDING"
+
+[harness.inputs.reused_tickers]   # reused-ticker original member periods (json)
+path = "PENDING"
+sha256 = "PENDING"
+
+[harness.inputs.missing_names]   # names with no usable history (json)
+path = "PENDING"
+sha256 = "PENDING"
+
+[harness.inputs.identity_list]   # identity list (tsv)
+path = "PENDING"
+sha256 = "PENDING"
+
+[harness.inputs.identity_basis_sums]   # accepted identity-basis SHA256SUMS
+path = "PENDING"
+sha256 = "PENDING"
+
+[harness.inputs.lineage_exclusions]   # lineage exclusions (tsv, symbol column)
+path = "PENDING"
+sha256 = "PENDING"
+
+[harness.inputs.dev_universe]   # DEV universe symbols (csv, symbol column)
+path = "PENDING"
+sha256 = "PENDING"
+
+[harness.inputs.h1_terminal_roster]   # H1 unresolved terminal rows (json)
+path = "PENDING"
+sha256 = "PENDING"
+
+[harness.inputs.acquirer_closes]   # optional: accepted acquirer closes (parquet)
+path = "PENDING"
+sha256 = "PENDING"

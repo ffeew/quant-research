@@ -12,6 +12,9 @@ n/a
 ## Method
 Frozen runner v1.3f (refuses to run until unsealed; exits 17 on import).
 
+## Successor
+Config-driven harness for further work: [../statarb_h1h2/FINDINGS.md](../statarb_h1h2/FINDINGS.md).
+
 ## Results
 - No returns computed.
 
