@@ -550,7 +550,15 @@ def run_all(mod: Any, tmp: Path) -> dict[str, Any]:
 # including every pin and config value, must still match the pre-cleanup module exactly.
 # h2_delisting_stress now prices the position actually held (review round 2); on these fixtures
 # that equals the target, so it stays in the comparison.
-FIXED = {"W1": "B1", "r1": "B1 B2 B3", "r2": "B2 B3", "tb": "B1 B3", "sharpe": "B1 B2 B3"}
+# Review round 3: R3-fill (a fill at close j-1 is priced, print-checked and capped on row j-1)
+# changes the priced paths r1, r2, sharpe and the H1 bound tb; it leaves rec2 and stress equal here.
+FIXED = {
+    "W1": "B1",
+    "r1": "B1 B2 B3 R3-fill",
+    "r2": "B2 B3 R3-fill",
+    "tb": "B1 B3 R3-fill",
+    "sharpe": "B1 B2 B3 R3-fill",
+}
 
 
 def test_computations_identical_on_synthetic_fixtures(old_src, tmp_path):
