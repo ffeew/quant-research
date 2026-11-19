@@ -1538,14 +1538,14 @@ def h1_terminal_bound(
         if row.get("economic_event_date") and pd.Timestamp(row["economic_event_date"]) < tau_d:
             raise Blocked(f"BLOCK H1: source-bound economic date < tau for {s}.")
         # suspension gaps before tau: a held session without trusted print before tau
-        held_pre = W[s].iloc[:t].abs() > 0
+        assert held is not None
+        held_pre = held[s].iloc[:t].abs() > 0  # the position actually held over each session, not W
         trusted = _trusted(bars, s)
         if (held_pre & ~trusted.iloc[:t]).any():
             raise Blocked(
                 f"BLOCK H1: suspension gap before tau for {s} (worse-of-prints "
                 "exit not representable in frozen weight path; fail closed)."
             )
-        assert held is not None
         if t + 1 >= len(dates):
             continue  # not open after tau within window
         # held after the fills at close tau (the last fill it can get); this is what reaches tau+1

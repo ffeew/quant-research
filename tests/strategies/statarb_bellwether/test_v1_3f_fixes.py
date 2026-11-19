@@ -298,3 +298,23 @@ def test_round3_h2_receipts_and_stress_follow_the_held_remainder(mod: Any) -> No
     W3.iloc[12:19, 0] = 4_000 * k
     pos3 = [dict(pos[0], w_sym=4_000 * k, exit_i=19)]
     assert mod.h2_delisting_receipts(b, W3, pos3) == [] and mod.h2_delisting_stress(b, W3, pos3)[0].sum() == 0
+
+
+def test_round3_h1_suspension_gap_check_uses_the_held_position(mod: Any) -> None:
+    b = _delisting()  # tau = 19; 1% ADV = 5k per session
+    d = b["R"].index
+    k = 1.0 / float(mod.AUM)
+    b["VOL"].iloc[17, 0] = 0.0  # untrusted session 17 (zero volume) before tau
+    W = pd.DataFrame({"A": 0.0}, index=d)
+    W.iloc[12:16, 0] = 12_000 * k  # target flat from 16, but the capped exit still holds 7k over 17
+    held = mod.held_positions(b, W)["A"]
+    assert W["A"].iloc[17] == 0 and np.isclose(held.iloc[17], 7_000 * k)
+    roster = [{"symbol": "A", "identity_ok": True}]
+    cfg = mod.build_cost_config("unknown_borrow_required")
+    with pytest.raises(SystemExit, match="suspension gap"):
+        mod.h1_terminal_bound(b, W, roster, cfg)
+    W2 = W.copy()
+    W2.iloc[12:16, 0] = 4_000 * k  # filled in one session, out by close 16: nothing held over 17
+    assert mod.held_positions(b, W2)["A"].iloc[17] == 0
+    _, ov, rec = mod.h1_terminal_bound(b, W2, roster, cfg)
+    assert rec == [] and ov.sum() == 0
