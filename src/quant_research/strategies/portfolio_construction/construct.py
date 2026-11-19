@@ -21,7 +21,7 @@ Pipeline
  5. Convex optimisation (cvxpy):  max α'w − tc/H·|w−w0|  s.t. ex-ante vol ≤ target, Risk-Manager limits,
     |β'w| ≤ beta_tol, sector caps, earnings blackout.  Then integer-share rounding + post-checks.
  6. Admission gate (FRAMEWORK.md §1): a signal is VALIDATED only if it passes the internal OOS test AND is
-    listed in --validation_passed (the validator's PASS / CONDITIONAL PASS in validation/verdicts-log.md).
+    listed in --victor_passed (the validator's PASS / CONDITIONAL PASS in validation/verdicts-log.md).
  7. FALLBACK = SHADOW / DE-RISK ONLY (CIO-confirmed 2026-10-30, default --fallback derisk): with no validated
     signal the full optimised book is written to portfolio/shadow/targets_<date>.json (tradable=false,
     NOT FOR TRADING) and the tradable portfolio/targets_<date>.json may only trim / close / cover existing
@@ -669,7 +669,7 @@ def main() -> None:
         help="no validated signal: 'derisk' (CIO policy) = shadow book + de-risk-only tradable file",
     )
     ap.add_argument(
-        "--validation_passed",
+        "--victor_passed",
         default="",
         help="comma list of signal keys with validator PASS/COND PASS (none as of 2026-10-30)",
     )
@@ -903,7 +903,7 @@ def main() -> None:
     keys = ["MOM_12_1", "RS63", "TREND", "REV5", "PEAD"]
     stats, series = ic_study(sig, C, alpha_univ)
     sw, mode, passed, ic_shr, sigcorr = signal_weights(stats, series, keys)
-    vp = [x.strip() for x in a.validation_passed.split(",") if x.strip()]
+    vp = [x.strip() for x in a.victor_passed.split(",") if x.strip()]
     validated = [k for k in passed if k in vp]
     fallback_derisk = ((not validated) and a.fallback == "derisk") or halted  # HALTED -> de-risk only regardless
     gp = None
@@ -1659,7 +1659,7 @@ def main() -> None:
         desk_rule="DESK_RULES.md #5: history from the data owner's store; live Alpaca data only via data/lib/desk_data_client.py; no data.json, no direct HTTP",
         **DATA_PROVENANCE,
         earnings_calendar=f"{a.earnings_dir} (the data owner; forward dates from Nasdaq scheduled rows; uses announce_date_et, not first_tradable_session)",
-        validation_defects_file=DATA_ISSUES,
+        victor_defects_file=DATA_ISSUES,
         book_affected_by_data_defects=bool(a.proxy_src == "store_pit"),
         data_defect_status=(DEFECT_LABEL if a.proxy_src == "store_pit" else None),
         reason=(
@@ -1749,7 +1749,7 @@ def main() -> None:
             excluded_assets="crypto (hard exclusion, CIO 2026-10-30)",
             blackout=bl,
             fallback_policy=a.fallback,
-            validation_passed=vp,
+            victor_passed=vp,
             garleanu_pedersen=gp if gp_on else "off",
         ),
         risk_overlays=dict(

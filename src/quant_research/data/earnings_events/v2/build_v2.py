@@ -438,7 +438,7 @@ key_recon.to_csv(f"{V2}/symbol_accession_key_reconciliation.csv", index=False)
 # ---------- finalize v2 columns / version ----------
 v2["dataset_version"] = "earnings_events_8k202 v2 (the sentiment researcher, 2026-11-06)"
 v2["v1_parent_sha256"] = V1_HASH
-v2["pit_ruling_sha256"] = VALIDATION_PIT
+v2["victor_pit_ruling_sha256"] = VALIDATION_PIT
 # ensure accession unique
 assert v2.accession.is_unique
 assert set(v1.accession).issubset(set(v2.accession))

@@ -65,7 +65,7 @@ Stage B can only **down-weight** a passed signal. It can never admit a signal th
 - No research signal has a PASS yet.
 - ⇒ **zero admitted signals** ⇒ §8 fallback applies.
 
-**Implementation (v2):** Stage A is an explicit input, `--validation_passed SIG1,SIG2`, with default empty, i.e. none passed as of 2026-10-30. A signal is validated only if it is in that list **and** passes Stage B. To do: parse verdicts-log.md directly.
+**Implementation (v2):** Stage A is an explicit input, `--victor_passed SIG1,SIG2`, with default empty, i.e. none passed as of 2026-10-30. A signal is validated only if it is in that list **and** passes Stage B. To do: parse verdicts-log.md directly.
 
 ## 2. Combination: IC-weighted, shrunk toward equal weight, with a correlation adjustment
 For admitted signals k = 1..K, each a cross-sectional z-score winsorised at ±3:
@@ -541,7 +541,7 @@ The earlier label "equal-risk" was inaccurate and has been retired. The signal w
 ## 9. Implemented vs to-do summary
 | Component | construct.py today | To do |
 |---|---|---|
-| Admission gate | ✅ `--validation_passed` AND internal OOS test | Parse verdicts-log automatically |
+| Admission gate | ✅ `--victor_passed` AND internal OOS test | Parse verdicts-log automatically |
 | IC weights + shrinkage + correlation adjustment | ✅ (n0 = 20, C_shr, 50/50 blend) | Walk-forward IC and decay from the validator; per-signal budget cap |
 | Covariance shrinkage | ✅ LW 2004 optimal δ\* to constant correlation (fixed 0.5 optional) | Exclude cross-asset ETFs from the CC block |
 | Risk-forecast inflation | ✅ k = 1.25 in the 6% cap only (short-sample bias 1.15–1.37; v0.5 10y PIT L/S bias 1.14–1.23, **PROVISIONAL – data defects pending the data owner's fixes**) | Regime-dependent k (2020 bias ~1.5); re-run ls_volcap_wf after the data owner's fixes |

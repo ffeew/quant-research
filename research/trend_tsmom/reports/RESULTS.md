@@ -97,7 +97,7 @@
 Against the same risk-parity book held long-only, the trend timing adds about **+5.5%/yr gross**.
 
 ## 5. Sensitivity / robustness grid (19 trials on the common window, plus cost variants on the baseline)
-| variant                                  | gross_ret   |   gross_sharpe | net_ret   | net_vol   |   net_sharpe |   net_t | net_maxdd   |   turnover_x |   avg_cost_bps_1way |   breakeven_bps_1way |   avg_gross_lev |   corr_spy_d | costs_flag   |
+| variant                                  | gross_ret   |   gross_sharpe | net_ret   | net_vol   |   net_sharpe |   net_t | net_maxdd   |   turnover_x |   avg_cost_bps_1way |   breakeven_bps_1way |   avg_gross_lev |   corr_spy_d | tomas_flag   |
 |:-----------------------------------------|:------------|---------------:|:----------|:----------|-------------:|--------:|:------------|-------------:|--------------------:|---------------------:|----------------:|-------------:|:-------------|
 | BASELINE = lb12_M (pvt10, card universe) | 6.8%        |           0.61 | 2.3%      | 11.3%     |         0.2  |    0.63 | -25.6%      |         15.5 |                26.3 |                 43.8 |            3.19 |         0.04 | WARN         |
 | lb1_M                                    | 1.5%        |           0.14 | -11.5%    | 11.9%     |        -0.97 |   -3.02 | -71.1%      |         46.1 |                27.4 |                  3.3 |            3.3  |        -0.13 | FAIL         |

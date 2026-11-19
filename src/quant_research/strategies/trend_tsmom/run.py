@@ -94,7 +94,7 @@ def summarise(name: str, o: dict[str, Any], start: str = EVAL_START) -> dict[str
         "corr_spy_d": c["corr_daily"],
         "corr_spy_m": c["corr_monthly"],
         "skew_m": n["skew_m"],
-        "costs_flag": flag,
+        "tomas_flag": flag,
     }
 
 

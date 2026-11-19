@@ -81,7 +81,7 @@ def trade_costs(
         floor = (ETF_FLOOR if s in etfs else VALIDATION_FLOOR[b]) + hs
         rows.append((date, s, d, b, tc["total_bps"], floor, max(tc["total_bps"], floor), sh / a if a > 0 else np.nan))
     return pd.DataFrame(
-        rows, columns=["date", "symbol", "dw", "bucket", "costs_bps", "validation_floor_bps", "bps", "participation"]
+        rows, columns=["date", "symbol", "dw", "bucket", "tomas_bps", "victor_floor_bps", "bps", "participation"]
     )
 
 

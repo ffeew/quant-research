@@ -370,8 +370,8 @@ def gap_classes(
         ),
         "annret_reason_counts": ann.ann_ret_reason.value_counts().to_dict(),
         "aa_evhc_reconciliation": aa_evhc,
-        "research_v1_v2_used_for_values": False,
-        "ex99_rule_research_v1_additive_rows": int((e.ex99_rule == "ethan_v1_additive").sum()),
+        "ethan_v1_v2_used_for_values": False,
+        "ex99_rule_ethan_v1_additive_rows": int((e.ex99_rule == "ethan_v1_additive").sum()),
     }
 
 
