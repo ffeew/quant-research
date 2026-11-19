@@ -78,7 +78,7 @@ def test_named_output_keys_match_base() -> None:
     head_all: set[str] = set()
     for path in (ROOT / "src").rglob("*.py"):
         head_all |= _all_keys(path.read_text())
-    assert RENAMED_TO <= head_all
+    assert head_all >= RENAMED_TO
 
 
 def _json_keys(obj: Any, path: str = "") -> set[str]:
