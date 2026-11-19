@@ -1316,21 +1316,22 @@ def apply_costs_and_returns(bars: dict[str, Any], W: pd.DataFrame, cfg: Any, *, 
     # W row k is the weight filled at close k (signals put it at their fill session, never the
     # signal bar); it earns the next row's return, close k -> k+1.
     W_exec = W.shift(1).fillna(0.0)
-    # Participation cap: clip |Δw|*AUM / ADV20 <= 1%; carry remainder (simplified single-day carry)
+    # Participation cap: each session trades at most 1% of ADV20 shares toward the target; the
+    # unfilled remainder carries to later sessions. Gross, cost and borrow are on the held position.
     DV = PX * VOL
     ADV20 = DV.rolling(20, min_periods=10).mean().shift(1)
-    dW = W_exec.diff().fillna(W_exec)
-    # Exclude / hard-cap L4 at capacity stress: flag only here; full multi-day
-    # carry is applied in the sealed sitting implementation detail.
+    held = pd.Series(0.0, index=W_exec.columns)
     rets = []
     dates = W_exec.index
+    capped_sessions = 0
     for j in range(1, len(dates)):
         d = dates[j]
-        w = W_exec.iloc[j]
-        # gross trading cost on Δw
-        dw = dW.iloc[j]
+        # trade toward the target from the position actually held
+        want = W_exec.iloc[j] - held
+        fill = want.copy()
         trade_cost_frac = 0.0
-        for s, delta in dw.items():
+        capped = False
+        for s, delta in want.items():
             if abs(delta) < 1e-15 or s not in PX.columns:
                 continue
             px = PX.at[d, s]
@@ -1339,14 +1340,19 @@ def apply_costs_and_returns(bars: dict[str, Any], W: pd.DataFrame, cfg: Any, *, 
             adv = ADV20.at[d, s] if s in ADV20.columns else np.nan
             adv_sh = (adv / px) if (isinstance(adv, float) and adv > 0) else None
             sh = abs(delta) * AUM / px
-            # 1% ADV cap on filled slice
+            # 1% ADV cap on the trade itself; the remainder carries
             if adv_sh and sh > PARTICIPATION_CAP * adv_sh:
                 sh = PARTICIPATION_CAP * adv_sh
+                fill.loc[str(s)] = math.copysign(sh * px / AUM, delta)
+                capped = True
             side = "buy" if delta > 0 else "sell"
             sig = None
             c = one_way_bps(side, float(px), float(sh), adv_sh, sig, cfg=cfg, venue="close", symbol=s, etf_symbols=ETFS)
             trade_cost_frac += (sh * px / AUM) * c["bps"] / 1e4
-        # asset return contribution
+        capped_sessions += capped
+        held = held + fill
+        w = held
+        # asset return contribution, on the held position only
         rrow = R.loc[d].reindex(w.index).fillna(0.0) if d in R.index else 0.0
         gross = float((w * rrow).sum()) if not isinstance(rrow, float) else 0.0
         # borrow on short notional for 1 session (~1 calendar day approx; 360-day convention)
@@ -1363,6 +1369,7 @@ def apply_costs_and_returns(bars: dict[str, Any], W: pd.DataFrame, cfg: Any, *, 
         "is_pass_bar": cfg.is_pass_bar,
         "k_impact": cfg.k_impact,
         "n_sessions": int(len(df)),
+        "n_sessions_adv_capped": int(capped_sessions),
         "daily": df,
     }
 
