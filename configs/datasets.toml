@@ -161,3 +161,17 @@ description = "Earnings events v2.1 (reconciled)"
 module = "quant_research.data.etf_distributions.fetch"
 description = "ETF distributions"
 
+
+[datasets.trading-calendar]
+module = "quant_research.data.pipelines.trading_calendar"
+description = "U-CAL: SPY/NYSE DEV-window trading calendar (build + pinned check)"
+# Paths are relative to $QR_DATA_DIR; override the calendar location with env QR_UCAL_PATH.
+bars = "bars/daily/raw/SPY.parquet"
+calendar = "calendars/ucal_dev_spy.csv"
+# DEV window: first session on or after dev_start, strictly before holdout_start (exclusive).
+dev_start = "2007-01-01"
+holdout_start = "2016-06-01"
+# Pinned sha256 of the calendar file. Left empty in the repo; set env QR_UCAL_SHA256 at runtime.
+# The check fails closed when no pin is configured.
+sha256 = ""
+sha256_env = "QR_UCAL_SHA256"

@@ -14,6 +14,7 @@ import pandas as pd
 
 ND = NormalDist()
 EULER = 0.5772156649
+DSR_MIN_OBS = 4  # smallest series dsr() accepts: bias-corrected sample kurtosis needs n >= 4
 
 
 def nw_lag(T: int) -> int:
@@ -62,9 +63,24 @@ def basic(r: pd.Series, ppy: int = 252) -> dict[str, Any]:
 
 def dsr(r: pd.Series, trial_srs_daily: np.ndarray, N: int) -> dict[str, Any]:
     """r: daily returns of the selected strategy; trial_srs_daily: non-annualised Sharpe of the logged trials;
-    N: trial count used for the expected-max benchmark."""
+    N: trial count used for the expected-max benchmark.
+
+    Input checks (ValueError; they run first and do not change the arithmetic for valid inputs):
+      * N >= 1 (N = 1 means a single trial, benchmark SR0 = 0);
+      * after dropping NaNs, r needs at least DSR_MIN_OBS = 4 observations: the bias-corrected sample kurtosis
+        used in the denominator is undefined below 4 (skewness below 3, the std below 2), and the formula would
+        silently return NaN or a meaningless value;
+      * r and trial_srs_daily must be finite (+/-inf would propagate silently)."""
+    if not N >= 1:
+        raise ValueError(f"dsr: N (trial count) must be >= 1, got {N!r}")
     r = r.dropna()
     T = len(r)
+    if T < DSR_MIN_OBS:
+        raise ValueError(f"dsr: need at least {DSR_MIN_OBS} non-NaN returns for skew/kurtosis, got {T}")
+    if not np.isfinite(r.to_numpy(dtype=float)).all():
+        raise ValueError("dsr: returns contain non-finite values")
+    if not np.isfinite(np.asarray(trial_srs_daily, dtype=float)).all():
+        raise ValueError("dsr: trial_srs_daily contains non-finite values")
     sr = r.mean() / r.std(ddof=1)
     g3, g4 = cast(float, r.skew()), cast(float, r.kurt()) + 3
     V = float(np.var(trial_srs_daily, ddof=1)) if len(trial_srs_daily) > 1 else 0.0
@@ -234,3 +250,76 @@ def walk_forward(
         )
     s = pd.concat(oos) if oos else pd.Series(dtype=float)
     return s, pd.DataFrame(folds)
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# Shared overfitting guards (Victor). Minimal, dependency-free helpers so every trial uses the same purged CV and
+# the same hold-out check instead of re-implementing them per strategy. Code above keeps its original arithmetic.
+# ---------------------------------------------------------------------------------------------------------------
+
+
+class HoldoutViolation(ValueError):
+    """Raised when data reaches into a sealed hold-out window."""
+
+
+def assert_before_holdout(timestamps: Any, holdout_start: Any, who: str = "") -> None:
+    """Fail closed unless EVERY timestamp is strictly before `holdout_start`.
+
+    The cutoff is always a parameter (never hard-coded here); a timestamp exactly at the cutoff is already hold-out.
+    Missing timestamps (NaT) are rejected because they cannot be shown to be outside the hold-out."""
+    cut = pd.Timestamp(holdout_start)
+    if pd.isna(cut):
+        raise ValueError("holdout_start must be a valid timestamp")
+    ts = pd.DatetimeIndex(pd.to_datetime(pd.Index(np.asarray(timestamps).ravel())))
+    tag = f"{who}: " if who else ""
+    if ts.hasnans:
+        raise HoldoutViolation(
+            f"{tag}{int(cast(np.ndarray, ts.isna()).sum())} missing timestamp(s); cannot prove they precede {cut}"
+        )
+    bad = ts >= cut
+    if bad.any():
+        raise HoldoutViolation(
+            f"{tag}{int(bad.sum())} timestamp(s) at or after hold-out start {cut} (first offending {ts[bad].min()})"
+        )
+
+
+def purged_kfold(
+    t0: Any, t1: Any, n_splits: int = 5, embargo_pct: float = 0.0, holdout_start: Any = None
+) -> list[tuple[np.ndarray, np.ndarray]]:
+    """Purged and embargoed K-fold split (Lopez de Prado 2018, Advances in Financial ML, ch. 7).
+
+    t0[i], t1[i]: start and end of observation i's label span (t0 sorted ascending, t1 >= t0).
+    Test folds are contiguous blocks of positions that partition 0..T-1 exactly once. For each fold:
+      * purge: drop from train every i whose span [t0[i], t1[i]] overlaps [min t0(test), max t1(test)];
+      * embargo: also drop the h = ceil(embargo_pct * T) positions immediately after the fold's last position.
+    If `holdout_start` is given, every t0 and t1 must be strictly before it (assert_before_holdout).
+    Returns a list of (train_positions, test_positions) integer arrays, deterministic given the inputs."""
+    a = pd.DatetimeIndex(pd.to_datetime(pd.Index(np.asarray(t0).ravel())))
+    b = pd.DatetimeIndex(pd.to_datetime(pd.Index(np.asarray(t1).ravel())))
+    T = len(a)
+    if len(b) != T:
+        raise ValueError("t0 and t1 must have the same length")
+    if not isinstance(n_splits, (int, np.integer)) or n_splits < 2 or n_splits > T:
+        raise ValueError(f"n_splits must be an int in [2, T={T}], got {n_splits!r}")
+    if not (0.0 <= embargo_pct < 1.0):
+        raise ValueError(f"embargo_pct must be in [0, 1), got {embargo_pct!r}")
+    if a.hasnans or b.hasnans:
+        raise ValueError("t0/t1 contain missing timestamps")
+    if not a.is_monotonic_increasing:
+        raise ValueError("t0 must be sorted ascending")
+    if (b < a).any():
+        raise ValueError("every label end t1 must be >= its start t0")
+    if holdout_start is not None:
+        assert_before_holdout(a, holdout_start, "purged_kfold t0")
+        assert_before_holdout(b, holdout_start, "purged_kfold t1")
+    h = int(math.ceil(embargo_pct * T))
+    pos = np.arange(T)
+    a_v, b_v = a.asi8, b.asi8
+    out: list[tuple[np.ndarray, np.ndarray]] = []
+    for test in np.array_split(pos, n_splits):
+        lo, hi = a_v[test].min(), b_v[test].max()
+        keep = (b_v < lo) | (a_v > hi)  # no overlap with the fold's label span
+        keep[test] = False
+        keep[test[-1] + 1 : test[-1] + 1 + h] = False  # embargo after the fold
+        out.append((pos[keep], test.copy()))
+    return out
