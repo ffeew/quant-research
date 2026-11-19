@@ -548,6 +548,8 @@ def run_all(mod: Any, tmp: Path) -> dict[str, Any]:
 # apply_costs_and_returns and everything priced from it (B2 ADV cap on the trade, B3 calendar-day
 # borrow), and h1_terminal_bound (built on the H1 weights; B3 borrow overlay). Everything else,
 # including every pin and config value, must still match the pre-cleanup module exactly.
+# h2_delisting_stress now prices the position actually held (review round 2); on these fixtures
+# that equals the target, so it stays in the comparison.
 FIXED = {"W1": "B1", "r1": "B1 B2 B3", "r2": "B2 B3", "tb": "B1 B3", "sharpe": "B1 B2 B3"}
 
 
