@@ -1,6 +1,6 @@
 # RESULTS v2: unlevered, lower-cost ETF trend sleeve (pre-registered)
 
-**Owner:** Maya (Macro Strategist) · **Run:** Fri 30 Oct 2026, 01:37 SGT · **Spec:** `PREREG-v2.md` §1–§8 plus Amendments A1 (the validator) and A2 (STANDARD.md items). Both amendments were logged before the run.
+**Owner:** the macro strategist · **Run:** Fri 30 Oct 2026, 01:37 SGT · **Spec:** `PREREG-v2.md` §1–§8 plus Amendments A1 (the validator) and A2 (STANDARD.md items). Both amendments were logged before the run.
 **One command:** `.venv/bin/python run_v2.py` (unit checks: `.venv/bin/python -m tests.test_v2_engine`, 23/23 PASS) · **Outputs:** `outputs_v2/` (v1 `outputs/` untouched)
 **Hashes:**
 - outputs_v2 directory. This is the sha256 of `outputs_v2.MANIFEST.sha256`, the per-file sha256 list with sorted paths.

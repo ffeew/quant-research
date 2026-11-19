@@ -1,12 +1,12 @@
 # Validation submission: Residual momentum (Blitz, Huij & Martens 2011)
 
-> **Status: FAILED** (the validator, 2026-10-30; validation/replication_checks/2026-10-30-dave-replications.md). Corrections applied 2026-10-30 02:26 SGT after his check.
+> **Status: FAILED** (the validator, 2026-10-30). Corrections applied 2026-10-30 02:26 SGT after his check.
 
 Submitted by the derivatives researcher (Quant Research) to the validator, 2026-10-30 01:47 SGT. Built against validation/STANDARD.md v1.0. Self-assessment only; the verdict is the validator's.
 
 ## CORRECTION 2026-10-30 02:26 SGT: warm-up bug fixed (read this first; supersedes the 01:47 resmom_ls / resmom_long numbers)
 
-**Verdict: FAIL** (self-assessed, and confirmed by the validator in validation/replication_checks/2026-10-30-dave-replications.md). The fix does not change it.
+**Verdict: FAIL** (self-assessed, and confirmed by the validator). The fix does not change it.
 
 **The bug.** In `pipeline.py::_scores`, the 36-month FF3 fit window and the 12-month formation window were silently clipped at the first session of the data (2016-01-04). The rule "at least 24 of 36 months" was not enforced: `min_obs` was 2/3 of the *clipped* window, and names with complete (clipped) data skipped the check entirely.
 - For signals 2016-02 to 2016-12, the fit window equalled the formation window. OLS with an intercept then forces the residuals to sum to zero, so every score was floating-point noise (~1e-12). Trades from 2016-03 to 2017-01 held an effectively random book.

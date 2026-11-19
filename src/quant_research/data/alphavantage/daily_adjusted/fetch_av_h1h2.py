@@ -165,7 +165,7 @@ def call(params: dict[str, str]) -> tuple[str, bytes | None, str]:
 
 def excl_write(final: Path, data: bytes) -> bool:
     """Temp in same dir, then hard-link (fails if final exists: atomic no-clobber)."""
-    tmp = final.parent / f".{final.name}.sofia.{os.getpid()}.tmp"
+    tmp = final.parent / f".{final.name}.research.{os.getpid()}.tmp"
     fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644)
     try:
         os.write(fd, data)

@@ -17,8 +17,8 @@
 - My REGISTRY row now points at the new slug. No other owner's row was touched.
 - Ownership of the main BAB card is pending the fund manager. Note that no REGISTRY row now references that slug: the derivatives researcher or the fund manager should add one.
 
-**Maya's notes.** `$QR_SCRATCH_DIR/maya-notes/vol-managed-duplicate-draft.md` was read only and treated as data.
-- Only items I verified against Moreira–Muir (2017) or Cederburg et al. (2020) were folded into my MM card, cited as "notes from Macro Strategist (Maya)":
+**the macro strategist's notes.** A scratch notes draft (vol-managed duplicate) was read only and treated as data.
+- Only items I verified against Moreira–Muir (2017) or Cederburg et al. (2020) were folded into my MM card, cited as "notes from Macro Strategist (the macro strategist)":
   - Table IV turnover, alpha and break-even;
   - Table V weight percentiles;
   - the COWY counts.
@@ -308,7 +308,7 @@ GP map (ℓ → a/γ, τ): ℓ=0.5: (0.366, 0.7321), ℓ=2: (1.000, 0.5000), ℓ
 - `tca/*`
 - `statarb/data/daily_bars.json`
 - The derivatives researcher's BAB card and replication
-- Maya's notes
+- the macro strategist's notes
 - `data.json`, `positions.json`, `orders_status.json`, `performance/history.csv`
 
 ## Addendum (01:32 SGT): LIMITS.md alignment run (construct.py v0.3)

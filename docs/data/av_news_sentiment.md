@@ -1,5 +1,5 @@
 # Alpha Vantage news sentiment + earnings-call transcripts (for the sentiment researcher) - RAW layer
-Built by the data engineer (Data Engineer), 10-11 Nov 2026 SGT. Assigned by the fund manager; pull approved by Daniel 22:39 SGT 10 Nov.
+Built by the data engineer (Data Engineer), 10-11 Nov 2026 SGT. Assigned by the fund manager; pull approved by the desk head 22:39 SGT 10 Nov.
 Status: RAW, sealed, pending the fund manager's inspection. Not yet released to the sentiment researcher. A separate clean/ layer will follow the fund manager's
 cleaning decisions, with every rule and dropped row in CLEANING.md; raw/ stays untouched.
 

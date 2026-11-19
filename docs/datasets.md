@@ -279,7 +279,7 @@ Sample of 22 liquid stocks/ETFs, 2016-2026:
 | `crypto_bars.py` | DEPRECATED | - | - |
 | `alfred_store.py` | macro/treasury, macro/carry/g10_3m, sentiment/credit (frozen dated ALFRED vintages; `python alfred_store.py treasury g10_3m credit treasury_extra`) | weekly (daily for treasury/credit if needed); each run writes new dated files | ~1-2 min |
 
-Suggested daily order: corporate_actions, then daily_bars, total_return, assets_snapshot, earnings, qa. Run it at **07:30 SGT Tue-Sat** (US close + about 3.5 h; robust to the 1 Nov 2026 DST change). No schedules are configured; Daniel sets routines.
+Suggested daily order: corporate_actions, then daily_bars, total_return, assets_snapshot, earnings, qa. Run it at **07:30 SGT Tue-Sat** (US close + about 3.5 h; robust to the 1 Nov 2026 DST change). No schedules are configured; the desk head sets routines.
 
 ## Blockers / not freely obtainable
 - **Macro release calendar (CPI/NFP/GDP/PCE/ISM), vintage-aware.**
@@ -305,7 +305,7 @@ Legend: COVERED = in store now; PARTIAL = usable with caveats; NO = not in store
 | gatev 2006 / rad-low-faff 2016 / do-faff 2010 & 2012 pairs (the stat-arb researcher) | adjusted bars, industry classification, borrow fees | COVERED: bars. PARTIAL: GICS is current only. NO: borrow fees |
 | lou-polk-skouras 2019 overnight/intraday (the stat-arb researcher) | adjusted open and close | COVERED: adjusted open/close daily; intraday bars NO (next step) |
 | tadi-kortchemski 2021 crypto pairs (the stat-arb researcher) | crypto | OUT OF SCOPE (crypto dropped) |
-| crypto-tsmom-liu-tsyvinski-2021 (Maya) | BTC/ETH daily | OUT OF SCOPE (crypto dropped; deprecated files exist) |
+| crypto-tsmom-liu-tsyvinski-2021 (the macro strategist) | BTC/ETH daily | OUT OF SCOPE (crypto dropped; deprecated files exist) |
 | frazzini-pedersen-2014 BAB (the derivatives researcher/PC) | adjusted daily returns, market, RF | COVERED (bars, FF RF/Mkt). AQR BAB copy in the derivatives researcher's _public_data |
 | moskowitz-grinblatt-1999 industry momentum (the derivatives researcher) | sector ETF history >10y, PIT GICS | PARTIAL: ETFs from 2016 only in store (Alpaca SIP starts 2016); GICS current only |
 | jegadeesh-1990 ST reversal (the derivatives researcher) | daily returns, FF ST_Rev | COVERED |
@@ -315,10 +315,10 @@ Legend: COVERED = in store now; PARTIAL = usable with caveats; NO = not in store
 | cohen-malloy-pomorski-2012 insiders (the sentiment researcher) | Form 4 filings, ticker-CIK map | PARTIAL: ticker-CIK map COVERED; Form 4 not pulled (free on EDGAR, next step) |
 | ke-kelly-xiu-2019 / price-2012 call tone (the sentiment researcher) | news text / call transcripts | NO (Alpaca news is pullable, transcripts are paid) |
 | greenwood-sammon-2025 index effect (the sentiment researcher) | S&P add/drop dates + announcement dates, bars | PARTIAL: effective dates COVERED; announcement dates NO (Wikipedia has effective date only) |
-| tsmom-moskowitz 2012; trend-century 2017 (Maya) | cross-asset ETF adjusted bars 15y+, T-bill | PARTIAL: 49 ETFs from 2016 only (Alpaca limit); BIL plus FF RF as T-bill; pre-2016 needs another source |
-| carry-koijen 2018 (Maya) | rates curves, futures, dividend yields | NO (futures/rates not in store); dividends for ETFs COVERED |
-| pre-fomc-drift-lucca-moench-2015 (Maya) | FOMC timestamps, intraday SPY | PARTIAL: FOMC calendar COVERED 2016-2027; intraday SPY NO (next step) |
-| macro-announcement-premium-savor-wilson-2013 (Maya) | macro release calendar, SPY/IEF/TLT/BIL TR | PARTIAL: TR COVERED; release calendar BLOCKED (see Blockers) |
+| tsmom-moskowitz 2012; trend-century 2017 (the macro strategist) | cross-asset ETF adjusted bars 15y+, T-bill | PARTIAL: 49 ETFs from 2016 only (Alpaca limit); BIL plus FF RF as T-bill; pre-2016 needs another source |
+| carry-koijen 2018 (the macro strategist) | rates curves, futures, dividend yields | NO (futures/rates not in store); dividends for ETFs COVERED |
+| pre-fomc-drift-lucca-moench-2015 (the macro strategist) | FOMC timestamps, intraday SPY | PARTIAL: FOMC calendar COVERED 2016-2027; intraday SPY NO (next step) |
+| macro-announcement-premium-savor-wilson-2013 (the macro strategist) | macro release calendar, SPY/IEF/TLT/BIL TR | PARTIAL: TR COVERED; release calendar BLOCKED (see Blockers) |
 | daniel-moskowitz-2016; barroso-santa-clara-2015 (the risk manager) | SPY daily 2y+, momentum factor daily | COVERED (SPY TR, FF Mom daily) |
 | khandani-lo-2011 (the risk manager) | fundamentals B/M, E/P, earnings surprise | PARTIAL (XBRL + earnings events) |
 | moreira-muir-2017, ledoit-wolf-2004, HRP-2016, beta-estimation (PC) | 10y+ clean PIT daily returns, factors | COVERED (10.8y SIP from 2016-01; FF factors back to 1926/1963) |
@@ -397,7 +397,7 @@ It works from any desk venv: it needs only the stdlib, pandas and pyarrow, plus 
   - `alfred_vintages(id, start, end)`: every vintage of each observation, with `realtime_start`/`realtime_end`.
     - Uses output_type=1. FRED allows at most 2000 vintage dates per request, so the real-time axis is split into chunks of 1900 vintage dates and re-merged.
   - `fred_vintage_dates(id)`, `fred_series_info(id)`, `fred_release_dates(release_id)` (e.g. 18 = H.15), and the raw `fred_get` / `fred_get_all`.
-- **Point-in-time reads from the local store**, which is how Maya and every other reader should consume the data:
+- **Point-in-time reads from the local store**, which is how the macro strategist and every other reader should consume the data:
   - `alfred_asof(id, asof_et)` gives the value of each observation as known at `asof` (naive = New York time), using only vintages with `available_at_et <= asof`.
   - `alfred_first_available(id)` gives the "as first available" view.
   - `alfred_store(id)` gives all stored vintages.
@@ -413,7 +413,7 @@ y10 = ddc.alfred_asof("DGS10", "2022-04-04 17:00")  # what was known at 17:00 ET
 hy = ddc.alfred_asof("BAMLH0A0HYM2", pd.Timestamp("2026-10-29 22:30", tz="Asia/Singapore"))
 ```
 
-### 13. ALFRED vintage datasets (Maya: curve / carry / credit): frozen, dated, sha256-verified
+### 13. ALFRED vintage datasets (the macro strategist: curve / carry / credit): frozen, dated, sha256-verified
 Built by `pipelines/alfred_store.py`; observation start 2004-01-01. Every run writes **new dated, read-only (0444) files**. Earlier files are never overwritten. Check them with `sha256sum -c SHA256SUMS_<group>_<YYYYMMDD>.txt`.
 
 | group | dir | series | rows (vintages / obs) | coverage |

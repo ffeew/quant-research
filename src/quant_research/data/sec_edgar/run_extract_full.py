@@ -1,5 +1,5 @@
 """Full EX-99.1 EPS extraction across edgar_8k_202 events. Resume-safe checkpoint.
-No prices/returns. Uses exhibits.parquet (or ethan-cache fallback) for URLs.
+No prices/returns. Uses exhibits.parquet (or the research-cache fallback file) for URLs.
 """
 
 from __future__ import annotations

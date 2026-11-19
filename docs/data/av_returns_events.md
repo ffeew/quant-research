@@ -1,5 +1,5 @@
 # av_returns_events_20261111 (the data engineer, data engineer)
-Purpose: daily prices, earnings report dates and sectors for the sentiment researcher's sentiment prereg (draft). Approved: Daniel 13:29 SGT 11 Nov 2026 (relayed by the fund manager). Plan: PLAN.md.
+Purpose: daily prices, earnings report dates and sectors for the sentiment researcher's sentiment prereg (draft). Approved: the desk head 13:29 SGT 11 Nov 2026 (relayed by the fund manager). Plan: PLAN.md.
 Raw: raw/{daily,earnings,overview}/<SYM>.json, AV bytes as received (TIME_SERIES_DAILY_ADJUSTED full x51 incl SPY; EARNINGS x50; OVERVIEW x50). raw/SHA256SUMS. Hash-only.
 Partitioned (split_validate.py, reviewed by the validator, run offline): boundary per validator: DEV <= 2024-12-31, HOLDOUT 2025-01-01..2026-10-31 (first session 2025-01-02).
 - dev/daily_dev.csv, holdout/daily_holdout.csv: symbol,date,close,adjusted_close,dividend,split_coefficient (AV strings verbatim), 2021-03-01..2026-10-31.

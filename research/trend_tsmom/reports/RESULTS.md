@@ -1,6 +1,6 @@
 # Cross-asset trend sleeve (TSMOM, ETFs only) replication: RESULTS
 
-**Owner:** Maya (Macro Strategist) · **Run:** Fri 30 Oct 2026, ~01:50 SGT · **Status:** replicated, awaiting validation (the validator). Research only: no orders and no broker calls.
+**Owner:** the macro strategist · **Run:** Fri 30 Oct 2026, ~01:50 SGT · **Status:** replicated, awaiting validation (the validator). Research only: no orders and no broker calls.
 **Papers:**
 - `tsmom-moskowitz-ooi-pedersen-2012`: 12m sign, 40% vol per asset
 - `trend-century-hurst-ooi-pedersen-2017`: 1/3/12 blend, 10% book vol

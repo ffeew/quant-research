@@ -1159,7 +1159,7 @@ def compute(
         header=DECL_D,
         prereg="PREREG_H3_DRAFT_v2.md ecce2bbf",
         seal="40ddcc9c (S1-S6)",
-        rulings="the validator (51c8ca77), (c37eedb2), (1eb03efe)",
+        rulings="the validator's rulings",
         env=ENV,
         calendar=facts,
         inputs=inputs,

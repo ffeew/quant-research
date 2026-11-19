@@ -27,7 +27,7 @@
 - **Risk limits:** `$QR_DESK_DIR/risk/LIMITS.md` **v0.3.7** (the risk manager; read-only; header parsed at run time by `limits_version`). State files: `risk/state/panic_flag.json`, `risk/state/breaker_state.json` (read-only).
 - **Validation standard:** the validator's pass bar in `$QR_DESK_DIR/validation/verdicts-log.md`.
 
-## 0. Desk constraints (hard; from risk/ and Daniel's brief)
+## 0. Desk constraints (hard; from risk/ and the desk head's brief)
 - About $100k Alpaca **paper** equity (99,997.56 in performance/history.csv on 2026-10-30).
 - Long/short US-listed equities and ETFs only: no options, no leverage. **Crypto is ruled out entirely** (CIO, 2026-10-30): hard exclusion in code, see §4a.6.
 - Limits:
@@ -227,7 +227,7 @@ The composite is Σ_k sw_k·m_s(k)·p_s(k)·Z_k, divided by the cross-sectional 
   - RESUMED_DISARMED with a missing or invalid `backstop_equity` → **fail-safe HALVED**.
 - **LIMITS v0.3.5 T4 (v0.7), as implemented:**
   - Lifts:
-    - Exit (i) is automatic on shadow conditions plus a CIO review. Exit (ii) is discretionary, needs Daniel's explicit logged OK, and resumes as RESUMED_DISARMED.
+    - Exit (i) is automatic on shadow conditions plus a CIO review. Exit (ii) is discretionary, needs the desk head's explicit logged OK, and resumes as RESUMED_DISARMED.
     - Every exit-(ii) lift **resets** the episode backstop.
     - Construction **never infers a lift**. Only the `state` in `breaker_state.json` counts: HALTED never allows new trades, whatever `current_equity` is.
     - Lift or episode fields, if Risk adds them, are passed through verbatim (`lift_fields_in_file`). They are never used to relax anything.
@@ -239,7 +239,7 @@ The composite is Σ_k sw_k·m_s(k)·p_s(k)·Z_k, divided by the cross-sectional 
   - Tests: `test_t4_*` (3) in `tests/test_risk_state.py`, and `test_E_episode_backstop_hit_in_normal_state`.
   - **Discrepancies (reported, not edited; files are the risk manager's):**
     1. The `breaker_state.json` legend still says "backstop = 0.97 x equity at resumption". The LIMITS §2b body text still describes E_resume × 0.97. Both pre-date the v0.3/v0.3.2/v0.3.5 episode rule (tighter of 0.97 × resume and 0.92 × peak, set once per episode, reset on each exit-(ii) lift). Construction takes the number in the file, so the conflict only matters if Risk computes it with the old rule.
-    2. The file has no episode or lift fields, so construction cannot verify that an exit-(ii) lift carries Daniel's logged OK. It relies on Risk's `state` alone.
+    2. The file has no episode or lift fields, so construction cannot verify that an exit-(ii) lift carries the desk head's logged OK. It relies on Risk's `state` alone.
     3. As of 01:55 SGT the file reads NORMAL, `backstop_equity: null`, `halt_armed: true`. No episode is active, so there is no backstop check this run.
 - **Any unknown state → fail-safe HALVED 30%** (unchanged; now tested with new states and wrong case). The optimiser uses cap − 1pp (58% or 29%).
 - The SPY hedge must also fit under the cap.

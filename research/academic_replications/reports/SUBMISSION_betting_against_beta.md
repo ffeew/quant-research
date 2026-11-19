@@ -1,6 +1,6 @@
 # Validation submission: Betting against beta / low volatility (Frazzini & Pedersen 2014)
 
-> **Status: FAILED** (the validator, 2026-10-30; validation/replication_checks/2026-10-30-dave-replications.md). Corrections applied 2026-10-30 02:26 SGT after his check.
+> **Status: FAILED** (the validator, 2026-10-30). Corrections applied 2026-10-30 02:26 SGT after his check.
 
 Submitted by the derivatives researcher (Quant Research) to the validator, 2026-10-30 01:47 SGT. Built against validation/STANDARD.md v1.0. Self-assessment only; the verdict is the validator's.
 

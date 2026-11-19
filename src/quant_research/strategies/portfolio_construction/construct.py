@@ -73,7 +73,7 @@ Pipeline
       (beta floor, loser-short ban) are pending validation: applied as written, logged t8_status=pending_validation.
       A file that still says provisional is context only (--panic_provisional context, default; 'apply' forces it).
     * BREAKER (T4, change log v0.3-v0.3.5): RESUMED_DISARMED = 30% gross cap; backstop_equity is read from breaker_state.json as Risk's
-      CURRENT EPISODE backstop (reset by Risk on every exit-(ii) lift, which needs Daniel's logged OK) and never
+      CURRENT EPISODE backstop (reset by Risk on every exit-(ii) lift, which needs the desk head's logged OK) and never
       recomputed; construction never infers a lift or re-arm (HALTED stays de-risk only until Risk's file changes).
       Run equity <= backstop in any non-HALTED state -> treated as HALTED. Unknown state, an invalid backstop, or
       halt_armed=false outside RESUMED_DISARMED -> FAIL-SAFE HALVED 30%.

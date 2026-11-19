@@ -24,7 +24,7 @@ This enforces the entry API route; it does not sandbox arbitrary Python or remov
 ## Evidence and binding restrictions
 Fund manager reports data owner TR basis **NOT_AVAILABLE**, with corporate-actions/B7/PIT blockers. Verified decision section A identifies as NOT_AVAILABLE FYI, not a validation decision. No exact receipt path/full hash supplied there; receipt not searched for/read/independently certified. This is not merely a promised pending certificate; no acquisition/repair or completion promise. The TCA owner's static signed estimator receipt remains SATISFIED but cannot solve actual TR basis.
 
-Still blocked: accepted PCG64/runtime byte lock; independent full NB2/readback and real-adapter wiring approval; B1–B7/B11/B13/NB3/NB4/RIGHTS; matching sector freeze+RUNLOG; P1 rules re-pin at separately authorized freeze; Daniel own-words real-run approval. No audit/seen-map receipt invented. D3 still bars paper trading, promotion and allocation regardless numerical results. Optional H48 unchanged/inactive/unreviewed; +1 charged/floor177, no24th PBO column, O1–O3 unchanged. No earnings-control rework.
+Still blocked: accepted PCG64/runtime byte lock; independent full NB2/readback and real-adapter wiring approval; B1–B7/B11/B13/NB3/NB4/RIGHTS; matching sector freeze+RUNLOG; P1 rules re-pin at separately authorized freeze; the desk head's own-words real-run approval. No audit/seen-map receipt invented. D3 still bars paper trading, promotion and allocation regardless numerical results. Optional H48 unchanged/inactive/unreviewed; +1 charged/floor177, no24th PBO column, O1–O3 unchanged. No earnings-control rework.
 
 **fixed D3 claim limitation (not a test result)**
 

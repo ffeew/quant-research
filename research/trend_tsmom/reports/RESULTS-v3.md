@@ -1,6 +1,6 @@
 # RESULTS v3: limits-compliant ETF trend sleeve (single pre-registered run)
 
-**Owner:** Maya (Macro Strategist) · **Run:** Fri 6 Nov 2026, 06:21:23 → 06:21:59 SGT · **Spec:** `PREREG-v3.md` (§1–§12; validator A1–A6, §9.B/§9.C, option-(b) data rules).
+**Owner:** the macro strategist · **Run:** Fri 6 Nov 2026, 06:21:23 → 06:21:59 SGT · **Spec:** `PREREG-v3.md` (§1–§12; validator A1–A6, §9.B/§9.C, option-(b) data rules).
 **One command:** `.venv/bin/python run_v3.py run` (after one authorised `pin` and a clean `preflight`). Unit checks at run: 106/106 PASS. **Outputs:** `outputs_v3/` (v1/v2 outputs untouched).
 **Single-run statement:** this is the one pre-registered v3 execution. No retry, no alternate data, no parameter change. Research only; not a trade.
 

@@ -23,7 +23,7 @@ LIMITS.md (current header read at run time by limits_version(); v0.3.7 at 2026-1
   * Breaker states (§2b): NORMAL 60% | HALVED 30% | HALTED 30%, no new trades (de-risk only, book held) |
     RESUMED_DISARMED 30%, new trades allowed, H9 disarmed, backstop_equity = the current EPISODE backstop as
     set by Risk (v0.3 (a) level; set once per drawdown episode (v0.3.2), reset by Risk on a resume at/below it (v0.3.3(1))
-    and on every exit-(ii) lift (v0.3.5(a)); exit (ii) needs Daniel's logged OK and never fires automatically). We never
+    and on every exit-(ii) lift (v0.3.5(a)); exit (ii) needs the desk head's logged OK and never fires automatically). We never
     compute the level or infer a lift. backstop_equity is logged. RESUMED_DISARMED with a missing/invalid backstop_equity -> FAIL-SAFE
     HALVED (30%); live current_equity <= backstop_equity -> treated as HALTED (re-halt per §2b) until Risk updates the file.
     Any unknown state -> FAIL-SAFE HALVED 30%.
