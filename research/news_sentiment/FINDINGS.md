@@ -14,7 +14,7 @@ Pre-registered specs; 72 statistics across two universes; gross and net long-sho
 
 ## Results
 - FAIL on seen data. Example: text_lm_prev_open L/S r1 gross -0.7 bp, net -26.3 bp.
-- Caveat (survivorship): the SECTOR-LM sector grouping uses a current-snapshot GICS classification from the universe file, which is missing for names delisted during DEV, so those names drop out of the sector scores; DEV results are survivorship-suspect. The grouping moves to a point-in-time EDGAR SIC-4 map in a new prereg version; no reruns until that map is accepted.
+- Caveat (survivorship): the SECTOR-LM sector grouping uses a current-snapshot GICS classification from the universe file, which is missing for names delisted before the snapshot, so those names drop out of the sector scores; the seen-sample results are survivorship-suspect. The grouping moves to a point-in-time EDGAR SIC-4 map in a new prereg version; no reruns until that map is accepted.
 
 ## Code
 - Entry point: `qr run news_sentiment` (`python -m quant_research.strategies.news_sentiment.prereg_run`)
