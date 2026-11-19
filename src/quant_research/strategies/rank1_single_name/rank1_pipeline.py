@@ -59,7 +59,7 @@ def evaluate_fabricated_card(
         capture_active=False,
         claim_label_context=gate["claim_label_context"],
         pending_semantics=[
-            "Q4 signed estimator receipt SATISFIED; Dmitri actual TR-basis certification OPEN; no mock adoption"
+            "Q4 signed estimator receipt SATISFIED; data owner actual TR-basis certification OPEN; no mock adoption"
         ],
     )
 

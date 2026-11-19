@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Daily updater for the frozen S&P 500 index history (Rachel / Risk).
+"""Daily updater for the frozen S&P 500 index history (the risk manager / Risk).
 
 Run (after the close, each trading day):
     $QR_DATA_DIR/.venv/bin/python $QR_DATA_DIR/pipelines/update_sp500_index.py

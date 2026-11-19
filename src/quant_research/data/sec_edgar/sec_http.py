@@ -1,4 +1,4 @@
-"""SEC EDGAR fetcher for Dave's derived controls: stdlib only, cached, rate-limited.
+"""SEC EDGAR fetcher for the derivatives researcher's derived controls: stdlib only, cached, rate-limited.
 
 - User-Agent from env SEC_USER_AGENT ("<Org> <contact email>", per SEC fair-access policy).
   The default matches the desk pipeline convention (data/pipelines/earnings.py).
@@ -21,12 +21,14 @@ import urllib.request
 from pathlib import Path
 from typing import Any, cast
 
+from quant_research.utils import env as _env
+
 HERE = Path(__file__).resolve().parent
 RAW = HERE / "raw" / "sec"
 STATE = HERE / "cache" / "sec_rate.state.json"
 LEDGER = HERE / "cache" / "sec_requests.log"
 UA = os.environ.get("SEC_USER_AGENT", "CIO-Desk-Research research-data@example.com")
-RPS = float(os.environ.get("DAVE_SEC_RPS", "8"))
+RPS = float(_env.getenv("RESEARCH_SEC_RPS", "8"))
 BURST = 4.0
 
 

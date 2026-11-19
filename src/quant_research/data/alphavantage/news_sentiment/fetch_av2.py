@@ -5,7 +5,7 @@ import datetime
 import hashlib
 import json
 
-# v2 fetcher, $QR_DATA_DIR/av_sentiment_20261110. Adds Jeremy's 23:19 SGT approval: +600 split calls
+# v2 fetcher, $QR_DATA_DIR/av_sentiment_20261110. Adds +600 split calls
 # (total SPLIT calls <= 800 incl. R1's 158), half-month -> weekly re-split, R1 re-split pass (R1b).
 # News runs split smaller (R2a..R4b) to stay under 35 min. Metadata parse only: len(feed). No scores read.
 # Usage: python3 -I -B $QR_DATA_DIR/av_sentiment_20261110/fetch_av2.py <R1b|R2a|R2b|R3a|R3b|R4a|R4b|R6|R7|R8>

@@ -1,4 +1,4 @@
-"""ALFRED real-time vintage store for Maya's curve / carry / credit specs. Uses lib/desk_data_client (FRED throttle +
+"""ALFRED real-time vintage store for the macro strategist's curve / carry / credit specs. Uses lib/desk_data_client (FRED throttle +
 cache). Writes FROZEN dated files (read-only, 0444) plus SHA256SUMS per group; never overwrites an existing dated file.
 
 Groups (priority order):

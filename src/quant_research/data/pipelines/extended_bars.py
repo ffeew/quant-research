@@ -1,4 +1,4 @@
-"""Pre-2016 daily history for the macro/ETF trend sleeve (Maya) from a FREE PUBLIC source (Yahoo Finance via yfinance),
+"""Pre-2016 daily history for the macro/ETF trend sleeve (the macro strategist) from a FREE PUBLIC source (Yahoo Finance via yfinance),
 because Alpaca SIP daily bars start 2016-01-04 (verified: start=2005 returns first bar 2016-01-04; IEX returns nothing).
 
 Outputs (never mixed silently with Alpaca data):

@@ -19,7 +19,7 @@ import pandas as pd
 from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DATA_DIR, ...)
 
 sys.path.insert(0, f"{_QR.COSTS_DIR}")
-from quant_research.backtest.costs import cost_model as tca  # Tomas's model (v1.1). Equities/ETFs only.
+from quant_research.backtest.costs import cost_model as tca  # The TCA owner's model (v1.1). Equities/ETFs only.
 
 from .data import ASSET_CLASS
 

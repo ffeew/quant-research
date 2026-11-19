@@ -1,13 +1,13 @@
 # RESULTS v2: unlevered, lower-cost ETF trend sleeve (pre-registered)
 
-**Owner:** Maya (Macro Strategist) · **Run:** Fri 30 Oct 2026, 01:37 SGT · **Spec:** `PREREG-v2.md` §1–§8 plus Amendments A1 (Victor) and A2 (STANDARD.md items). Both amendments were logged before the run.
+**Owner:** the macro strategist · **Run:** Fri 30 Oct 2026 · **Spec:** `PREREG-v2.md` §1–§8 plus Amendments A1 (the review) and A2 (STANDARD.md items). Both amendments were logged before the run.
 **One command:** `.venv/bin/python run_v2.py` (unit checks: `.venv/bin/python -m tests.test_v2_engine`, 23/23 PASS) · **Outputs:** `outputs_v2/` (v1 `outputs/` untouched)
 **Hashes:**
-- outputs_v2 directory: `1a19555e870896865cd3af470cbc4647138d2fa8f6f1748db7980d43f6a0039d`. This is the sha256 of `outputs_v2.MANIFEST.sha256`, the per-file sha256 list with sorted paths.
-- Data build: TR `0590692d…29db`.
-- Cost model: Tomas v1.1 `df67d604…eebf`, unchanged from the pre-registration.
-- Code: combined `69f39bf7…0337`.
-- PREREG-v2.md at run time: `db90f920…bda`.
+- outputs_v2 directory. This is the sha256 of `outputs_v2.MANIFEST.sha256`, the per-file sha256 list with sorted paths.
+- Data build: TR.
+- Cost model: TCA owner v1.1, unchanged from the pre-registration.
+- Code: combined.
+- PREREG-v2.md at run time.
 - Full values are in `outputs_v2/meta.json`.
 
 Crypto remains excluded by desk decision.
@@ -23,7 +23,7 @@ Even a clear would only have meant "eligible for Stage B" (A1.1), not a pass.
 | # | Criterion (PREREG §5 + A1) | V1 value | Met |
 |---|---|---|---|
 | 1 | Net Sharpe ≥ 0.40 | **0.395** | **NO** (near miss; not rounded) |
-| 2 | Tomas flag PASS (net > 0 at 2× costs AND cost ≤ 50% of gross) | PASS: net at 2× costs +2.66%/yr; costs are 10.5% of gross | yes |
+| 2 | TCA owner flag PASS (net > 0 at 2× costs AND cost ≤ 50% of gross) | PASS: net at 2× costs +2.66%/yr; costs are 10.5% of gross | yes |
 | 3 | Net max drawdown ≥ −15% | **−16.4%** | **NO** |
 | 4a | Net Sharpe excluding 2022 > 0 | 0.34 | yes |
 | 4b | Net return > 0 in ≥ 2 of 3 subperiods | 3/3 | yes |
@@ -61,7 +61,7 @@ The largest single trade was 0.22% of 20-day ADV at $1M NAV, so STANDARD §8 (�
 Net Sharpe roughly doubled because costs fell by more than 90%. But the gross edge also halved, and what is left is not statistically distinguishable from zero (Sharpe SE 0.32).
 
 ## Secondary variants (descriptive only; cannot rescue the sleeve)
-| Variant | Gross ret / SR | Net ret | Net vol | **Net SR** (t) | Net max DD | Turnover | Avg cost (bps) | Corr SPY (d) | Tomas |
+| Variant | Gross ret / SR | Net ret | Net vol | **Net SR** (t) | Net max DD | Turnover | Avg cost (bps) | Corr SPY (d) | the TCA owner |
 |---|---|---|---|---|---|---|---|---|---|
 | **V1 PRIMARY** (CORE-L12, L/S where shortable, M) | 3.4% / 0.44 | 3.0% | 7.6% | **0.395** (1.23) | −16.4% | 3.2× | 8.2 | 0.11 | PASS |
 | V2 long/flat | 4.3% / 0.47 | 4.0% | 9.2% | 0.439 (1.37) | −22.1% | 3.0× | 7.9 | **0.63** | PASS |
@@ -88,7 +88,7 @@ V[SR] always comes from the 24 logged trials; only N varies (A1.2).
 | **gross** (Stage A gate) | 0.149 | 0.295 / **0.62** | 0.309 / 0.61 | 0.339 / 0.57 |
 | all-net | 0.734 | 1.453 / 0.0005 | 1.521 / 0.0002 | 1.670 / 0.0000 |
 
-- At Victor's N = 30, DSR is 0.61 in the gross version and about 0 in the all-net version. Both are far below 0.95.
+- At the review's N = 30, DSR is 0.61 in the gross version and about 0 in the all-net version. Both are far below 0.95.
 - The all-net version is degenerate: the v1 fast and levered trials lost up to −2.4 Sharpe net, which inflates the dispersion. It is reported as A1.2 requires.
 
 ## PBO via CSCV (A1.4)
@@ -167,14 +167,14 @@ The band saved about 0.6× turnover and added about 0.04 to net Sharpe.
 ## Caveats / limitations
 1. **Not out-of-sample.** 2017–2026 was fully seen in v1, and the v2 design was informed by v1's attribution (PREREG §1). Stage B on the 2005+ backfill is the real test. `bars/daily/extended/etf_total_return_spliced.parquet` exists but was **not read**.
 2. **Shortability look-ahead (A1.5).** Today's (2026-10-29) Alpaca shortable/ETB flags are applied to the whole history. USO is long/flat for this reason. Historical borrow availability is unknown.
-3. **Data build moved between pre-registration and run.** The TR file's sha256 was `87d09bb9…` at pre-registration (01:29 build) and `0590692d…` at run time (rebuilt 01:32:38 SGT). Per PREREG §2, all 19 v1 trials were re-run on the new build. They reproduce the v1-logged Sharpes to 3 decimals (e.g. baseline net 0.203, gross 0.607), so the rebuild did not move these ETFs materially.
+3. **Data build moved between pre-registration and run.** The TR file's sha256 was at pre-registration (01:29 build) and at run time (rebuilt). Per PREREG §2, all 19 v1 trials were re-run on the new build. They reproduce the v1-logged Sharpes to 3 decimals (e.g. baseline net 0.203, gross 0.607), so the rebuild did not move these ETFs materially.
 4. **Fills** are at the next session's close (lag 1), not STANDARD §2's "next-bar open or worse" open fill.
-5. **Borrow** base is Tomas's 25 bps. At STANDARD's 1%/yr floor, net Sharpe falls to 0.36.
-6. **No VIX series in the desk store**, so STANDARD §7's VIX regime split is not reported (gap; Dmitri).
+5. **Borrow** base is the TCA owner's 25 bps. At STANDARD's 1%/yr floor, net Sharpe falls to 0.36.
+6. **No VIX series in the data store**, so STANDARD §7's VIX regime split is not reported (gap; the data owner).
 7. **Universe** is today's surviving ETFs (no delisted ETFs). STANDARD's 20% survivorship haircut would cut net Sharpe to about 0.32.
 8. **Short sample.** 9.7 years gives a Sharpe SE of 0.32. The 0.395 vs 0.40 miss is far inside noise in both directions. The verdict is applied strictly as pre-registered, not because 0.005 is meaningful.
 9. **Partial parameter neighbourhood.** Only lookback ±25% and vol target ±20% were perturbed, as A1.3 specified. Band width, cap and EWMA centre of mass were not perturbed, and no joint perturbation was run.
-10. **Cost model.** Spreads are bucket defaults, not measured; ETF CA records are missing (TR index used). Both are open with Tomas and Dmitri.
+10. **Cost model.** Spreads are bucket defaults, not measured; ETF CA records are missing (TR index used). Both are open with the TCA owner and the data owner.
 
 ## Files (`outputs_v2/`)
 - **Trials and returns:** `trial_log_24.csv` (all 24 trials with configs), `returns_matrix_{net,gross}_Tx24.csv`.
@@ -186,5 +186,5 @@ The band saved about 0.6× turnover and added about 0.04 to net Sharpe.
 - **Directory hash:** manifest at `../outputs_v2.MANIFEST.sha256`, hash at `../outputs_v2.HASH.txt`.
 
 ## Next steps (proposals only; any of them is a new trial and needs a new pre-registration)
-- **Stage B:** run the frozen V1 spec unchanged on the 2005+ backfill (needs Dmitri's sign-off on the spliced file). This is the only route to a STANDARD verdict, and it requires DSR ≥ 0.95 and net Sharpe > 0.5.
+- **Stage B:** run the frozen V1 spec unchanged on the 2005+ backfill (needs the spliced file accepted first). This is the only route to a STANDARD verdict, and it requires DSR ≥ 0.95 and net Sharpe > 0.5.
 - **Optional new pre-registration:** a long-only-plus-trend-overlay or vol-target-8% variant would have to be pre-registered as new trials (N → 25+) and judged on Stage B only.

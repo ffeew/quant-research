@@ -1,6 +1,6 @@
-"""Sofia H1/H2 Alpha Vantage DATA REBUILD (data only; no returns/signals/backtests).
+"""stat-arb researcher H1/H2 Alpha Vantage DATA REBUILD (data only; no returns/signals/backtests).
 Key: read from env ALPHAVANTAGE_API_KEY only; never printed/logged/written. All messages redacted.
-Limiter: <=15 requests per rolling 60s AND >=4.1s spacing (Sofia share of desk 75/min).
+Limiter: <=15 requests per rolling 60s AND >=4.1s spacing (this pull's share of the 75/min key limit).
 No-overwrite: skip if any file for symbol exists; write temp then os.link (atomic EXCL) to final."""
 
 from __future__ import annotations
@@ -24,6 +24,7 @@ from typing import Any, cast
 import pandas as pd
 
 from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DATA_DIR, ...)
+from quant_research.utils.pins import desk_pin
 
 KEY = os.environ.get("ALPHAVANTAGE_API_KEY") or ""
 ROOT = Path(f"{_QR.DESK_DIR}")
@@ -33,7 +34,7 @@ LOGS = ROOT / "data/alphavantage/logs"
 WORK = ROOT / "statarb/av_rebuild_20261110"
 TS = sys.argv[1]
 MEMBERSHIP = ROOT / "data/universe/sp500_membership.parquet"
-MEMBERSHIP_SHA = "d3e01d89c840c9f4c83ca35bd375e458657122dc63cc474022919e6c3ca33763"
+MEMBERSHIP_SHA = desk_pin("data.alphavantage.daily_adjusted.fetch_av_h1h2", "MEMBERSHIP_SHA")
 LOAD0, HOLD1 = pd.Timestamp("2015-12-31"), pd.Timestamp("2026-10-28")
 ETFS = ["XLK", "XLF", "XLE", "XLV", "XLY", "XLP", "XLI", "XLU", "XLB", "XLRE", "XLC", "SPY", "AGG", "BND"]
 HEADER = [
@@ -164,7 +165,7 @@ def call(params: dict[str, str]) -> tuple[str, bytes | None, str]:
 
 def excl_write(final: Path, data: bytes) -> bool:
     """Temp in same dir, then hard-link (fails if final exists: atomic no-clobber)."""
-    tmp = final.parent / f".{final.name}.sofia.{os.getpid()}.tmp"
+    tmp = final.parent / f".{final.name}.research.{os.getpid()}.tmp"
     fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644)
     try:
         os.write(fd, data)

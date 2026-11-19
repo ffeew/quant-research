@@ -1,6 +1,6 @@
-"""Curve episode gate, Victor follow-up ruling (2026-10-30 ~02:06 SGT).
+"""Curve episode gate, validation follow-up decision (2026-10-30).
 SIGNAL INPUTS ONLY: DGS2/DGS10 (+ the USO session calendar from the store, used only for its NYSE session dates). No ETF prices or returns.
-Merge rule (ruling (1)): an exit to neutral followed by a SAME-direction re-entry within 4 weeks (<= 28 calendar days between the last active
+Merge rule (decision (1)): an exit to neutral followed by a SAME-direction re-entry within 4 weeks (<= 28 calendar days between the last active
 weekly evaluation and the re-entry evaluation) counts as ONE episode. Opposite-direction flips are never merged.
 v1.1 = the frozen threshold rule (+/-25bp in, back inside the band out). v1.2 = hysteresis: enter |dS| >= 25bp; exit to flat only when dS <= +10bp
 (long-steepener state) / >= -10bp (flattener state); dS past the opposite 25bp reverses directly.

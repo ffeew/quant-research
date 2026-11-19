@@ -6,7 +6,7 @@ from typing import Any, cast
 #!/usr/bin/env python3
 """
 Portfolio construction model for the CIO desk (Alpaca PAPER).  READ-ONLY w.r.t. the desk:
-reads Dmitri's store (data/bars, data/universe, data/earnings) + desk_data_client (rule #5), $QR_DESK_DIR/{positions.json,orders_status.json,performance/history.csv},
+reads the data owner's store (data/bars, data/universe, data/earnings) + desk_data_client (rule #5), $QR_DESK_DIR/{positions.json,orders_status.json,performance/history.csv},
 writes only $QR_DESK_DIR/portfolio/targets_<date>.json (+ diagnostics).  Places NO orders.
 
 Pipeline
@@ -21,7 +21,7 @@ Pipeline
  5. Convex optimisation (cvxpy):  max α'w − tc/H·|w−w0|  s.t. ex-ante vol ≤ target, Risk-Manager limits,
     |β'w| ≤ beta_tol, sector caps, earnings blackout.  Then integer-share rounding + post-checks.
  6. Admission gate (FRAMEWORK.md §1): a signal is VALIDATED only if it passes the internal OOS test AND is
-    listed in --victor_passed (Victor's PASS / CONDITIONAL PASS in validation/verdicts-log.md).
+    listed in the Stage-A pass list given on the command line (a recorded PASS / CONDITIONAL PASS verdict).
  7. FALLBACK = SHADOW / DE-RISK ONLY (CIO-confirmed 2026-10-30, default --fallback derisk): with no validated
     signal the full optimised book is written to portfolio/shadow/targets_<date>.json (tradable=false,
     NOT FOR TRADING) and the tradable portfolio/targets_<date>.json may only trim / close / cover existing
@@ -46,22 +46,22 @@ Pipeline
       (buffer 1pp below), HALTED -> de-risk only, no new trades.
     * Covariance: Ledoit-Wolf (2004) optimal shrinkage intensity to constant correlation (default, --shrinkage lw);
       fixed 0.5 via --shrinkage fixed --shrink_delta 0.5. Risk-forecast inflation k (--risk_inflation, default 1.25)
-      multiplies ex-ante vol in the 6% book vol cap only (walk-forward bias 1.15-1.37 for MV on Dave's bars; MV-LW 1.20).
+      multiplies ex-ante vol in the 6% book vol cap only (walk-forward bias 1.15-1.37 for MV on the derivatives researcher's bars; MV-LW 1.20).
     * Hard asset exclusion: only US-listed equities/ETFs; crypto pairs can never enter any targets file.
-10. LIMITS.md alignment (current header read at run time, v0.3.7 at 02:28 SGT; CIO 01:58 + Risk rulings ~02:13/02:27/02:28; FRAMEWORK v0.6/v0.7):
-    * EARNINGS (H7, earnings_gate.py, Dmitri's data/earnings calendar, read-only): a name whose next release falls
+10. LIMITS.md alignment (current header read at run time, v0.3.7 at 02:28 SGT; risk decisions 01:58-02:28; FRAMEWORK v0.6/v0.7):
+    * EARNINGS (H7, earnings_gate.py, the data owner's data/earnings calendar, read-only): a name whose next release falls
       inside the holding horizon (execution session + --earn_horizon_sessions) may not be opened or increased on
       either side; a held position carries exit_by = last session before the release (AMC: the release day) and is
       closed now if exit_by is today. SHORTS are never held through their own release (no exceptions); a held LONG
       may be kept through only with a CIO exception (--earnings_hold_exceptions, 3x stop-gap stress = CIO's).
       DEFAULT POLICY risk_ruling_20261030_0227 (--earnings_policy; Risk decisions-log 2026-10-30 02:27):
-      (1) confirmed date -> standard H7, 10-session flag; (2) estimated date (Dmitri's next_earnings sidecar) -> window
+      (1) confirmed date -> standard H7, 10-session flag; (2) estimated date (the data owner's next_earnings sidecar) -> window
       opens 5 sessions before the earliest candidate minus the 10-session flag (15 sessions); shorts closed before the
       window opens, nothing opened/increased inside it; (3) estimated date outside the buffered horizon counts as known
       only if the last 8-K 2.02 is <= 45 days old, else unknown (tradable: no new/increased short; shadow: flagged);
       (4) no date row, or a calendar/sidecar > 1 US session stale (or sha256 mismatch/unreadable) -> FULL FAIL-SAFE
       (treated as reporting inside the window: no opens/adds, existing position closed this session, both books);
-      (5) earliest date across the current file applies. --earnings_policy strict = pre-ruling gate (estimated dates
+      (5) earliest date across the current file applies. --earnings_policy strict = pre-decision gate (estimated dates
       = unknown). ETFs are exempt. The manual --blackout list stays on top.
     * sigma_target (§5 T12): expanding-window median of the proxy sleeve's 126d realised vol once the proxy has
       >= 3 years (756 days) of history; before that the proxy's full-sample vol. 1x cap (m <= 1) unchanged.
@@ -73,15 +73,15 @@ Pipeline
       (beta floor, loser-short ban) are pending validation: applied as written, logged t8_status=pending_validation.
       A file that still says provisional is context only (--panic_provisional context, default; 'apply' forces it).
     * BREAKER (T4, change log v0.3-v0.3.5): RESUMED_DISARMED = 30% gross cap; backstop_equity is read from breaker_state.json as Risk's
-      CURRENT EPISODE backstop (reset by Risk on every exit-(ii) lift, which needs Daniel's logged OK) and never
+      CURRENT EPISODE backstop (reset by the risk process on every exit-(ii) lift, which needs a logged OK) and never
       recomputed; construction never infers a lift or re-arm (HALTED stays de-risk only until Risk's file changes).
       Run equity <= backstop in any non-HALTED state -> treated as HALTED. Unknown state, an invalid backstop, or
       halt_armed=false outside RESUMED_DISARMED -> FAIL-SAFE HALVED 30%.
-11. DESK RULE #5 (2026-10-30, FRAMEWORK v0.7): history only from Dmitri's store, live data only through
+11. Data-provenance rule (2026-10-30, FRAMEWORK v0.7): history only from the shared store, live data only through
     $QR_DATA_DIR/lib/desk_data_client.py. Book prices/vols/betas/cov/ADV: store (SIP, adjusted) for complete
     sessions + SIP 5-min intraday bars via the client for today's partial row. data.json is no longer read.
-    Sleeve proxy (--proxy_src store_pit): PIT S&P 500 members from the store, Victor's defect names + SNDK excluded,
-    PROVISIONAL until Dmitri's fixes land. Shadow book bumped to shadow_fallback_composite_v2; method_version "v2".
+    Sleeve proxy (--proxy_src store_pit): PIT S&P 500 members from the store, the validator's defect names + SNDK excluded,
+    PROVISIONAL until the data owner's fixes land. Shadow book bumped to shadow_fallback_composite_v2; method_version "v2".
 """
 
 import argparse
@@ -105,7 +105,7 @@ from quant_research.strategies.portfolio_construction import earnings_gate as eg
 from quant_research.strategies.portfolio_construction import targets_io as tio
 from quant_research.strategies.portfolio_construction.risk_state import ET, NYSE_HOLIDAYS, SGT, read_breaker, read_panic
 
-DDC_LIB = f"{_QR.DATA_DIR}/lib"  # DESK RULE #5: Dmitri's shared client (read-only; never edited here)
+DDC_LIB = f"{_QR.DATA_DIR}/lib"  # data-provenance rule: the shared data client (read-only; never edited here)
 if DDC_LIB not in sys.path:
     sys.path.insert(0, DDC_LIB)
 from quant_research.data.client import desk_data_client as ddc
@@ -116,7 +116,7 @@ LIMITS_VERSION = (
 )  # parsed from the risk/LIMITS.md header at run time (v0.3.7 at 02:28 SGT)
 METHOD_VERSION = "v2"  # method_version in every targets doc / log line (FRAMEWORK §8a)
 
-DEFECT_LABEL = "PROVISIONAL - data defects pending Dmitri's fixes"
+DEFECT_LABEL = "PROVISIONAL - data defects pending the data owner's fixes"
 DATA_ISSUES = f"{_QR.DESK_DIR}/validation/backtests/pead_long_pit/data_issues.json"
 
 # Stable identifiers for downstream consumers (Priya / Performance). Bump the version suffix ONLY on a material
@@ -130,8 +130,8 @@ SHADOW_DESCRIPTION = (
     "long/short by a mean-variance optimiser on a 120d Ledoit-Wolf constant-correlation covariance with a 6% ex-ante vol cap "
     "(forecast x1.25), |beta| <= 0.01 via an SPY hedge, sector, 9.5% position, 0.95% risk-to-stop and 58% (or breaker) gross "
     "caps, TCA cost model; 2xATR(14) stops. US equities/ETFs only. v2: sigma_target = expanding median of the 126d vol of a "
-    "PIT S&P 500 sleeve proxy from Dmitri's SIP store (Victor's defect names + SNDK excluded; PROVISIONAL), LIMITS H7 "
-    "earnings gate (default policy risk_ruling_20261030_0227), Risk's panic flag (binding when final; responses from the file), prices/volumes from Dmitri's store "
+    "PIT S&P 500 sleeve proxy from the data owner's SIP store (the validator's defect names + SNDK excluded; PROVISIONAL), LIMITS H7 "
+    "earnings gate (default: the 2026-10-30 02:27 policy), the risk panic flag (binding when final; responses from the file), prices/volumes from the shared store "
     "+ SIP intraday via desk_data_client (desk rule #5)."
 )
 TRADABLE_IDS = {
@@ -144,7 +144,7 @@ TRADABLE_IDS = {
     "FULL": (
         "tradable_validated_composite_v1",
         "Tradable validated composite v1",
-        "Tradable book on Victor-validated signals, same construction as the shadow composite.",
+        "Tradable book on validator-validated signals, same construction as the shadow composite.",
     ),
 }
 
@@ -185,7 +185,7 @@ for sec, names in {
         SECTOR[s] = sec
 
 # Desk universe (DESK RULE #5, 2026-10-30): the 117 US equities/ETFs of quant.py's list, frozen here (= SECTOR map keys).
-# data.json is no longer read. MMC is absent from Dmitri's store (Marsh McLennan trades as MRSH there); it was already
+# data.json is no longer read. MMC is absent from the data owner's store (Marsh McLennan trades as MRSH there); it was already
 # dropped under data.json (90 bars < 260), so the effective universe is unchanged at 116.
 DESK_UNIVERSE = sorted(SECTOR)
 HIST_CAL_DAYS = 420  # same window as quant.py (start = today - 420 calendar days)
@@ -193,7 +193,7 @@ DATA_PROVENANCE: dict[str, Any] = {}  # filled by load() / sleeve_vol_scaling();
 
 
 def load(args: Any) -> tuple[Any, ...]:
-    """DESK RULE #5. History: Dmitri's SIP store (bars/daily/adjusted) via desk_data_client.get_daily_bars (local parquet
+    """Data-provenance rule. History: the shared SIP store (bars/daily/adjusted) via desk_data_client.get_daily_bars (local parquet
     first; the client calls the API, throttled + cached, only for sessions after the store's coverage end). Today's
     partial row: SIP 5-min bars (adjustment=all, regular hours 09:30-16:00 ET) via desk_data_client.get_intraday_bars
     (end capped by the client at now-16 min: free-plan SIP). No data.json, no direct HTTP.
@@ -270,7 +270,7 @@ def load(args: Any) -> tuple[Any, ...]:
         raise SystemExit(f"unknown --live_source {args.live_source}")
     DATA_PROVENANCE.update(
         book_history=dict(
-            source=f"Dmitri's store {_QR.DATA_DIR}/bars/daily/adjusted (SIP, adjustment=all) via desk_data_client.get_daily_bars",
+            source=f"The data owner's store {_QR.DATA_DIR}/bars/daily/adjusted (SIP, adjustment=all) via desk_data_client.get_daily_bars",
             store_version=_store_version(),
             store_coverage_end=str(ddc.store_coverage("all")),
             window=[str(start), str(end)],
@@ -484,19 +484,19 @@ def sigma_target_rule(r: pd.Series, window: int = 126, rule: str = "limits", min
 
 
 def defect_names() -> set[str]:
-    """Victor's data_issues.json members_without_bars_symbols + SNDK (ticker reuse). Fail closed if unreadable."""
+    """the review's data_issues.json members_without_bars_symbols + SNDK (ticker reuse). Fail closed if unreadable."""
     try:
         iss = json.load(open(DATA_ISSUES))
         return set(iss["members_without_bars_symbols"]) | {"SNDK"}
     except Exception as e:
         raise SystemExit(
-            f"cannot read Victor's defect list {DATA_ISSUES} ({type(e).__name__}): store_pit proxy needs it; no targets written"
+            f"cannot read the validator's defect list {DATA_ISSUES} ({type(e).__name__}): store_pit proxy needs it; no targets written"
         )
 
 
 def load_store_pit(cutoff: Any, start: str = "2016-01-01") -> tuple[Any, ...]:
-    """PIT S&P 500 proxy panel from Dmitri's store (rule #5): bars/daily/adjusted for every current + former member
-    (universe.parquet roles sp500_current / sp500_former_since_2016) minus Victor's defect names and SNDK, via
+    """PIT S&P 500 proxy panel from the data owner's store (rule #5): bars/daily/adjusted for every current + former member
+    (universe.parquet roles sp500_current / sp500_former_since_2016) minus the review's defect names and SNDK, via
     desk_data_client.get_daily_bars(allow_api=False); zero_volume rows masked; membership mask from
     universe/sp500_membership.parquet ([start_date_filled, end_date)). SPY added for RS63. No delisting returns applied
     (same as the old proxy). Returns C, O, V, member mask M, info."""
@@ -525,7 +525,7 @@ def load_store_pit(cutoff: Any, start: str = "2016-01-01") -> tuple[Any, ...]:
         sel = (idx >= pd.Timestamp(start_raw)) & ((idx < e) if e is not None else True)
         M.loc[sel, r.symbol] = True
     info = dict(
-        source="Dmitri's store bars/daily/adjusted (SIP) via desk_data_client.get_daily_bars(allow_api=False); PIT membership universe/sp500_membership.parquet",
+        source="the data owner's store bars/daily/adjusted (SIP) via desk_data_client.get_daily_bars(allow_api=False); PIT membership universe/sp500_membership.parquet",
         store_version=_store_version(),
         span=[str(idx[0].date()), str(idx[-1].date())],
         n_symbols_loaded=len(cols),
@@ -561,19 +561,19 @@ def sleeve_vol_scaling(
     sigma_target (LIMITS §5 T12, rule='limits'): expanding median of the rolling 126d realised vol once >= min_days
     (3y) of proxy history, else the proxy's full-sample vol. rule='fullsample' = v0.5 behaviour."""
     pinfo = None
-    if (
-        proxy_src == "store_pit"
-    ):  # production (CIO 2026-10-30 ~02:12): PIT S&P 500 from Dmitri's store, defects excluded
+    if proxy_src == "store_pit":  # production (2026-10-30 ~02:12): PIT S&P 500 from the shared store, defects excluded
         Cp, Op, Vp, Mp, pinfo = load_store_pit(cutoff)
         alpha_names = list(Mp.columns)
         sigp = signals_panel(Cp, Op, Vp)
         R = Cp.pct_change(fill_method=None)
         Mv = Mp & Cp[alpha_names].notna()
         zf: Callable[[str], Any] = lambda k: masked_z(sigp[k][alpha_names], Mv)
-    elif proxy_src == "statarb":  # TESTS / AUDIT ONLY: Dave's deprecated IEX file via an explicit --proxy_path
+    elif (
+        proxy_src == "statarb"
+    ):  # TESTS / AUDIT ONLY: the derivatives researcher's deprecated IEX file via an explicit --proxy_path
         if not proxy_path:
             raise SystemExit(
-                "--proxy_src statarb needs an explicit --proxy_path (Dave's file is deprecated; tests/audit only, never production)"
+                "--proxy_src statarb needs an explicit --proxy_path (the derivatives researcher's file is deprecated; tests/audit only, never production)"
             )
         if not os.path.exists(proxy_path):
             raise SystemExit(f"sleeve proxy bars not found: {proxy_path}; no targets written")
@@ -588,7 +588,10 @@ def sleeve_vol_scaling(
         R = Cp.pct_change()
         alpha_names = [c for c in Cp.columns if c != HEDGE]
         zf = lambda k: sigp[k][alpha_names].apply(zscore_row, axis=1).fillna(0)
-        pinfo = dict(source=f"{proxy_path} (Dave's deprecated IEX bars; TEST/AUDIT ONLY)", status="NOT FOR PRODUCTION")
+        pinfo = dict(
+            source=f"{proxy_path} (the derivatives researcher's deprecated IEX bars; TEST/AUDIT ONLY)",
+            status="NOT FOR PRODUCTION",
+        )
     else:
         raise SystemExit(f"unknown --proxy_src {proxy_src}")
     DATA_PROVENANCE["sleeve_proxy"] = dict(pinfo, proxy_src=proxy_src)
@@ -664,9 +667,9 @@ def main() -> None:
         help="no validated signal: 'derisk' (CIO policy) = shadow book + de-risk-only tradable file",
     )
     ap.add_argument(
-        "--victor_passed",
+        "--validator_passed",
         default="",
-        help="comma list of signal keys with Victor PASS/COND PASS (none as of 2026-10-30)",
+        help="comma list of signal keys with validator PASS/COND PASS (none as of 2026-10-30)",
     )
     ap.add_argument(
         "--gp_ell",
@@ -711,7 +714,7 @@ def main() -> None:
         "--risk_inflation",
         type=float,
         default=1.25,
-        help="risk-forecast inflation k: ex-ante vol in the 6%% cap = k * sqrt(w'Sw). Source: walk-forward bias 1.15-1.37 (MV on Dave's bars), MV-LW 1.20",
+        help="risk-forecast inflation k: ex-ante vol in the 6%% cap = k * sqrt(w'Sw). Source: walk-forward bias 1.15-1.37 (MV on the derivatives researcher's bars), MV-LW 1.20",
     )
     ap.add_argument(
         "--run_ts",
@@ -739,7 +742,7 @@ def main() -> None:
         "--proxy_src",
         choices=["store_pit", "statarb"],
         default="store_pit",
-        help="sleeve backtest proxy: store_pit = PIT S&P 500 from Dmitri's SIP store, Victor's defect names + SNDK excluded (PROVISIONAL; production); statarb = Dave's deprecated IEX file via --proxy_path (tests/audit only)",
+        help="sleeve backtest proxy: store_pit = PIT S&P 500 from the data owner's SIP store, the validator's defect names + SNDK excluded (PROVISIONAL; production); statarb = the derivatives researcher's deprecated IEX file via --proxy_path (tests/audit only)",
     )
     ap.add_argument("--proxy_path", default=None, help="bars file for --proxy_src statarb (tests/audit only)")
     ap.add_argument(
@@ -769,7 +772,9 @@ def main() -> None:
         default="context",
         help="only for a flag file that still carries a provisional marker: context = report only, §3 responses not applied; apply = apply anyway. A FINAL flag (no marker, since 02:27 SGT) is always binding; fail-safe panic is always applied.",
     )
-    ap.add_argument("--earnings_dir", default=f"{ROOT}/data/earnings", help="Dmitri's earnings calendar (read-only)")
+    ap.add_argument(
+        "--earnings_dir", default=f"{ROOT}/data/earnings", help="the data owner's earnings calendar (read-only)"
+    )
     ap.add_argument(
         "--earn_horizon_sessions",
         type=int,
@@ -788,12 +793,12 @@ def main() -> None:
         "--earnings_policy",
         choices=list(eg.POLICIES),
         default=eg.POLICY_RULING,
-        help="risk_ruling_20261030_0227 (default; Risk decisions-log 02:27) or strict (pre-ruling: estimated dates = unknown)",
+        help="the 2026-10-30 02:27 earnings-gate policy (default) or strict (pre-decision: estimated dates = unknown)",
     )
     ap.add_argument(
         "--next_earnings_dir",
         default=eg.NEXT_DIR,
-        help="Dmitri's next_earnings sidecar dir; newest next_earnings_*.parquet is used",
+        help="the data owner's next_earnings sidecar dir; newest next_earnings_*.parquet is used",
     )
     ap.add_argument(
         "--next_earnings_file", default="", help="explicit sidecar file (tests); overrides the newest-file search"
@@ -896,7 +901,7 @@ def main() -> None:
     keys = ["MOM_12_1", "RS63", "TREND", "REV5", "PEAD"]
     stats, series = ic_study(sig, C, alpha_univ)
     sw, mode, passed, ic_shr, sigcorr = signal_weights(stats, series, keys)
-    vp = [x.strip() for x in a.victor_passed.split(",") if x.strip()]
+    vp = [x.strip() for x in a.validator_passed.split(",") if x.strip()]
     validated = [k for k in passed if k in vp]
     fallback_derisk = ((not validated) and a.fallback == "derisk") or halted  # HALTED -> de-risk only regardless
     gp = None
@@ -995,7 +1000,7 @@ def main() -> None:
     except FileNotFoundError:
         pass
     hs_meas = {k: float(np.mean(v)) for k, v in hs_meas.items()}
-    # Volumes are SIP (Dmitri's store, rule #5): ADV20 from the store; the TCA file's measured SIP ADV20 overrides
+    # Volumes are SIP (the data owner's store, rule #5): ADV20 from the store; the TCA file's measured SIP ADV20 overrides
     # where present. The old IEX->SIP scaling ratio is no longer needed (fixed at 1.0).
     adv_iex = (C[univ] * V[univ]).iloc[-20:].mean()  # name kept for diff clarity: this is SIP ADV20 now
     adv_sip = {}
@@ -1008,7 +1013,7 @@ def main() -> None:
     ratios = [adv_sip[k] / adv_iex[k] for k in adv_sip if k in adv_iex.index and adv_iex[k] > 0]
     sip_iex_ratio = 1.0  # store volumes are SIP; median TCA/store ratio reported in data_provenance only
     DATA_PROVENANCE["adv"] = dict(
-        source="SIP ADV20 from Dmitri's store (TCA-file ADV20 where measured)",
+        source="SIP ADV20 from the data owner's store (TCA-file ADV20 where measured)",
         median_tca_over_store_ratio=round(float(np.median(ratios)), 3) if ratios else None,
         n=len(ratios),
     )
@@ -1025,7 +1030,7 @@ def main() -> None:
         cost_bps[i] = hs + imp + hcut
         cost_src[s] = dict(
             adv20_usd_m=round(adv_usd[s] / 1e6, 1),
-            adv_source="SIP (TCA file)" if s in adv_sip else "SIP ADV20 (Dmitri's store)",
+            adv_source="SIP (TCA file)" if s in adv_sip else "SIP ADV20 (the data owner's store)",
             bucket=bname,
             hs_bps=round(hs, 2),
             hs_source="measured pilot fill" if s in hs_meas else "bucket default",
@@ -1075,7 +1080,7 @@ def main() -> None:
                 cons.append(w[i] >= 0)
             else:
                 cons.append(w[i] <= 0)
-    # ---- LIMITS H7 earnings gate (earnings_gate.py; Dmitri's calendar, read-only) ----
+    # ---- LIMITS H7 earnings gate (earnings_gate.py; the data owner's calendar, read-only) ----
     try:
         import pandas as _pd
 
@@ -1395,7 +1400,7 @@ def main() -> None:
         chk(
             "No options / us_equity only",
             "US-listed stocks/ETFs only",
-            "universe = DESK_UNIVERSE us_equity stocks/ETFs (Dmitri's store)",
+            "universe = DESK_UNIVERSE us_equity stocks/ETFs (the data owner's store)",
             True,
         )
         cx = [r["symbol"] for r in out if excluded_asset(r["symbol"])]
@@ -1476,7 +1481,7 @@ def main() -> None:
         chk(
             "Earnings calendar",
             f"policy {EINFO.get('policy')}; fresh (<= 1 US session) else "
-            + ("FULL FAIL-SAFE (ruling 4)" if EINFO.get("policy") == eg.POLICY_RULING else "all single stocks unknown"),
+            + ("FULL FAIL-SAFE" if EINFO.get("policy") == eg.POLICY_RULING else "all single stocks unknown"),
             f"main: {EINFO.get('reason')}; fetched {EINFO.get('fetched_at_utc')}; covers to {EINFO.get('coverage_through')}; next_earnings: {ni_.get('reason')} "
             f"({os.path.basename(ni_.get('path') or '-')}, sha256 {str(ni_.get('sha256'))[:12]}.. pinned_ok={ni_.get('sha256_ok')}, fetched {ni_.get('fetched_at_utc')}); horizon {exe_s}..{EINFO['horizon_end_session']}",
             True,
@@ -1484,7 +1489,7 @@ def main() -> None:
         )
         fs_ = sorted(s_ for s_ in univ if str(EG[s_].get("kind", "")).startswith("failsafe"))
         chk(
-            "Earnings: full fail-safe names (ruling 4)",
+            "Earnings: full fail-safe names",
             "no date row / stale or unusable file -> treated as reporting inside the window",
             ", ".join(fs_) or "none",
             True,
@@ -1649,16 +1654,16 @@ def main() -> None:
     _bad = defect_names() if a.proxy_src == "store_pit" else set()
     _ov = sorted(set(univ) & _bad)
     DATA_PROV = dict(
-        desk_rule="DESK_RULES.md #5: history from Dmitri's store; live Alpaca data only via data/lib/desk_data_client.py; no data.json, no direct HTTP",
+        desk_rule="data-provenance rule: history from the shared store; live Alpaca data only via data/lib/desk_data_client.py; no data.json, no direct HTTP",
         **DATA_PROVENANCE,
-        earnings_calendar=f"{a.earnings_dir} (Dmitri; forward dates from Nasdaq scheduled rows; uses announce_date_et, not first_tradable_session)",
+        earnings_calendar=f"{a.earnings_dir} (the data owner; forward dates from Nasdaq scheduled rows; uses announce_date_et, not first_tradable_session)",
         victor_defects_file=DATA_ISSUES,
         book_affected_by_data_defects=bool(a.proxy_src == "store_pit"),
         data_defect_status=(DEFECT_LABEL if a.proxy_src == "store_pit" else None),
         reason=(
-            "sleeve m / sigma_target come from the PIT S&P 500 proxy on Dmitri's store (defect names + SNDK excluded; delisting returns and "
-            "former-member gaps still pending Dmitri's fixes) -> PROVISIONAL. Book prices/vols/betas use the store for the "
-            f"{len(univ)} current desk names only. Desk-universe overlap with Victor's defect symbols: {_ov or 'none'}"
+            "sleeve m / sigma_target come from the PIT S&P 500 proxy on the data owner's store (defect names + SNDK excluded; delisting returns and "
+            "former-member gaps still pending the data owner's fixes) -> PROVISIONAL. Book prices/vols/betas use the store for the "
+            f"{len(univ)} current desk names only. Desk-universe overlap with the validator's defect symbols: {_ov or 'none'}"
             + (
                 " (LIN: missing PRE-2018 Praxair history; the book uses <= 420 calendar days, so not affected)"
                 if "LIN" in _ov
@@ -1729,7 +1734,7 @@ def main() -> None:
             risk_inflation=dict(
                 k=a.risk_inflation,
                 applies_to="ex-ante covariance in the 6% book vol cap only (Sigma_cap = k^2 * Sigma * 252)",
-                source="research/RESULTS_2026-10-30.md walk-forward forecast bias: MV models on Dave's statarb bars 1.15-1.37, MV-LW 1.20 (L120 weekly); volcap check research/out/volcap_*.json (not affected by the data defects). 10y PIT L/S re-check (research/ls_volcap_wf.py, Dmitri's SIP store): "
+                source="research/RESULTS_2026-10-30.md walk-forward forecast bias: MV models on the legacy statarb bars 1.15-1.37, MV-LW 1.20 (L120 weekly); volcap check research/out/volcap_*.json (not affected by the data defects). 10y PIT L/S re-check (research/ls_volcap_wf.py, the shared SIP store): "
                 + DEFECT_LABEL,
                 ten_year_pit_check_status=DEFECT_LABEL,
                 stacking="does NOT stack with the per-sleeve m (separate time-series overlay on alpha; still the single vol overlay)",
@@ -1742,7 +1747,7 @@ def main() -> None:
             excluded_assets="crypto (hard exclusion, CIO 2026-10-30)",
             blackout=bl,
             fallback_policy=a.fallback,
-            victor_passed=vp,
+            validator_passed=vp,
             garleanu_pedersen=gp if gp_on else "off",
         ),
         risk_overlays=dict(
@@ -1755,11 +1760,11 @@ def main() -> None:
             sleeve_multipliers=sleeve_mult,
             earnings=dict(
                 policy=EINFO.get("policy"),
-                policy_source="risk/decisions-log.md 2026-10-30 02:27 (Risk ruling: ACCEPTED WITH CONDITIONS)"
+                policy_source="earnings-gate policy of 2026-10-30 02:27 (accepted with conditions)"
                 if EINFO.get("policy") == eg.POLICY_RULING
-                else "pre-ruling strict mode (CLI option)",
+                else "pre-decision strict mode (CLI option)",
                 rule=(
-                    eg.__doc__.split("--- pre-ruling")[0].strip()
+                    eg.__doc__.split("--- pre-decision")[0].strip()
                     if EINFO.get("policy") == eg.POLICY_RULING
                     else "strict: confirmed/main-calendar dates known; estimated or missing -> unknown (tradable no new/increased short; shadow flag); stale -> all unknown"
                 ),
@@ -1847,7 +1852,7 @@ def main() -> None:
     run_id = f"{stamp}{sfx}"
     p_tr = f"{a.outdir}/targets/targets_{stamp}{sfx}.json"
     p_sh = f"{a.outdir}/shadow/targets_{stamp}{sfx}.json"
-    # CIO (Jeremy) 2026-11-06: while new_trades_allowed is false (breaker H9 halt OR CIO all-new-trading hold),
+    # 2026-11-06 rule: while new_trades_allowed is false (breaker H9 halt OR an all-new-trading hold),
     # DO NOT publish/write any tradable targets file — even an empty de-risk book. Shadow-only is allowed.
     suppress_tradable = bool(halted)
     planned = [p_sh] + ([] if suppress_tradable else [p_tr])
@@ -1900,7 +1905,7 @@ def main() -> None:
                 book_type="DE-RISK ONLY",
                 tradable=True,
                 label=("BREAKER HALTED (H9) -> " if halted else "")
-                + "TRADABLE, DE-RISK ONLY: no validated signal (Victor) or breaker halt -> may only trim/close/cover existing positions and tighten stops. "
+                + "TRADABLE, DE-RISK ONLY: no validated signal (the validator) or breaker halt -> may only trim/close/cover existing positions and tighten stops. "
                 f"Shadow book ({SHADOW_SLEEVE_ID}): {p_sh}",
                 portfolio=port,
                 compliance=checks,
@@ -1974,13 +1979,13 @@ def main() -> None:
             tio.correction_record(
                 corrects=[dict(run_id=run_id, book="SUPPRESSED", note="no tradable file this run")],
                 fields=dict(tradable_suppressed=True, reason=ident["tradable_suppressed_reason"]),
-                note="CIO 2026-11-06: no tradable targets published while new_trades_allowed=false (all-new-trading hold / H9). Shadow-only written.",
-                author="Hana (Portfolio Construction)",
-                requested_by="Jeremy (CIO)",
+                note="2026-11-06 rule: no tradable targets published while new_trades_allowed=false (all-new-trading hold / H9). Shadow-only written.",
+                author="portfolio construction",
+                requested_by="portfolio owner",
             ),
         )
         print(
-            "TRADABLE SUPPRESSED: new_trades_allowed=false (CIO all-new-trading hold and/or H9). No targets/*.json written this run."
+            "TRADABLE SUPPRESSED: new_trades_allowed=false (all-new-trading hold and/or H9). No targets/*.json written this run."
         )
     print(
         json.dumps(

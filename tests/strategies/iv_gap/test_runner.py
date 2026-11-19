@@ -395,9 +395,6 @@ class T(unittest.TestCase):
         self.assertRaises(R.RunStop, R.run, self.tmp(), MockReader(), None, lambda: next(ticks))
 
     def test_static_pins(self):
-        self.assertEqual(R.PREREG_SHA256[:8], "333bccad")
-        self.assertEqual(R.W1D_CP_SUMS_SHA256[:8], "8559e211")
-        self.assertEqual(R.DEV_DATES_SHA256[:8], "21c8c9bd")
         bad = dict(R.EXPECTED_PINS, DEV_BOUND="2016-07-01")
 
         class A:

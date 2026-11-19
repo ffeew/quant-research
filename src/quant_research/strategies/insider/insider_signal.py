@@ -7,12 +7,12 @@ Pipeline:
     ROUTINE if it traded in the same calendar month in all 3 prior years; else OPPORTUNISTIC.
     Pairs without 3 years of history are UNCLASSIFIED (as in CMP).
  3. Signal month t = month of FILING_DATE (public date, not transaction date). Universe filter:
-    issuer is a point-in-time S&P 500 member on the filing date (Dmitri's membership file).
- 3b. Issuer->ticker mapping chain: see code (Dmitri's ticker_cik_map first; SEC ticker file as stopgap).
+    issuer is a point-in-time S&P 500 member on the filing date (the data owner's membership file).
+ 3b. Issuer->ticker mapping chain: see code (the data owner's ticker_cik_map first; SEC ticker file as stopgap).
  4. Returns: enter at close of first trading day of month t+1 (>= 1 full trading day after any filing
     in month t, so no intraday look-ahead), exit at close of first trading day of month t+1+h, h=1,3.
     Excess vs SPY over the same window. Delisted names: last close x (1+terminal_return)
-    from Dmitri's delisting_returns.parquet when available; else last close (listed in diagnostics).
+    from the data owner's delisting_returns.parquet when available; else last close (listed in diagnostics).
  5. Benchmarks: SPY (primary, as specified) and equal-weighted PIT S&P 500 members (secondary;
     our portfolios are equal-weighted, so SPY embeds the 2016-26 cap-weighted vs EW gap).
  6. Stats: equal-weighted monthly cohort portfolios; N months, N stock-months, hit rate, mean,
@@ -93,8 +93,8 @@ keys["cls"] = [classify(o, i, y) for o, i, y in keys.itertuples(index=False)]
 tr = tr.merge(keys, on=["rptownercik", "issuercik", "fy"])
 # ---- 3. map issuer -> universe symbol, PIT membership --------------------------------------
 # Mapping chain (first hit wins), all restricted to tickers present in the membership file:
-#   1. Dmitri's reference ticker_cik_map (CIK -> ticker valid on the filing date)   [DESK_TICKER_CIK]
-#   2. Dmitri's universe.parquet cik column (current CIKs, no dates)
+# 1. The data owner's reference ticker_cik_map (CIK -> ticker valid on the filing date) [DESK_TICKER_CIK]
+# 2. The data owner's universe.parquet cik column (current CIKs, no dates)
 #   3. SEC company_tickers.json stopgap (current tickers only; ref/company_tickers.json)
 #   4. issuer's own ticker on the filing (ISSUERTRADINGSYMBOL), only for membership symbols with no CIK anywhere
 mem_syms = set(dd.membership().symbol)

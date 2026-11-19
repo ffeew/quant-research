@@ -1,4 +1,4 @@
-"""Bug-fix rerun (2026-10-30, after Victor's check): residual momentum warm-up bug.
+"""Bug-fix rerun (2026-10-30, after the review's check): residual momentum warm-up bug.
 Reruns ONLY the primary L/S (resmom_ls) and long-only (resmom_long) books at BASE params with the fixed pipeline
 (nominal 24-of-36-month minimum enforced, no clipped windows). Same config as the logged base trials, so it is logged
 in TRIAL_LOG.csv with role 'bugfix_rerun' and a trial_id whose spec key equals the base spec (counted once in N).
@@ -109,9 +109,9 @@ for book in ("resmom_ls", "resmom_long"):
             "param_tag": "base",
             "params": str(mod.BASE),
             "universe": "PIT S&P 500 (stocks)",
-            "data": "Dmitri SIP total_return (clean), same snapshot",
+            "data": "data owner SIP total_return (clean), same snapshot",
             "fill": "next open",
-            "costs": "Tomas v1.1 max Victor floor; borrow 1%/yr; book $100,000",
+            "costs": "TCA owner v1.1 max validator floor; borrow 1%/yr; book $100,000",
             "role": "bugfix_rerun",
             "has_daily_series": True,
             "sr_net_full": c["net"]["sharpe"],

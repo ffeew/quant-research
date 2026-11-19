@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""DQ pass. Victor 63d3073d: content stats DEV-only (<2016-06-01).
+"""DQ pass. Review: content stats DEV-only (<2016-06-01).
 OOS (>=2016-06-01): existence + row count (from manifest) + sha256 ONLY.
 Hashing OOS files (decompress + hash raw payload) is allowed for integrity;
 do not inspect quote/IV/expiry/greeks fields on OOS.
@@ -316,7 +316,7 @@ def main() -> None:
     verify_rows = []
     lines = []
     sgt = datetime.now(UTC) + timedelta(hours=8)
-    lines.append("# Options DQ Report — SPY / QQQ (Victor 63d3073d partitions)")
+    lines.append("# Options DQ Report — SPY / QQQ (validator 63d3073d partitions)")
     lines.append("")
     lines.append(
         f"**Generated:** {datetime.now(UTC).strftime('%Y-%m-%dT%H:%M:%SZ')} UTC / "

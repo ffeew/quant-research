@@ -1,6 +1,6 @@
-# Alpha Vantage news sentiment + earnings-call transcripts (for Ethan) - RAW layer
-Built by Marcus (Data Engineer), 10-11 Nov 2026 SGT. Assigned by Jeremy; pull approved by Daniel 22:39 SGT 10 Nov.
-Status: RAW, sealed, pending Jeremy's inspection. Not yet released to Ethan. A separate clean/ layer will follow Jeremy's
+# Alpha Vantage news sentiment + earnings-call transcripts (for the sentiment researcher) - RAW layer
+Built 10-11 Nov 2026.
+Status: RAW, sealed, pending inspection. Not yet released for research use. A separate clean/ layer will follow the
 cleaning decisions, with every rule and dropped row in CLEANING.md; raw/ stays untouched.
 
 ## Contents
@@ -22,10 +22,10 @@ AVGO ORCL CSCO ADBE CRM AMD INTC QCOM TXN NFLX DIS CMCSA T VZ NKE MCD SBUX BA CA
 6,796 request attempts: 6,790 OK, 6 ERROR (all recovered on retry), 2 MISSING after 2 retries. 530 split calls (cap 800).
 News: 2,912 symbol-months, all with an accepted file. Transcripts: 3,348 accepted of 3,350.
 
-## Fields touched by validation (Jeremy ruling B, metadata only)
+## Fields touched by validation (decision B, metadata only)
 News: top-level 'feed' (list present, length), per item 'url' and 'time_published'. Transcripts: 'symbol', 'quarter',
 'transcript' (entry count, and character count of each entry's 'content' summed; text never printed or stored).
-Raw-byte checks: size, sha256, substring test for "Information" / "Note" / "Error Message" on bodies < 4 KB (ruling C).
+Raw-byte checks: size, sha256, substring test for "Information" / "Note" / "Error Message" on bodies < 4 KB (decision C).
 Never read: sentiment scores, relevance scores, transcript text, prices. No returns or signals computed.
 
 ## Known limits
@@ -50,4 +50,4 @@ Never read: sentiment scores, relevance scores, transcript text, prices. No retu
   Remaining runs restarted as fresh workers <= 35 min each. No calls lost or duplicated.
 - Low: R8 process was killed at 04:56:32Z 11 Nov after 490/804 items (last OK SBUX 2015Q1; no .done). Remainder fetched by a
   fresh split run R8b (fetch_av2_r8b.py, 314/314 OK, orphan files 0). R8 is not counted as resumed.
-- Low: news runs 2-4 split into R2a..R4b; R1b added for weekly re-splits of R1 halves (Jeremy-approved budget).
+- Low: news runs 2-4 split into R2a..R4b; R1b added for weekly re-splits of R1 halves (within the agreed call budget).

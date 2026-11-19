@@ -79,7 +79,7 @@ DV = pd.concat([P.dollar_vol, pd.DataFrame(edv).reindex(P.close.index)], axis=1)
 ADV = DV.rolling(20, min_periods=10).mean()
 SIG = pd.concat([P.ret_cc, P.etf_close.pct_change(fill_method=None)], axis=1).rolling(20, min_periods=10).std()
 # STANDARD.md s5 per-side minimum before half-spread. S&P 500 constituents are large-cap by index definition -> 5 bps,
-# except thin names (Tomas bucket L4, 20d ADV < $50M) -> small-cap/thin row 20 bps; liquid ETFs 2 bps.
+# except thin names (TCA owner bucket L4, 20d ADV < $50M) -> small-cap/thin row 20 bps; liquid ETFs 2 bps.
 FLOOR = {"L1": 5.0, "L2": 5.0, "L3": 5.0, "L4": 20.0}
 
 

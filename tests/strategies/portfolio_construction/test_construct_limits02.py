@@ -1,5 +1,5 @@
 """Run: $QR_DESK_DIR/portfolio/.venv/bin/python $QR_DESK_DIR/portfolio/tests/test_construct_limits02.py  (~45 s)
-End-to-end construct.py runs into temp outdirs with synthetic Risk state files (never Rachel's files):
+End-to-end construct.py runs into temp outdirs with synthetic Risk state files (never the risk manager's files):
  A  provisional panic ON + context (default) + RESUMED_DISARMED + --fallback full (tradable = optimiser)
  B  provisional panic ON + --panic_provisional apply + unknown breaker state
  C  missing panic file (fail-safe) -> applied with all fail-safe defaults
@@ -25,7 +25,7 @@ PY = sys.executable
 NOW = "2026-10-30T02:00:00+08:00"
 TS = "2026-10-30T01:22:00+08:00"
 PROV = "PROVISIONAL: Alpaca-only (synthetic test)"
-# Dave deprecated statarb/data/daily_bars.json at 02:09 SGT; tests read the audit copy explicitly (logic tests, not a data endorsement)
+# Derivatives researcher deprecated statarb/data/daily_bars.json; tests read the audit copy explicitly (logic tests, not a data endorsement)
 sys.path.insert(0, HERE)
 from quant_research.strategies.portfolio_construction.risk_state import limits_version
 
@@ -164,7 +164,7 @@ def test_D_store_pit_proxy_defects_excluded_v2():
     )
     assert {"SNDK", "LIN"} <= set(sp["excluded_defects"]) and len(
         sp["excluded_defects"]
-    ) == 59  # Victor's 59 names (SNDK already among them; added explicitly too, no double count)
+    ) == 59  # The review's 59 names (SNDK already among them; added explicitly too, no double count)
     assert prov["live_row"]["source"] == "offline_test" and "store" in prov["book_history"]["source"].lower()
     assert all(v["proxy_status"].startswith("PROVISIONAL") for v in sh["risk_overlays"]["vol_scaling"].values())
     assert all(l["method_version"] == "v2" and l["data_source"]["sleeve_proxy"] == "store_pit" for l in log)

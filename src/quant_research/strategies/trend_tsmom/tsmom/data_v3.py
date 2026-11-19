@@ -27,10 +27,10 @@ ROOT = f"{_QR.DATA_DIR}"
 BARS = f"{ROOT}/bars/daily"
 RF_PATH = f"{ROOT}/factors/ken_french/ff3_daily.parquet"
 PREREG = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "PREREG-v3.md")
-PLACEHOLDER = "<PLACEHOLDER: sha256 of Dmitri-signed-off 2005+ v2 build (built under the substitution rule below)>"
-DIFF_PLACEHOLDER = "<PLACEHOLDER: sha256 of Dmitri's published v2 substitution diff>"
-SRC_PLACEHOLDER = "<TBD-2: sha256 of Dmitri's per-ticker reference-source table>"
-CA_PLACEHOLDER = "<PLACEHOLDER: sha256 of Dmitri-signed-off corporate-action table>"
+PLACEHOLDER = "<PLACEHOLDER: sha256 of data-owner-signed-off 2005+ v2 build (built under the substitution rule below)>"
+DIFF_PLACEHOLDER = "<PLACEHOLDER: sha256 of the data owner's published v2 substitution diff>"
+SRC_PLACEHOLDER = "<TBD-2: sha256 of the data owner's per-ticker reference-source table>"
+CA_PLACEHOLDER = "<PLACEHOLDER: sha256 of data-owner-signed-off corporate-action table>"
 FIELDS = ["tr", "open", "high", "low", "close", "volume"]
 
 
@@ -68,7 +68,7 @@ def _pinned_row(prefix: str, placeholder: str) -> str | None:
 
 
 def pinned_ca_hash() -> str | None:
-    """Corporate-action table hash pinned in PREREG-v3 §2 (None while the placeholder is present). Ruling 9B-7 / run gate."""
+    """Corporate-action table hash pinned in PREREG-v3 §2 (None while the placeholder is present). Decision 9B-7 / run gate."""
     return _pinned_row("| **Corporate-action table**", CA_PLACEHOLDER)
 
 
@@ -83,7 +83,7 @@ def pinned_src_hash() -> str | None:
 
 
 def load_corporate_actions(ca: dict[str, Any], expected_sha: str) -> tuple[pd.DataFrame, dict[str, Any]]:
-    """Dmitri's corporate-action table -> DataFrame(symbol, date, price_factor). Hash verified FIRST.
+    """the data owner's corporate-action table -> DataFrame(symbol, date, price_factor). Hash verified FIRST.
     ca = {"path":..., "symbol":..., "date":..., "ratio":..., "ratio_convention": "price_factor"|"new_per_old"|"old_per_new",
           "type_column": optional, "split_types": optional list of values in type_column that are splits}"""
     got = sha_file(ca["path"])
@@ -143,7 +143,7 @@ OHLC = ["open", "high", "low", "close"]
 
 
 def check_substitution_diff(diff: pd.DataFrame, alpaca_start: str) -> dict[str, Any]:
-    """§2 S4/S5 audit of Dmitri's published v2 diff (columns symbol, date, old_<f>, new_<f> for f in OHLC).
+    """§2 S4/S5 audit of the data owner's published v2 diff (columns symbol, date, old_<f>, new_<f> for f in OHLC).
     Aborts (RuntimeError) if any substituted row lacks a positive new value for any of the four fields, breaks
     low <= min(open, close) and max(open, close) <= high, or is dated before the Alpaca start (S3: pre-2016 rows never trigger)."""
     need = ["symbol", "date"] + [f"{p}_{f}" for p in ("old", "new") for f in OHLC]
@@ -196,7 +196,7 @@ def nasdaq_yahoo_xcheck(
         ["symbol", "date", "nasdaq_close_raw", "yahoo_close_raw", "dev_bp"]
     ]
     if not all((s, d) in keys for s, d in zip(sub_rows.symbol, sub_rows.date)):
-        raise RuntimeError("X2: a listed substituted row is missing from Dmitri's diff")
+        raise RuntimeError("X2: a listed substituted row is missing from the data owner's diff")
     return {
         "agreement": share.reset_index(),
         "rows_gt_all": all_rows.reset_index(drop=True),
@@ -271,7 +271,7 @@ def load_pinned_build(
     if got != expected_sha:
         raise RuntimeError(f"data hash mismatch: {path} sha256 {got} != pinned {expected_sha}. Refusing to run (A4).")
     if not expected_ca_sha or not spec.get("corporate_actions", {}).get("path"):
-        raise RuntimeError("corporate-action table not pinned / not in the data spec (run gate, ruling 9B-7)")
+        raise RuntimeError("corporate-action table not pinned / not in the data spec (run gate)")
     ca_splits, ca_info = load_corporate_actions(spec["corporate_actions"], expected_ca_sha)
     from quant_research.strategies.trend_tsmom.tsmom import v3spec as S
 

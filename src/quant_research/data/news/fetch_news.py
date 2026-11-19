@@ -28,7 +28,7 @@ ap.add_argument("--out", default="raw")  # rate is set desk-wide by ddc (DESK_AL
 a = ap.parse_args()
 SYMS = [s.strip() for s in open(a.symbols) if s.strip()]
 CH = [SYMS[i : i + 120] for i in range(0, len(SYMS), 120)]  # keep URL length sane
-# DESK RULE 5 (2026-10-30): all live Alpaca calls go through Dmitri's shared, cross-process throttled client
+# Data-provenance rule (2026-10-30): all live Alpaca calls go through the shared, cross-process throttled client
 # (one 150 req/min budget for the whole desk). No private HTTP code or private rate limit here.
 import sys
 

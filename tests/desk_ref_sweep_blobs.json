@@ -1,0 +1,402 @@
+{
+ "src/quant_research/backtest/costs/cost_model.py": {
+  "blob": "6031658395781ec0107158182d1071aedcc8fa65",
+  "ref": "f485f00"
+ },
+ "src/quant_research/backtest/costs/cost_model_v1_1_baseline_20261107.py": {
+  "blob": "6031658395781ec0107158182d1071aedcc8fa65",
+  "ref": "f485f00"
+ },
+ "src/quant_research/backtest/costs/cost_model_v1_2.py": {
+  "blob": "e39f143dc85ae61583d5332a095b089fc405046e",
+  "ref": "f485f00"
+ },
+ "src/quant_research/backtest/engine.py": {
+  "blob": "89870ffbd969264886dea5be52d25e7d17771103",
+  "ref": "f485f00"
+ },
+ "src/quant_research/backtest/post_pub_checks.py": {
+  "blob": "c1712c96eaac672efa9e1d71c27e02d1c4cc21b2",
+  "ref": "f485f00"
+ },
+ "src/quant_research/backtest/report.py": {
+  "blob": "ad3aea74d69f5c3c37ad48d9723a4a7fe7b61d15",
+  "ref": "f485f00"
+ },
+ "src/quant_research/backtest/stats.py": {
+  "blob": "93b19d99d4d9fb7312dea29735cd1289ae0839ab",
+  "ref": "f485f00"
+ },
+ "src/quant_research/backtest/trial_log.py": {
+  "blob": "95bd54d138ccde7e4593a06b94d5387f55582182",
+  "ref": "f485f00"
+ },
+ "src/quant_research/backtest/validation.py": {
+  "blob": "f05ea3c2298c236ef9bb7a35304e187a7fadcc0b",
+  "ref": "f485f00"
+ },
+ "src/quant_research/data/alphavantage/daily_adjusted/fetch_av_h1h2.py": {
+  "blob": "40ebe8d7062c0882e635f2705978ac5ee42f94fe",
+  "ref": "f485f00"
+ },
+ "src/quant_research/data/alphavantage/h3_universe/fetch_1b.py": {
+  "blob": "d4e2617d88dd398a676f1c35276306ab64e1f14e",
+  "ref": "f485f00"
+ },
+ "src/quant_research/data/alphavantage/h3_universe/filter_1a.py": {
+  "blob": "44b3e91cb5fd541914f5883abf9a37898ff3e13e",
+  "ref": "f485f00"
+ },
+ "src/quant_research/data/alphavantage/news_sentiment/build_clean.py": {
+  "blob": "e4b43c4bf9df3594c4004fd4bfebf047b827ab8b",
+  "ref": "f485f00"
+ },
+ "src/quant_research/data/alphavantage/news_sentiment/fetch_av2.py": {
+  "blob": "46c34bb661c5ae73ea16bbd904539756679d702c",
+  "ref": "f485f00"
+ },
+ "src/quant_research/data/alphavantage/news_sentiment/validate.py": {
+  "blob": "1f94fc5c661982d765ad97ae7538c06e5bc16cb7",
+  "ref": "f485f00"
+ },
+ "src/quant_research/data/alphavantage/options/dq_options.py": {
+  "blob": "3f421467f1fda3f422fe95a7525887eb579eaf35",
+  "ref": "f485f00"
+ },
+ "src/quant_research/data/alphavantage/options/fetch_options_history.py": {
+  "blob": "9a64e6edcea89ca71ef71d9171e15947ac8fa665",
+  "ref": "f485f00"
+ },
+ "src/quant_research/data/alphavantage/returns_events/split_validate.py": {
+  "blob": "9f817fb86d4fcba7df3d02b3087881f9c5e68259",
+  "ref": "f485f00"
+ },
+ "src/quant_research/data/client/desk_data_client.py": {
+  "blob": "2357f09fcb46323157977a8f70bde1a850987d5f",
+  "ref": "f485f00"
+ },
+ "src/quant_research/data/desk_data.py": {
+  "blob": "0dddd10b4bf0fc006f182fa23a9df7d31bf26b47",
+  "ref": "f485f00"
+ },
+ "src/quant_research/data/earnings_events/ee_coverage.py": {
+  "blob": "fd1b675a22729a13ce6200e6ff364ef21df77d22",
+  "ref": "f485f00"
+ },
+ "src/quant_research/data/earnings_events/ee_finalize.py": {
+  "blob": "a243fdf6fb3cd243a30d9325be67514abe142c2f",
+  "ref": "f485f00"
+ },
+ "src/quant_research/data/earnings_events/ee_map.py": {
+  "blob": "26cab48856b10f3cb38eb7f1cdfc1fb1f33686b4",
+  "ref": "f485f00"
+ },
+ "src/quant_research/data/earnings_events/v2/build_v2.py": {
+  "blob": "9be77a3f873146d5ccecaea68dfae87fc0e1b43c",
+  "ref": "f485f00"
+ },
+ "src/quant_research/data/earnings_events/v2/validate_v2.py": {
+  "blob": "acf2262a1fdbf6c039b972944ad84421b39aa0c7",
+  "ref": "f485f00"
+ },
+ "src/quant_research/data/earnings_events/v2_1/build_recon_aligned.py": {
+  "blob": "6681acf0a0917a8ff93b51c3353666d196bdb82b",
+  "ref": "f485f00"
+ },
+ "src/quant_research/data/earnings_events/v2_1/validate_v2_1.py": {
+  "blob": "6bb08dfcbd5f12c00a1ef3669fd3920d32da003f",
+  "ref": "f485f00"
+ },
+ "src/quant_research/data/news/fetch_news.py": {
+  "blob": "e466732f6c08d173525b700c9d7a813fa6a3b567",
+  "ref": "f485f00"
+ },
+ "src/quant_research/data/pipelines/earnings_alignment.py": {
+  "blob": "36cf3ebc21d1a654d4751377285d40b7772129ce",
+  "ref": "f485f00"
+ },
+ "src/quant_research/data/pipelines/security_master.py": {
+  "blob": "b35036f6a92c9ada7cab1f70ed1e51f85dbf1a71",
+  "ref": "f485f00"
+ },
+ "src/quant_research/data/pipelines/shares_classes.py": {
+  "blob": "a753878888271c7e431376b39adfb4a82ef1125b",
+  "ref": "f485f00"
+ },
+ "src/quant_research/data/pipelines/update_sp500_index.py": {
+  "blob": "8e63280a012630f82376dd1f9ee898a77d9b7ca5",
+  "ref": "f485f00"
+ },
+ "src/quant_research/data/public_data.py": {
+  "blob": "2274e07b0dc35fa6175330598e8080395807dc83",
+  "ref": "f485f00"
+ },
+ "src/quant_research/data/sec_edgar/common.py": {
+  "blob": "009b7b1b003b94ca6fe39bec8220e04223398430",
+  "ref": "f485f00"
+ },
+ "src/quant_research/data/sec_edgar/eps8k_extract.py": {
+  "blob": "d9de3ad01c9de917708516c17b4197e750269a25",
+  "ref": "f485f00"
+ },
+ "src/quant_research/data/sec_edgar/fetch_exhibits.py": {
+  "blob": "83c3ae2306f830c6c81256f6997c5000976ff788",
+  "ref": "f485f00"
+ },
+ "src/quant_research/data/sec_edgar/run_extract_full.py": {
+  "blob": "0953cd5459fe80392d13133294c15f88319bd705",
+  "ref": "f485f00"
+ },
+ "src/quant_research/data/sec_edgar/sec_http.py": {
+  "blob": "8f7103efb11f2f7551301203d5f18ed56c343cfa",
+  "ref": "f485f00"
+ },
+ "src/quant_research/data/sec_edgar/sue_build.py": {
+  "blob": "41018656f634f254a0caf88c876e86dbc9d7a729",
+  "ref": "f485f00"
+ },
+ "src/quant_research/data/sec_edgar/xbrl_eps.py": {
+  "blob": "eef39b3fa5b52e3b9cb0510f8e52767ddedd1ee9",
+  "ref": "f485f00"
+ },
+ "src/quant_research/strategies/academic_replications/betting_against_beta/pipeline.py": {
+  "blob": "9169a125e17993d21281e28321184063f3ef54a6",
+  "ref": "f485f00"
+ },
+ "src/quant_research/strategies/academic_replications/industry_momentum/pipeline.py": {
+  "blob": "e801c5738382d53c6aab2b83ac79f2f298012e25",
+  "ref": "f485f00"
+ },
+ "src/quant_research/strategies/academic_replications/residual_momentum/bugfix_warmup_rerun.py": {
+  "blob": "a1349259e541ba6086553912bb32cebfb3ed34d8",
+  "ref": "f485f00"
+ },
+ "src/quant_research/strategies/academic_replications/residual_momentum/pipeline.py": {
+  "blob": "31629014631c97cd03f2e7fb5d97d4cf7208f066",
+  "ref": "f485f00"
+ },
+ "src/quant_research/strategies/academic_replications/run_all.py": {
+  "blob": "352143e884b7a98bb649d8125ee476b639df0d34",
+  "ref": "f485f00"
+ },
+ "src/quant_research/strategies/carry/v1_mechanics.py": {
+  "blob": "d293a09259476ce5f89188a369c889c333e8775d",
+  "ref": "f485f00"
+ },
+ "src/quant_research/strategies/insider/insider_signal.py": {
+  "blob": "118f4f945feb9828ac846d131f3255062b90df5c",
+  "ref": "f485f00"
+ },
+ "src/quant_research/strategies/insider/make_results.py": {
+  "blob": "37afc9acc10f2b1f04e3856f975745be1b59479d",
+  "ref": "f485f00"
+ },
+ "src/quant_research/strategies/iv_gap/derive.py": {
+  "blob": "092c45f571fd6c23dd2238281d2b634c54af34c6",
+  "ref": "f485f00"
+ },
+ "src/quant_research/strategies/iv_gap/runner.py": {
+  "blob": "4af5ced9cbbdbe17aa257ad65e1d4cf7a41f7b0a",
+  "ref": "f485f00"
+ },
+ "src/quant_research/strategies/macro_event_studies/count_episodes.py": {
+  "blob": "26a6641564fcfa06b5a753d95088f5fa80e5b343",
+  "ref": "f485f00"
+ },
+ "src/quant_research/strategies/macro_exposure_diffusion/mxd_signal.py": {
+  "blob": "ffa076a6b9ee60aef4326420ea2cec44f1fa5dfe",
+  "ref": "f485f00"
+ },
+ "src/quant_research/strategies/news_sentiment/holdout_guard.py": {
+  "blob": "5d2e8326aeedd623c4e4b9188f62994374f3abc3",
+  "ref": "f485f00"
+ },
+ "src/quant_research/strategies/news_sentiment/make_results.py": {
+  "blob": "e2b48275840722deb8757003efe99a4544f55a04",
+  "ref": "f485f00"
+ },
+ "src/quant_research/strategies/news_sentiment/news_signal.py": {
+  "blob": "c429e91e562f5336839d8830b07f8f05a93c8366",
+  "ref": "f485f00"
+ },
+ "src/quant_research/strategies/news_sentiment/prereg_run.py": {
+  "blob": "37c51ed5a51174916355aab1b88e2c39181098c9",
+  "ref": "f485f00"
+ },
+ "src/quant_research/strategies/pead_gap/pit/core.py": {
+  "blob": "93d72159052745cd803d16202a922cc192151cda",
+  "ref": "f485f00"
+ },
+ "src/quant_research/strategies/pead_gap/pit/run_all.py": {
+  "blob": "f8ff763d6bdc614694c9a3d522b2eceea67db1a9",
+  "ref": "f485f00"
+ },
+ "src/quant_research/strategies/portfolio_construction/construct.py": {
+  "blob": "43215ead40e2442e8f512b805729ff035ce014a1",
+  "ref": "f485f00"
+ },
+ "src/quant_research/strategies/portfolio_construction/earnings_gate.py": {
+  "blob": "0d73f9f2485cebc5f69ebd638b31de77c245587b",
+  "ref": "f485f00"
+ },
+ "src/quant_research/strategies/portfolio_construction/research/gp_wf.py": {
+  "blob": "cc14a0091767843e152f3d278116b0b2c55e6372",
+  "ref": "f485f00"
+ },
+ "src/quant_research/strategies/portfolio_construction/research/ls_volcap_wf.py": {
+  "blob": "228dea771b09182ef0552ee8b4dd2c7c5c3551ec",
+  "ref": "f485f00"
+ },
+ "src/quant_research/strategies/portfolio_construction/research/make_tables.py": {
+  "blob": "9e98be6072ef0925732b4683a812903e64e60c39",
+  "ref": "f485f00"
+ },
+ "src/quant_research/strategies/portfolio_construction/research/riskmodels_wf.py": {
+  "blob": "0744ebf3ba0ba345cf91e806c177596f8c995d2c",
+  "ref": "f485f00"
+ },
+ "src/quant_research/strategies/portfolio_construction/risk_state.py": {
+  "blob": "ba4048178b465b3c6eba34e7acd287a40c448c67",
+  "ref": "f485f00"
+ },
+ "src/quant_research/strategies/portfolio_construction/targets_io.py": {
+  "blob": "22b0224529cbe693c3ddf3d4e70d191dbb037f36",
+  "ref": "f485f00"
+ },
+ "src/quant_research/strategies/rank1_single_name/rank1_adapters.py": {
+  "blob": "490bebdce6de6867d28d516c381eec38230aa534",
+  "ref": "f485f00"
+ },
+ "src/quant_research/strategies/rank1_single_name/rank1_core.py": {
+  "blob": "e9552202db0d4f38b793c0bcdeb94228786fdac3",
+  "ref": "f485f00"
+ },
+ "src/quant_research/strategies/rank1_single_name/rank1_cost.py": {
+  "blob": "87121e32702ebc6f7dc62027cdcbd1a12e23dcc4",
+  "ref": "f485f00"
+ },
+ "src/quant_research/strategies/rank1_single_name/rank1_pipeline.py": {
+  "blob": "671e9d549eac6c898e6c40b93420ed00efc96f9e",
+  "ref": "f485f00"
+ },
+ "src/quant_research/strategies/rank1_single_name/rank1_sigma.py": {
+  "blob": "4b9bb5e535641f0a19ec1d2fff90df369c7e663b",
+  "ref": "f485f00"
+ },
+ "src/quant_research/strategies/sentiment_returns/dev_run.py": {
+  "blob": "e5ad42e7c0567b8c08bda5e72f7443c31ee8cd46",
+  "ref": "f485f00"
+ },
+ "src/quant_research/strategies/sentiment_returns/fiscal_diag_s6b.py": {
+  "blob": "e1c25d727a253915aae89db18e5dca3b60d42192",
+  "ref": "f485f00"
+ },
+ "src/quant_research/strategies/sentiment_returns/h2_dev.py": {
+  "blob": "d7b8748e2aae1eba6935578f67ddc039eaf933f5",
+  "ref": "f485f00"
+ },
+ "src/quant_research/strategies/sentiment_returns/h2c_dev_run.py": {
+  "blob": "997d5b76901835e7e1bd6e4b122f56b7528ad587",
+  "ref": "f485f00"
+ },
+ "src/quant_research/strategies/sentiment_returns/h3_dev_runner.py": {
+  "blob": "be8d8eaa525f3ef86d26cd327e80bb5688fe1b93",
+  "ref": "f485f00"
+ },
+ "src/quant_research/strategies/sentiment_returns/oos_runner.py": {
+  "blob": "d70021f4a2a5532342386963e97dec54fbc9cb53",
+  "ref": "f485f00"
+ },
+ "src/quant_research/strategies/statarb_v1/config.py": {
+  "blob": "cfa74b3e4a2be532e1be3fa78ddb33ba7f5bb778",
+  "ref": "f485f00"
+ },
+ "src/quant_research/strategies/statarb_v1/fetch_bars.py": {
+  "blob": "90931e889179b4dcdca10577e2a7310d92a9b0b0",
+  "ref": "f485f00"
+ },
+ "src/quant_research/strategies/statarb_v1/run_v1.py": {
+  "blob": "bfee1e338c4b2df937a7cc06e546960b2d99673c",
+  "ref": "f485f00"
+ },
+ "src/quant_research/strategies/statarb_v1/statarb/backtest.py": {
+  "blob": "ee9058230a4d07f33e1e8d200f97da2b5a52185c",
+  "ref": "f485f00"
+ },
+ "src/quant_research/strategies/statarb_v1/statarb/costs.py": {
+  "blob": "9e8a234633f79ee50d9bd1b2d17068815f595c7d",
+  "ref": "f485f00"
+ },
+ "src/quant_research/strategies/statarb_v1/statarb/data.py": {
+  "blob": "1e98bc97ecacdcf9615490c1f0dc9b3f450accef",
+  "ref": "f485f00"
+ },
+ "src/quant_research/strategies/trend_tsmom/_engine_v1_frozen.py": {
+  "blob": "58b0d1135c887292c196928a00b71a7e076c420d",
+  "ref": "f485f00"
+ },
+ "src/quant_research/strategies/trend_tsmom/run.py": {
+  "blob": "35ccd0fb7ccbb1c672bd793f067d95e1a73d28be",
+  "ref": "f485f00"
+ },
+ "src/quant_research/strategies/trend_tsmom/run_v2.py": {
+  "blob": "914c2affc927e31c9e6170069846291e96e56a43",
+  "ref": "f485f00"
+ },
+ "src/quant_research/strategies/trend_tsmom/run_v3.py": {
+  "blob": "994ddcd058fd4f2dd4c19741ee0eca164e49b008",
+  "ref": "f485f00"
+ },
+ "src/quant_research/strategies/trend_tsmom/tsmom/data_v3.py": {
+  "blob": "b07555668451d5015c8c7ffad74956b972d7ddd5",
+  "ref": "f485f00"
+ },
+ "src/quant_research/strategies/trend_tsmom/tsmom/engine.py": {
+  "blob": "663eb0d9f88ed9cebc5750c922b11e6467831d4c",
+  "ref": "f485f00"
+ },
+ "src/quant_research/strategies/trend_tsmom/tsmom/engine_v3.py": {
+  "blob": "31b4abe0da56f70c184617c311ec1ba593bbe745",
+  "ref": "f485f00"
+ },
+ "src/quant_research/strategies/trend_tsmom/tsmom/v2spec.py": {
+  "blob": "c54ac31c89c84d2ca798ce6a0ce8c6f4b4666ad2",
+  "ref": "f485f00"
+ },
+ "src/quant_research/strategies/trend_tsmom/tsmom/v3spec.py": {
+  "blob": "958e17b5c52bdc13a23b6e888422ddcedd14e012",
+  "ref": "f485f00"
+ },
+ "tests/strategies/carry/test_v1_mechanics.py": {
+  "blob": "242da39d5ad5a8522afa66eda575d4f90d366e60",
+  "ref": "f485f00"
+ },
+ "tests/strategies/news_sentiment/test_controls_asof.py": {
+  "blob": "c98784809f0974555966b83676cd3d9eb55dcb5f",
+  "ref": "f485f00"
+ },
+ "tests/strategies/portfolio_construction/test_construct_limits02.py": {
+  "blob": "d8c4094846cadd7aa0235155f8c47104c187f8ba",
+  "ref": "f485f00"
+ },
+ "tests/strategies/portfolio_construction/test_earnings.py": {
+  "blob": "61106ff522a653a709bf8c0809091fbcda56b5a3",
+  "ref": "f485f00"
+ },
+ "tests/strategies/portfolio_construction/test_targets_io.py": {
+  "blob": "df598fe0e5e80e31ccf601619db180ec081d4724",
+  "ref": "f485f00"
+ },
+ "tests/strategies/rank1_single_name/test_rank1_v2.py": {
+  "blob": "42af952f830a23909204bdd6c5cdfbd1b09248fc",
+  "ref": "f485f00"
+ },
+ "tests/strategies/rank1_single_name/test_rank1_v3.py": {
+  "blob": "720932e05cce3ce4332ccc437ebb975943993a11",
+  "ref": "f485f00"
+ },
+ "tests/strategies/trend_tsmom/test_v3_engine.py": {
+  "blob": "2c9442882410bf2bb9588efc3d2ff124aac3ab95",
+  "ref": "f485f00"
+ }
+}
