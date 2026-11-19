@@ -52,8 +52,24 @@ def test_costs_and_borrow_reduce_net():
     assert np.isclose(d["tc"].sum(), 2 * 0.1 * 10 / 1e4)
     assert (d["borrow"] == 0).all()
     shared = pnl.apply_costs_and_returns(b, W, cfg, idea="H2")["daily"]
-    assert np.isclose(shared["borrow"].sum(), 5 * 0.1 * AUM * 0.10 / 360 / AUM)
+    held_days = sum((d.index[k] - d.index[k - 1]).days for k in range(6, 11))  # held over rows 6..10
+    assert held_days == 7  # includes one weekend
+    assert np.isclose(shared["borrow"].sum(), held_days * 0.1 * AUM * 0.10 / 360 / AUM)
     assert (shared["net"] <= shared["gross"]).all()
+
+
+def test_borrow_accrues_calendar_days_over_weekend_and_year():
+    d = pd.bdate_range("2018-01-01", "2019-01-01")
+    one = {k: pd.DataFrame({"B": v}, index=d) for k, v in {"R": 0.0, "PX": 20.0, "VOL": 1e9}.items()}
+    W = pd.DataFrame({"B": -0.1}, index=d)
+    cfg = pnl.build_cost_config("unknown_borrow_required")
+    br = pnl.apply_costs_and_returns(one, W, cfg, idea="H2")["daily"]["borrow"]
+    per_day = 0.1 * 0.10 / 360
+    mon = d[(d.day_of_week == 0) & (d > d[2])][0]
+    assert np.isclose(br.loc[mon], 3 * per_day)  # Friday close -> Monday close: 3 days
+    assert np.isclose(br.loc[mon + pd.Timedelta(days=1)], per_day)
+    yr = br.loc["2018-01-02":"2019-01-01"].sum() / 0.1  # one full calendar year held short
+    assert np.isclose(yr, 0.10 * 365 / 360) and yr >= 0.10  # required 10%/yr, not ~7% (252/360)
 
 
 def test_adv_cap_fills_over_several_sessions():

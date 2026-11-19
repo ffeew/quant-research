@@ -54,7 +54,8 @@ class CostModel(Protocol):
 
 
 class SharedCostModel:
-    """Default: the repo's shared cost model at the close (MOC) venue, borrow on a 360-day basis.
+    """Default: the repo's shared cost model at the close (MOC) venue, borrow on a 360-day basis
+    over calendar days.
 
     The desk's frozen pre-registered cost path can be injected instead (same protocol)."""
 
@@ -136,7 +137,8 @@ def apply_costs_and_returns(
         rrow = R.loc[d].reindex(held.index).fillna(0.0) if d in R.index else None
         gross = float((held * rrow).sum()) if rrow is not None else 0.0
         short_mv = float((-held.clip(upper=0)).sum() * AUM)
-        b = costs.borrow_usd(short_mv, 1.0, cfg) / AUM
+        days = float((d - dates[j - 1]).days)  # calendar days since the last close (weekends accrue)
+        b = costs.borrow_usd(short_mv, days, cfg) / AUM
         rets.append((d, gross - trade_cost_frac - b, gross, trade_cost_frac, b))
     df = pd.DataFrame(rets, columns=["session_date", "net", "gross", "tc", "borrow"]).set_index("session_date")
     return {
@@ -281,10 +283,10 @@ def h1_terminal_bound(
             h_i = int(np.searchsorted(dates.values, h_d.to_datetime64(), side="right")) - 1
             end_i = min(max(frozen_exit_i, h_i), len(dates) - 1)
             rate = max(cfg.borrow_rate, float(terms.get("borrow_rate_source", 0.0)))
-            per = costs.borrow_usd(abs(w) * AUM, 1.0, cfg) / AUM
-            per *= rate / cfg.borrow_rate if cfg.borrow_rate > 0 else 1.0
+            per_day = costs.borrow_usd(abs(w) * AUM, 1.0, cfg) / AUM
+            per_day *= rate / cfg.borrow_rate if cfg.borrow_rate > 0 else 1.0
             for j in range(book_i, end_i + 1):
-                overlay.iloc[j] -= per
+                overlay.iloc[j] -= per_day * (dates[j] - dates[j - 1]).days  # calendar days, weekends accrue
             rec.update({"h": str(h_d.date()), "V_max": vmax, "liability": liab, "borrow_rate": rate})
         W_adj.iloc[t:, iloc_int(W_adj.columns, s)] = 0.0
         receipts.append(rec)
