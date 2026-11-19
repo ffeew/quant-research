@@ -28,15 +28,17 @@ def _bars(n=30):
     return {"R": R, "PX": PX, "VOL": VOL}
 
 
-def test_one_session_lag_zero_cost():
+def test_weight_row_earns_next_close_to_close_zero_cost():
     b = _bars()
-    W = pd.DataFrame(0.0, index=b["R"].index, columns=["A", "B"])
-    W.iloc[5:10, 0] = 0.1
+    d = b["R"].index
+    W = pd.DataFrame(0.0, index=d, columns=["A", "B"])
+    W.iloc[5:10, 0] = 0.1  # filled at close d[5]; this is the fill session, not a signal bar
     out = pnl.apply_costs_and_returns(
         b, W, pnl.build_cost_config("unknown_borrow_required"), idea="H1", costs=ZeroCost()
     )
     g = out["daily"]["gross"]
-    assert g.iloc[4] == 0 and np.isclose(g.iloc[5], 0.1 * 0.01)  # weight at t=5 earns from t=6 (row 5 = date 6)
+    assert g.loc[d[5]] == 0  # nothing is earned on the fill session itself
+    assert np.isclose(g.loc[d[6]], 0.1 * b["R"]["A"].iloc[6])  # first return: close d[5] -> d[6]
     assert np.isclose(g.sum(), 5 * 0.1 * 0.01) and (out["daily"]["net"] == g).all()
 
 

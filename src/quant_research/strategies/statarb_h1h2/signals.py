@@ -38,8 +38,10 @@ def signal_h1(
     with the largest 60d median dollar volume are leaders, the rest followers. G = 60-session
     sum of (leaders - followers) mean return; z = G / (std of the earlier 192 sessions * sqrt(L)).
     Long followers / short leaders in the direction of z (0.5 sleeve each side), skipping names
-    with an earnings event in the holding window or no recent event coverage. Signal at t, the
-    caller's one-session execution lag fills at t+1. Returns (weights, tranche dates).
+    with an earnings event in the holding window or no recent event coverage. A tranche formed on
+    signal bar i (close t) is held from session i+1, the same entry as H2, so with the P&L's
+    one-row lag it first earns i+1 -> i+2; nothing is ever held on its own signal bar.
+    Returns (weights, tranche dates).
     """
     R = bars["R"]
     DV = bars["PX"] * bars["VOL"]
@@ -107,7 +109,7 @@ def signal_h1(
         book = pd.concat(parts, axis=1).fillna(0).sum(axis=1) / hold_weeks
         rows[t] = book
     Wk = pd.DataFrame(rows).T.fillna(0.0)
-    W = Wk.reindex(dates).ffill().fillna(0.0)
+    W = Wk.reindex(dates).ffill().shift(1).fillna(0.0)  # held from i+1, never on the signal bar
     W = W.clip(-NAME_CAP, NAME_CAP)  # name cap: trim, do not reallocate
     return W, list(Wk.index)
 

@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from quant_research.strategies.statarb_h1h2 import events, signals, universe
+from quant_research.strategies.statarb_h1h2 import events, pnl, signals, universe
 from quant_research.strategies.statarb_h1h2.splits import DEV0, DEV1, MARGIN, NAME_CAP
 
 from . import synth as S
@@ -27,6 +27,34 @@ def test_h1_followers_long_when_leaders_led():
     assert np.isclose(row["AAA"], -NAME_CAP)  # name cap trims, does not reallocate
     assert W.abs().max().max() <= NAME_CAP + 1e-12
     assert (W.loc[: pd.Timestamp("2016-11-01")] == 0).all().all()  # nothing before the eval warm-up
+
+
+class _ZeroCost:
+    def one_way_bps(self, side, px, shares, adv_shares, *, symbol, is_etf, cfg):
+        return 0.0
+
+    def borrow_usd(self, short_mv_usd, days, cfg):
+        return 0.0
+
+
+def test_h1_signal_at_t_first_earns_t1_to_t2():
+    bars, E, sub, _, _, evidx, last = _setup()
+    W, tr = signals.signal_h1(bars, E, sub, evidx, eval_start=DEV0, eval_end=DEV1, last_exit_i=last)
+    d = W.index
+    i = int(np.flatnonzero((W.abs().sum(axis=1) > 0).to_numpy())[0]) - 1  # bar before the first holding
+    assert d[i] in tr  # ... is a signal bar: the tranche formed at close t is first held at t+1
+    assert (W.iloc[: i + 1] == 0).all().all()  # nothing held on (or before) that signal bar
+    for t in tr[1:]:  # every later tranche changes the book one session after its signal bar
+        k = d.get_loc(t)
+        if k + 1 < len(d):
+            assert (W.iloc[k] == W.iloc[k - 1]).all()
+    g = pnl.apply_costs_and_returns(
+        bars, W, pnl.build_cost_config("unknown_borrow_required"), idea="H1", costs=_ZeroCost()
+    )["daily"]["gross"]
+    assert g.loc[d[i + 1]] == 0
+    R = bars["R"].iloc[i + 2].reindex(W.columns).fillna(0.0)
+    assert np.isclose(g.loc[d[i + 2]], float((W.iloc[i + 1] * R).sum()))
+    assert g.loc[d[i + 2]] != 0
 
 
 def test_h1_flips_sign_and_respects_threshold():

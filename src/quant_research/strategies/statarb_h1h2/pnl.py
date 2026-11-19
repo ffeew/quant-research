@@ -96,7 +96,9 @@ def apply_costs_and_returns(
         raise RuntimeError("pass-bar config must have borrow_rate >= 10%/yr")
     costs = costs or SharedCostModel()
     R, PX, VOL = bars["R"], bars["PX"], bars["VOL"]
-    W_exec = W.shift(1).fillna(0.0)  # signal at t, fill at t+1
+    # W row k is the weight filled at close k (signals put it at their fill session, never the
+    # signal bar); it earns the next row's return, close k -> k+1.
+    W_exec = W.shift(1).fillna(0.0)
     DV = PX * VOL
     ADV20 = DV.rolling(20, min_periods=10).mean().shift(1)
     dW = W_exec.diff().fillna(W_exec)
