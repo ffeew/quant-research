@@ -11,12 +11,26 @@ Codified rules (base params; perturbed +/-20% in the sensitivity grid):
          lowvol_long = EW lowest-q 1y total volatility (vol_days), long-only, excess of rf.
   Rebalance monthly; fill next session's open (engine). Ex-ante book beta and leg leverage are recorded per rebalance.
 """
-import numpy as np, pandas as pd
+
+from __future__ import annotations
+
+from collections.abc import Sequence
+from typing import Any, TypedDict, cast
+
+import numpy as np
+import pandas as pd
 
 BASE = {"vol_days": 252, "corr_years": 5, "shrink": 0.6, "q": 0.20}
 
 
-def _betas(LR, t, names, p):
+class BabParams(TypedDict):
+    vol_days: int
+    corr_years: int
+    shrink: float
+    q: float
+
+
+def _betas(LR: pd.DataFrame, t: pd.Timestamp, names: Sequence[str], p: BabParams) -> tuple[pd.Series, pd.Series]:
     idx = LR.index
     e = idx.searchsorted(t, side="right")
     s1 = max(e - p["vol_days"], 0)
@@ -33,12 +47,14 @@ def _betas(LR, t, names, p):
     return p["shrink"] * beta + (1 - p["shrink"]), sig[n1 >= 120].dropna()
 
 
-def build_targets(panel, ctx, p=None):
-    p = {**BASE, **(p or {})}
+def build_targets(
+    panel: dict[str, pd.DataFrame], ctx: dict[str, Any], p: BabParams | None = None
+) -> tuple[dict[str, dict[pd.Timestamp, pd.Series]], pd.DataFrame]:
+    p = cast(BabParams, {**BASE, **(p or {})})
     R = panel["ret"]
-    LR = np.log1p(R)
-    out = {k: {} for k in ["bab_fp", "bab_q", "lowvol_long"]}
-    info = {}
+    LR = cast(pd.DataFrame, np.log1p(R))
+    out: dict[str, dict[pd.Timestamp, pd.Series]] = {k: {} for k in ["bab_fp", "bab_q", "lowvol_long"]}
+    info: dict[pd.Timestamp, dict[str, float]] = {}
     for t in ctx["month_ends"]:
         mem = [s for s in ctx["members_at"](t) if s in R.columns]
         b, vol = _betas(LR, t, mem, p)
@@ -50,8 +66,10 @@ def build_targets(panel, ctx, p=None):
             continue
         z = b.rank()
         d = z - z.mean()
-        wH = d.clip(lower=0); wH /= wH.sum()
-        wL = (-d).clip(lower=0); wL /= wL.sum()
+        wH = d.clip(lower=0)
+        wH /= wH.sum()
+        wL = (-d).clip(lower=0)
+        wL /= wL.sum()
         bL, bH = float((wL * b).sum()), float((wH * b).sum())
         out["bab_fp"][t] = (wL / bL).sub(wH / bH, fill_value=0)
         n = max(int(round(len(b) * p["q"])), 1)
@@ -59,9 +77,15 @@ def build_targets(panel, ctx, p=None):
         lo, hi = r.index[:n], r.index[-n:]
         out["bab_q"][t] = pd.concat([pd.Series(1 / n, lo), pd.Series(-1 / n, hi)])
         lv = out["lowvol_long"].get(t)
-        info[t] = {"beta_L": bL, "beta_H": bH, "lev_long_leg": 1 / bL, "lev_short_leg": 1 / bH,
-                   "fp_gross": 1 / bL + 1 / bH, "fp_net": 1 / bL - 1 / bH,
-                   "fp_exante_beta": float((out["bab_fp"][t] * b.reindex(out["bab_fp"][t].index)).sum()),
-                   "q_exante_beta": float(b.reindex(lo).mean() - b.reindex(hi).mean()),
-                   "lowvol_exante_beta": float(b.reindex(lv.index).mean()) if lv is not None else np.nan}
+        info[t] = {
+            "beta_L": bL,
+            "beta_H": bH,
+            "lev_long_leg": 1 / bL,
+            "lev_short_leg": 1 / bH,
+            "fp_gross": 1 / bL + 1 / bH,
+            "fp_net": 1 / bL - 1 / bH,
+            "fp_exante_beta": float((out["bab_fp"][t] * b.reindex(out["bab_fp"][t].index)).sum()),
+            "q_exante_beta": float(b.reindex(lo).mean() - b.reindex(hi).mean()),
+            "lowvol_exante_beta": float(b.reindex(lv.index).mean()) if lv is not None else np.nan,
+        }
     return out, pd.DataFrame(info).T

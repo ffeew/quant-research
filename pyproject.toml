@@ -1,6 +1,11 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["uv_build>=0.13.9,<0.14.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+# Data files under the module root, including the PEP 561 py.typed marker, are packaged.
+module-name = "quant_research"
+module-root = "src"
 
 [project]
 name = "quant-research"
@@ -23,20 +28,31 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "pytest-timeout>=2.3", "ruff>=0.6"]
 plots = ["matplotlib>=3.8"]
 nlp = ["vaderSentiment>=3.3"]
 data = ["openpyxl>=3.1", "yfinance>=0.2", "lxml>=5"]
-all = ["quant-research[dev,plots,nlp,data]"]
+all = ["quant-research[plots,nlp,data]"]
 
 [project.scripts]
 qr = "quant_research.cli:main"
 
-[tool.setuptools.packages.find]
-where = ["src"]
+[dependency-groups]
+dev = [
+  "mypy>=1.13",
+  "pandas-stubs>=2.2",
+  "pre-commit>=4",
+  "pytest>=8",
+  "pytest-timeout>=2.3",
+  "ruff>=0.8",
+  "scipy-stubs>=1.14",
+  "types-openpyxl>=3.1",
+  "types-python-dateutil>=2.9",
+  "types-requests>=2.32",
+  "types-tabulate>=0.9",
+]
 
-[tool.setuptools.package-data]
-"*" = ["*.json", "*.csv"]
+[tool.uv]
+default-groups = ["dev"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -48,7 +64,166 @@ markers = ["data: needs the private research data store (QR_DATA_DIR); skipped i
 line-length = 120
 target-version = "py312"
 extend-exclude = ["research"]
+src = ["src", "tests"]
 
 [tool.ruff.lint]
-# Research code is frozen at its pre-registered versions; only fail on real errors.
-select = ["E9", "F63", "F7", "F82"]
+select = [
+  "E", "W", "F", "I", "B", "UP", "SIM", "C4", "RUF",
+  "PL", "N", "PTH", "ARG", "RET", "TRY", "PERF",
+  "NPY", "PD", "S", "DTZ", "ERA", "T20", "ANN",
+]
+ignore = [
+  "ANN401",  # Any stays only on heterogeneous JSON, broker payloads, and untyped vendor cells
+  "ARG001",  # unused parameters are part of the registered signature; renaming breaks keyword callers
+  "ARG002",  # unused method parameters are part of the registered signature; renaming breaks keyword callers
+  "ARG005",  # unused lambda parameters match a callback shape; renaming breaks the caller
+  "B023",    # closures intentionally observe the loop variable as the runner was registered
+  "B905",    # strict=True would raise where alignment truncates to the shortest series
+  "E712",    # == True/False is element-wise on arrays; `is` would change the result
+  "E731",    # assigned lambdas are the registered callables; a def would rename them in traces
+  "B904",    # raise-from would attach a new cause and change the traceback the runners log
+  "C408",    # dict() and list() build rows and copies; a literal is not always equivalent
+  "C416",    # dict()/list()/set() rewrites are not equivalent for pandas GroupBy and some iterators
+  "DTZ003",  # market clocks are session-naive; a timezone-aware replacement would shift them
+  "DTZ005",  # market clocks are session-naive; adding a timezone would shift the session
+  "DTZ006",  # timestamps are exchange-local naive instants; attaching a zone would shift them
+  "DTZ007",  # strptime values are exchange session dates; forcing a zone would shift the day
+  "DTZ011",  # date.today() is the desk session date; a timezone would move the calendar day
+  "E402",    # imports follow path setup and optional-dependency probes that must run first
+  "E501",    # ruff format wraps code; leftover long lines are literals, hashes, and tables
+  "E741",    # single-letter names are the formula symbols, including l, I, and O
+  "ERA001",  # commented examples and section labels are research notes, not dead code to delete
+  "N802",    # function names match the paper or the vendor API they wrap
+  "N803",    # argument names match the paper notation used in the registered runners
+  "N806",    # matrix and series names follow the papers (X, Y, SUE) rather than snake_case
+  "N812",    # import aliases keep the symbol used in the research notes
+  "N816",    # module-level constants keep the mixed-case names from the source papers
+  "N817",    # acronym aliases (np, pd) are the conventional names
+  "N818",    # exception names are the registered error vocabulary; renaming changes messages
+  "PD008",   # .at is the label write the runners use; the suggested replacement differs
+  "PD009",   # .iat is the positional write the runners use; the suggested replacement differs
+  "PD010",   # pivot and unstack are the reshape the study specified
+  "PD011",   # .values keeps the existing numpy view; to_numpy() can copy and change results
+  "PD013",   # stack is the reshape the study specified
+  "PERF401", # loops keep early exits and side effects; a comprehension is not equivalent
+  "PLC0415", # local imports break cycles and keep optional heavy deps off the import path
+  "PLR0911", # return count follows the registered procedure; splitting it risks the result
+  "PLR0912", # branch count follows the registered procedure; splitting it risks the result
+  "PLR0913", # parameter lists are the registered function signature
+  "PLR0915", # statement count follows the registered procedure; splitting it risks the result
+  "PLR0124", # `x != x` is the NaN test; rewriting the comparison would drop missing values
+  "PLR0917", # positional parameters are the registered function signature
+  "PLR2004", # numeric thresholds are the pre-registered specification, not unexplained magic
+  "PLC0206", # the loop uses the key and writes the value back; .items() would not change the update
+  "PLW0108", # inlining a lambda changes the callable identity the caller holds
+  "PLW0127", # the tuple unpack keeps block_new on purpose; it is not a dropped write
+  "PLW0603", # module globals are process-local caches; an object wrapper would change identity
+  "PLW2901", # the loop variable is intentionally rebound to the filtered record
+  "PLW1510", # callers handle subprocess return codes; check=True would raise instead
+  "PTH100",  # os.path.abspath stays a string under the frozen path contract
+  "PTH101",  # os.chmod stays on the string path the runners already pass
+  "PTH102",  # os.mkdir stays on the string path the runners already pass
+  "PTH103",  # os.makedirs stays on the string path the runners already pass
+  "PTH105",  # os.replace stays on the string path the runners already pass
+  "PTH107",  # os.remove stays on the string path the runners already pass
+  "PTH108",  # os.unlink stays on the string path the runners already pass
+  "PTH110",  # os.path.exists stays on the string path the runners already pass
+  "PTH111",  # os.path.expanduser stays a string under the frozen path contract
+  "PTH112",  # os.path.isdir stays on the string path the runners already pass
+  "PTH113",  # os.path.isfile stays on the string path the runners already pass
+  "PTH115",  # os.readlink stays on the string path the runners already pass
+  "PTH116",  # os.stat stays on the string path the runners already pass
+  "PTH118",  # os.path.join stays string concatenation under the frozen path contract
+  "PTH119",  # os.path.basename stays a string under the frozen path contract
+  "PTH120",  # os.path.dirname stays a string under the frozen path contract
+  "PTH123",  # builtin open keeps the file-object behavior callers already depend on
+  "PTH204",  # os.path.getmtime stays on the string path the runners already pass
+  "PTH207",  # glob stays on the string pattern the runners already pass
+  "PTH208",  # os.listdir stays on the string path the runners already pass
+  "PTH211",  # os.symlink stays on the string path the runners already pass
+  "RUF005",  # unpacking is not equivalent for every sequence these runners concatenate
+  "RUF015",  # next() raises StopIteration where indexing raises IndexError
+  "RUF001",  # symbols in strings are market and paper notation, not ambiguous identifiers
+  "RUF002",  # symbols in docstrings are the paper notation
+  "RUF003",  # symbols in comments are the paper notation
+  "RUF046",  # int() truncates ids and rejects bad values; dropping the cast changes results
+  "S101",    # asserts are research and test invariants, not a security boundary
+  "S102",    # exec loads a registered runner snippet; replacing it would change how that study runs
+  "S103",    # 0o555 is the intentional read-only mode for a frozen output, not a world-writable mask
+  "S112",    # continue-on-error skips a bad vendor row; logging would change the quiet output
+  "S108",    # scratch paths are the explicit temporary directories the scripts document
+  "S110",    # except-pass guards optional vendor fields that are allowed to be missing
+  "S301",    # pickle loads only local research artifacts, never untrusted network payloads
+  "S310",    # HTTP calls target the documented market-data APIs, not user-controlled schemes
+  "S311",    # random is used for bootstrap and sampling, not for security tokens
+  "S324",    # MD5 and SHA1 here are content fingerprints, not password hashes
+  "S603",    # subprocess argv lists are fixed tool invocations and do not use a shell
+  "S607",    # the executable is a well-known tool name resolved on PATH, not user input
+  "SIM102",  # nested checks keep the registered comment on the inner condition
+  "SIM105",  # try/except/pass is the registered quiet skip; suppress drops nearby comments
+  "SIM108",  # a ternary would drop the comment that says which branch is primary
+  "SIM115",  # some loaders keep the handle open across reads; a context manager would close it
+  "SIM401",  # dict.get evaluates the default immediately and collapses a stored None with a missing key
+  "T201",    # print is the CLI and trial-report output, not leftover debug
+  "TRY003",  # exception text is the diagnostic; a new class per message would not catch bugs
+  "TRY004",  # callers catch ValueError; switching those raises to TypeError would change handlers
+  "TRY300",  # moving returns into try/else does not catch bugs and only reshuffles attribution
+  "TRY301",  # raising inside try shares one handler; an else-raise rewrite is cosmetic
+  "UP031",   # percent formatting is the registered report text; format() can change float rendering
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["ANN"]
+"scripts/**" = ["ANN"]
+
+[tool.ruff.lint.flake8-annotations]
+allow-star-arg-any = true
+mypy-init-return = true
+suppress-dummy-args = true
+
+[tool.ruff.lint.isort]
+known-first-party = ["quant_research"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unreachable = true
+files = ["src", "tests"]
+mypy_path = "src"
+explicit_package_bases = true
+namespace_packages = true
+warn_unused_ignores = true
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+disallow_untyped_calls = false
+check_untyped_defs = false
+
+[[tool.mypy.overrides]]
+module = [
+  "cvxpy",
+  "cvxpy.*",
+  "exchange_calendars",
+  "exchange_calendars.*",
+  "lxml",
+  "lxml.*",
+  "matplotlib",
+  "matplotlib.*",
+  "pandas_market_calendars",
+  "pandas_market_calendars.*",
+  "pyarrow",
+  "pyarrow.*",
+  "statsmodels",
+  "statsmodels.*",
+  "vaderSentiment",
+  "vaderSentiment.*",
+  "yfinance",
+  "yfinance.*",
+  "costs_original",
+  "costs_original.*",
+  "ivgap_av_reader_v2",
+  "ivgap_av_reader_v2.*",
+]
+ignore_missing_imports = true

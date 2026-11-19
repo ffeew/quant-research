@@ -1,43 +1,53 @@
 PYTHON ?= python3
 DATASET ?=
 
-.PHONY: help install test test-data lint format build-data datasets trials clean
+.PHONY: help install test test-data lint typecheck check format build-data datasets trials clean
 
 help:
-	@echo "make install          editable install with dev extras"
-	@echo "make test             run unit tests (data-dependent tests skip without QR_DATA_DIR)"
+	@echo "make install          uv sync --locked (Python 3.12, dev group)"
+	@echo "make lint             ruff check and ruff format --check"
+	@echo "make typecheck        mypy (strict on src, relaxed on tests)"
+	@echo "make check            lint, typecheck, and test"
+	@echo "make test             compileall and pytest (data tests skip without QR_DATA_DIR)"
 	@echo "make test-data        run all tests and fail if research data is missing"
-	@echo "make lint             ruff check"
+	@echo "make format           ruff format"
 	@echo "make datasets         list dataset builders"
 	@echo "make build-data DATASET=<name>   build one dataset into \$$QR_DATA_DIR"
 	@echo "make trials           list trials and verdicts"
 
 install:
-	$(PYTHON) -m pip install -e ".[dev]"
-
-test:
-	$(PYTHON) -m pytest
-
-test-data:
-	QR_REQUIRE_DATA=1 $(PYTHON) -m pytest
+	uv sync --locked
 
 lint:
-	$(PYTHON) -m ruff check .
+	uv run ruff check .
+	uv run ruff format --check .
+
+typecheck:
+	uv run mypy
+
+test:
+	uv run python -m compileall -q src tests scripts
+	uv run pytest
+
+test-data:
+	QR_REQUIRE_DATA=1 uv run pytest
+
+check: lint typecheck test
 
 format:
-	$(PYTHON) -m ruff format src tests scripts
+	uv run ruff format src tests scripts
 
 datasets:
-	qr datasets
+	uv run qr datasets
 
 build-data:
 	@test -n "$(DATASET)" || (echo "usage: make build-data DATASET=<name>  (see: make datasets)"; exit 2)
 	@test -n "$$ALPHAVANTAGE_API_KEY" || echo "warning: ALPHAVANTAGE_API_KEY is not set"
-	qr build-data $(DATASET)
+	uv run qr build-data $(DATASET)
 
 trials:
-	qr list
+	uv run qr list
 
 clean:
-	rm -rf build dist *.egg-info .pytest_cache .ruff_cache
+	rm -rf build dist *.egg-info src/*.egg-info .pytest_cache .ruff_cache .mypy_cache .venv
 	find . -name __pycache__ -type d -prune -exec rm -rf {} +

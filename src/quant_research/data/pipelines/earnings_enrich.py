@@ -11,24 +11,36 @@ event_type (method 'filing_sequence_v1', no exhibit text read):
 is_preannouncement = event_type == 'preannouncement_or_interim'.
 Usage: python earnings_enrich.py
 """
-import numpy as np, pandas as pd
-from quant_research.data.pipelines.common import DATA, write_parquet, update_manifest, log
+
+from __future__ import annotations
+
+import numpy as np
+import pandas as pd
+
+from quant_research.data.pipelines.common import DATA, log, update_manifest, write_parquet
 
 
-def main():
-    f = DATA / "earnings/earnings_events.parquet"; ev = pd.read_parquet(f)
+def main() -> None:
+    f = DATA / "earnings/earnings_events.parquet"
+    ev = pd.read_parquet(f)
     q = pd.read_parquet(DATA / "earnings/edgar_10q10k.parquet")
-    q = q[q.form.isin(["10-Q", "10-K"])][["symbol", "filing_date"]].copy(); q["fd"] = pd.to_datetime(q.filing_date).astype("datetime64[ns]")
+    q = q[q.form.isin(["10-Q", "10-K"])][["symbol", "filing_date"]].copy()
+    q["fd"] = pd.to_datetime(q.filing_date).astype("datetime64[ns]")
     ev["d"] = pd.to_datetime(ev.announce_date_et).astype("datetime64[ns]")
     e8 = ev.source.astype(str).str.startswith("edgar_8k")
     x = ev[e8][["symbol", "d"]].reset_index().sort_values("d")
-    nxt = pd.merge_asof(x, q.sort_values("fd")[["symbol", "fd"]], left_on="d", right_on="fd", by="symbol", direction="forward")
+    nxt = pd.merge_asof(
+        x, q.sort_values("fd")[["symbol", "fd"]], left_on="d", right_on="fd", by="symbol", direction="forward"
+    )
     nxt["gap"] = (nxt.fd - nxt.d).dt.days
     nxt["in_win"] = nxt.gap.between(0, 75)
     last = nxt[nxt.in_win].groupby(["symbol", "fd"]).d.transform("max")
     nxt.loc[nxt.in_win, "main_d"] = last
-    et = np.where(~nxt.in_win, "other_202_no_periodic",
-                  np.where(nxt.d >= nxt.main_d - pd.Timedelta(days=3), "quarterly_results", "preannouncement_or_interim"))
+    et = np.where(
+        ~nxt.in_win,
+        "other_202_no_periodic",
+        np.where(nxt.d >= nxt.main_d - pd.Timedelta(days=3), "quarterly_results", "preannouncement_or_interim"),
+    )
     ev["event_type"] = None
     ev.loc[nxt["index"], "event_type"] = et
     ev.loc[ev.source.astype(str).str.contains("10q10k"), "event_type"] = "periodic_filing_fallback"
@@ -42,17 +54,25 @@ def main():
     ev["security_id"] = None
     for s, g in ev.groupby("symbol"):
         sg = seg[(seg.ticker_at_time == s) | (seg.bars_file == s)]
-        idx = DATA  # placeholder
-        if sg.empty: continue
+        _idx = DATA  # placeholder
+        if sg.empty:
+            continue
         for i, d, c in zip(g.index, g.d.dt.date, g.cik):
             cand = sg[(sg.seg_from <= d) & (sg.seg_to >= d)]
-            if pd.notna(c) and (cand.cik == c).any(): cand = cand[cand.cik == c]
-            if cand.empty: cand = sg[sg.bars_source == "main"] if (sg.bars_source == "main").any() else sg
+            if pd.notna(c) and (cand.cik == c).any():
+                cand = cand[cand.cik == c]
+            if cand.empty:
+                cand = sg[sg.bars_source == "main"] if (sg.bars_source == "main").any() else sg
             ev.at[i, "security_id"] = cand.security_id.iloc[0]
     ev = ev.drop(columns="d")
     write_parquet(ev, f)
-    info = {"rows": len(ev), "event_type": ev.event_type.value_counts().to_dict(), "security_id_coverage": float(ev.security_id.notna().mean())}
-    update_manifest("earnings_enrich", info); log.info("%s", info)
+    info = {
+        "rows": len(ev),
+        "event_type": ev.event_type.value_counts().to_dict(),
+        "security_id_coverage": float(ev.security_id.notna().mean()),
+    }
+    update_manifest("earnings_enrich", info)
+    log.info("%s", info)
 
 
 if __name__ == "__main__":

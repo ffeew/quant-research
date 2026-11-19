@@ -14,20 +14,30 @@ Rules (v0.4):
     Unmatched accn -> Dmitri's `available_session` (flag knowledge_src = 'available_session_fallback'); share logged.
 Output: out/xbrl_eps_quarterly.parquet ; log: out/xbrl_eps_quarterly.log.json
 """
+
+from __future__ import annotations
+
 import json
-import numpy as np, pandas as pd
+from typing import Any
+
+import numpy as np
+import pandas as pd
+
 from quant_research.data.sec_edgar import common
 
 TAGS = ["EarningsPerShareDiluted", "EarningsPerShareBasicAndDiluted"]
 
 
-def build(save=True):
+def build(save: bool = True) -> tuple[pd.DataFrame, dict[str, Any]]:
     x = pd.read_parquet(common.STORE / "fundamentals/xbrl_facts.parquet", filters=[("tag", "in", TAGS)])
     x = x[(x.unit == "USD/shares") & x.form.isin(["10-Q", "10-K"])].copy()
-    x["period_start"] = pd.to_datetime(x.period_start); x["period_end"] = pd.to_datetime(x.period_end)
+    x["period_start"] = pd.to_datetime(x.period_start)
+    x["period_end"] = pd.to_datetime(x.period_end)
     x["days"] = (x.period_end - x.period_start).dt.days
     x = x[x.days.between(80, 100)].copy()
-    acc = pd.read_parquet(common.STORE / "earnings/edgar_10q10k.parquet", columns=["accession", "acceptance_datetime_et"])
+    acc = pd.read_parquet(
+        common.STORE / "earnings/edgar_10q10k.parquet", columns=["accession", "acceptance_datetime_et"]
+    )
     acc = acc.drop_duplicates("accession").rename(columns={"accession": "accn"})
     x = x.merge(acc, on="accn", how="left")
     x["knowledge_et"] = pd.to_datetime(x.acceptance_datetime_et)
@@ -49,17 +59,41 @@ def build(save=True):
     q["derivation"] = "reported_3m"
     # Effective knowledge time used by SUE as-of lookups: 10-Q/10-K acceptance, else Dmitri available_session at 09:29 ET
     # (i.e. usable from that session's open, never earlier). Flagged by knowledge_src.
-    q["knowledge_et_eff"] = q.knowledge_et.fillna(pd.to_datetime(q.knowledge_session) + pd.Timedelta(hours=9, minutes=29))
-    cols = ["cik", "ticker", "period_start", "period_end", "fy", "fp", "form", "accession_10q10k", "tag",
-            "eps_diluted_xbrl", "derivation", "knowledge_et", "knowledge_src", "knowledge_session", "knowledge_et_eff"]
+    q["knowledge_et_eff"] = q.knowledge_et.fillna(
+        pd.to_datetime(q.knowledge_session) + pd.Timedelta(hours=9, minutes=29)
+    )
+    cols = [
+        "cik",
+        "ticker",
+        "period_start",
+        "period_end",
+        "fy",
+        "fp",
+        "form",
+        "accession_10q10k",
+        "tag",
+        "eps_diluted_xbrl",
+        "derivation",
+        "knowledge_et",
+        "knowledge_src",
+        "knowledge_session",
+        "knowledge_et_eff",
+    ]
     q = q[[c for c in cols if c in q.columns]].sort_values(["cik", "period_end"]).reset_index(drop=True)
-    log = {"rows": int(len(q)), "knowledge_src": q.knowledge_src.value_counts().to_dict(),
-           "fallback_share_overall": float((q.knowledge_src != "acceptance_10q10k").mean()),
-           "fallback_share_by_period_year": q.assign(y=q.period_end.dt.year).groupby("y").knowledge_src
-               .apply(lambda s: float((s != "acceptance_10q10k").mean())).round(3).to_dict(),
-           "ciks_by_period_year": q.groupby(q.period_end.dt.year).cik.nunique().to_dict(),
-           "fy_minus_9m_rows": int((q.derivation != "reported_3m").sum()),
-           "source_release": common.DATA_RELEASE_ID, "source_release_top_hash": common.RELEASE_TOP_HASH}
+    log = {
+        "rows": int(len(q)),
+        "knowledge_src": q.knowledge_src.value_counts().to_dict(),
+        "fallback_share_overall": float((q.knowledge_src != "acceptance_10q10k").mean()),
+        "fallback_share_by_period_year": q.assign(y=q.period_end.dt.year)
+        .groupby("y")
+        .knowledge_src.apply(lambda s: float((s != "acceptance_10q10k").mean()))
+        .round(3)
+        .to_dict(),
+        "ciks_by_period_year": q.groupby(q.period_end.dt.year).cik.nunique().to_dict(),
+        "fy_minus_9m_rows": int((q.derivation != "reported_3m").sum()),
+        "source_release": common.DATA_RELEASE_ID,
+        "source_release_top_hash": common.RELEASE_TOP_HASH,
+    }
     if save:
         q.to_parquet(common.OUT / "xbrl_eps_quarterly.parquet", index=False)
         json.dump(log, open(common.OUT / "xbrl_eps_quarterly.log.json", "w"), indent=1, default=str)

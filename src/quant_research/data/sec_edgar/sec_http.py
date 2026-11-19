@@ -7,8 +7,19 @@
 - Raw responses are cached under raw/sec/<host>/<path> and never re-fetched unless refresh=True.
 - Retries 429/5xx with exponential backoff.
 """
-import fcntl, gzip, json, os, random, time, urllib.request, urllib.error
+
+from __future__ import annotations
+
+import fcntl
+import gzip
+import json
+import os
+import random
+import time
+import urllib.error
+import urllib.request
 from pathlib import Path
+from typing import Any, cast
 
 HERE = Path(__file__).resolve().parent
 RAW = HERE / "raw" / "sec"
@@ -19,7 +30,7 @@ RPS = float(os.environ.get("DAVE_SEC_RPS", "8"))
 BURST = 4.0
 
 
-def _acquire():
+def _acquire() -> None:
     STATE.parent.mkdir(parents=True, exist_ok=True)
     while True:
         with open(STATE, "a+") as f:
@@ -33,13 +44,15 @@ def _acquire():
             tokens = min(BURST, st.get("tokens", BURST) + (now - st.get("t", now)) * RPS)
             if tokens >= 1:
                 st = {"tokens": tokens - 1, "t": now}
-                f.seek(0); f.truncate(); f.write(json.dumps(st))
+                f.seek(0)
+                f.truncate()
+                f.write(json.dumps(st))
                 return
             wait = (1 - tokens) / RPS
         time.sleep(wait)
 
 
-def cache_path(url):
+def cache_path(url: str) -> Path:
     u = url.split("://", 1)[1]
     p = RAW / u.replace("?", "_q_")
     if u.endswith("/"):
@@ -47,7 +60,7 @@ def cache_path(url):
     return p
 
 
-def get(url, refresh=False, tries=6):
+def get(url: str, refresh: bool = False, tries: int = 6) -> bytes:
     """Return bytes for url, from the cache if present."""
     p = cache_path(url)
     if p.exists() and not refresh:
@@ -64,20 +77,20 @@ def get(url, refresh=False, tries=6):
                 lg.write(f"{time.time():.3f}\t{os.getpid()}\t200\t{url}\n")
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_bytes(b)
-            return b
+            return cast(bytes, b)
         except urllib.error.HTTPError as e:
             with open(LEDGER, "a") as lg:
                 lg.write(f"{time.time():.3f}\t{os.getpid()}\t{e.code}\t{url}\n")
             if e.code == 404:
                 raise
             if e.code in (403, 429) or e.code >= 500:
-                time.sleep(min(60, 2 ** i + random.random()))
+                time.sleep(min(60, 2**i + random.random()))
                 continue
             raise
         except (urllib.error.URLError, TimeoutError):
-            time.sleep(min(60, 2 ** i + random.random()))
+            time.sleep(min(60, 2**i + random.random()))
     raise RuntimeError(f"SEC fetch failed after {tries} tries: {url}")
 
 
-def get_json(url, refresh=False):
+def get_json(url: str, refresh: bool = False) -> Any:
     return json.loads(get(url, refresh).decode("utf-8", "replace"))

@@ -19,9 +19,10 @@ Rules
 - Credentials: env ALPACA_API_KEY_ID / ALPACA_API_SECRET_KEY, sent only as request headers. They are never logged,
   printed, cached or written: cache keys/files contain only the URL and query params, and errors carry only status + body.
 """
-from __future__ import annotations
-from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DATA_DIR, ...)
 
+from __future__ import annotations
+
+import contextlib
 import datetime as dt
 import fcntl
 import hashlib
@@ -32,22 +33,33 @@ import random
 import tempfile
 import threading
 import time
+from collections.abc import Iterable, Sequence
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Union
+from typing import IO, Any, cast
+from urllib.parse import urlparse
 
 import pandas as pd
 import pyarrow.parquet as pq
-from urllib.parse import urlparse
+
+from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DATA_DIR, ...)
 
 try:  # only needed for live API calls; local-store reads work without it
     import requests
 except ImportError:  # pragma: no cover
-    requests = None
+    requests = None  # type: ignore[assignment]  # requests is optional; live calls raise if it is missing
 
 __all__ = [
-    "get_daily_bars", "get_intraday_bars", "get_minute_bars", "get_hour_bars",
-    "alpaca_get", "alpaca_get_paginated", "throttle", "store_coverage", "purge_cache",
-    "RateLimiter", "AlpacaError",
+    "AlpacaError",
+    "RateLimiter",
+    "alpaca_get",
+    "alpaca_get_paginated",
+    "get_daily_bars",
+    "get_hour_bars",
+    "get_intraday_bars",
+    "get_minute_bars",
+    "purge_cache",
+    "store_coverage",
+    "throttle",
 ]
 
 DATA_DIR = Path(os.environ.get("CIO_DATA_DIR", f"{_QR.DATA_DIR}"))
@@ -57,11 +69,13 @@ RATE_DIR = CACHE_DIR / "ratelimit"
 HTTP_CACHE_DIR = CACHE_DIR / "http"
 DATA_URL = "https://data.alpaca.markets"
 
-DEFAULT_RPM = float(os.environ.get("DESK_ALPACA_RPM", "150"))      # shared across ALL processes; free plan cap is 200
+DEFAULT_RPM = float(os.environ.get("DESK_ALPACA_RPM", "150"))  # shared across ALL processes; free plan cap is 200
 DEFAULT_BURST = float(os.environ.get("DESK_ALPACA_BURST", "10"))
-DEFAULT_TTL = float(os.environ.get("DESK_ALPACA_CACHE_TTL", "300"))  # seconds, for windows that are not yet "historical"
-HISTORICAL_AGE = dt.timedelta(days=1)                                # end older than this -> cache forever
-SIP_DELAY = dt.timedelta(minutes=16)                                 # free plan: the last 15 min of SIP is blocked
+DEFAULT_TTL = float(
+    os.environ.get("DESK_ALPACA_CACHE_TTL", "300")
+)  # seconds, for windows that are not yet "historical"
+HISTORICAL_AGE = dt.timedelta(days=1)  # end older than this -> cache forever
+SIP_DELAY = dt.timedelta(minutes=16)  # free plan: the last 15 min of SIP is blocked
 REQUEST_LOG_MAX_BYTES = 5_000_000
 
 log = logging.getLogger("desk_data_client")
@@ -82,8 +96,13 @@ class RateLimiter:
     """Token bucket whose state lives in a JSON file guarded by an exclusive fcntl lock, so every process on the box
     that uses the same `name` shares one budget. Also holds a shared `blocked_until` (epoch s) set after 429s."""
 
-    def __init__(self, name: str = "alpaca_data", rpm: float = DEFAULT_RPM, burst: float = DEFAULT_BURST,
-                 directory: Path = RATE_DIR):
+    def __init__(
+        self,
+        name: str = "alpaca_data",
+        rpm: float = DEFAULT_RPM,
+        burst: float = DEFAULT_BURST,
+        directory: Path = RATE_DIR,
+    ):
         self.rate = rpm / 60.0
         self.burst = max(1.0, burst)
         self.dir = Path(directory)
@@ -91,23 +110,26 @@ class RateLimiter:
         self.lock_path = self.dir / f"{name}.lock"
         self.state_path = self.dir / f"{name}.state.json"
         self.log_path = self.dir / f"{name}.requests.log"
-        self._tlock = threading.Lock()   # also serialise threads inside one process
+        self._tlock = threading.Lock()  # also serialise threads inside one process
 
     # -- state helpers (call only while holding the file lock) --
-    def _read(self, now: float) -> Dict[str, float]:
+    def _read(self, now: float) -> dict[str, float]:
         try:
             st = json.loads(self.state_path.read_text())
-            return {"tokens": float(st.get("tokens", self.burst)), "ts": float(st.get("ts", now)),
-                    "blocked_until": float(st.get("blocked_until", 0.0))}
+            return {
+                "tokens": float(st.get("tokens", self.burst)),
+                "ts": float(st.get("ts", now)),
+                "blocked_until": float(st.get("blocked_until", 0.0)),
+            }
         except (OSError, ValueError):
             return {"tokens": self.burst, "ts": now, "blocked_until": 0.0}
 
-    def _write(self, st: Dict[str, float]) -> None:
+    def _write(self, st: dict[str, float]) -> None:
         tmp = self.state_path.with_suffix(f".tmp{os.getpid()}")
         tmp.write_text(json.dumps(st))
         os.replace(tmp, self.state_path)
 
-    def _locked(self):
+    def _locked(self) -> IO[str]:
         f = open(self.lock_path, "a+")
         fcntl.flock(f.fileno(), fcntl.LOCK_EX)
         return f
@@ -149,8 +171,9 @@ class RateLimiter:
             now = time.time()
             st = self._read(now)
             tokens = min(self.burst, st["tokens"] + max(0.0, now - st["ts"]) * self.rate)
-            self._write({"tokens": 0.0 if drain else tokens, "ts": now,
-                         "blocked_until": max(st["blocked_until"], epoch)})
+            self._write(
+                {"tokens": 0.0 if drain else tokens, "ts": now, "blocked_until": max(st["blocked_until"], epoch)}
+            )
         finally:
             fcntl.flock(f.fileno(), fcntl.LOCK_UN)
             f.close()
@@ -166,7 +189,7 @@ class RateLimiter:
             pass
 
 
-_LIMITER: Optional[RateLimiter] = None
+_LIMITER: RateLimiter | None = None
 
 
 def throttle() -> RateLimiter:
@@ -185,9 +208,10 @@ def _full_url(path_or_url: str) -> str:
     return path_or_url if path_or_url.startswith("http") else DATA_URL + "/" + path_or_url.lstrip("/")
 
 
-def _cache_key(url: str, params: Optional[Dict[str, Any]]) -> str:
-    norm = json.dumps({"url": url, "params": {k: str(v) for k, v in sorted((params or {}).items()) if v is not None}},
-                      sort_keys=True)
+def _cache_key(url: str, params: dict[str, Any] | None) -> str:
+    norm = json.dumps(
+        {"url": url, "params": {k: str(v) for k, v in sorted((params or {}).items()) if v is not None}}, sort_keys=True
+    )
     return hashlib.sha256(norm.encode()).hexdigest()
 
 
@@ -195,7 +219,7 @@ def _cache_path(key: str) -> Path:
     return HTTP_CACHE_DIR / key[:2] / f"{key}.json"
 
 
-def _parse_ts(x: Any) -> Optional[pd.Timestamp]:
+def _parse_ts(x: Any) -> pd.Timestamp | None:
     if x is None or x == "":
         return None
     try:
@@ -205,7 +229,7 @@ def _parse_ts(x: Any) -> Optional[pd.Timestamp]:
     return t.tz_localize("UTC") if t.tzinfo is None else t.tz_convert("UTC")
 
 
-def _auto_ttl(params: Optional[Dict[str, Any]]) -> Optional[float]:
+def _auto_ttl(params: dict[str, Any] | None) -> float | None:
     """None = cache forever. A request is 'historical' when its `end` is more than 1 day ago."""
     end = _parse_ts((params or {}).get("end"))
     if end is not None and end < pd.Timestamp.now(tz="UTC") - HISTORICAL_AGE:
@@ -213,7 +237,7 @@ def _auto_ttl(params: Optional[Dict[str, Any]]) -> Optional[float]:
     return DEFAULT_TTL
 
 
-def _cache_read(key: str, ttl: Optional[float]) -> Optional[Any]:
+def _cache_read(key: str, ttl: float | None) -> Any | None:
     p = _cache_path(key)
     try:
         rec = json.loads(p.read_text())
@@ -224,20 +248,23 @@ def _cache_read(key: str, ttl: Optional[float]) -> Optional[Any]:
     return rec.get("body")
 
 
-def _cache_write(key: str, url: str, params: Optional[Dict[str, Any]], body: Any) -> None:
+def _cache_write(key: str, url: str, params: dict[str, Any] | None, body: Any) -> None:
     p = _cache_path(key)
     p.parent.mkdir(parents=True, exist_ok=True)
-    rec = {"fetched_at": time.time(), "url": url, "params": {k: str(v) for k, v in (params or {}).items()}, "body": body}
+    rec = {
+        "fetched_at": time.time(),
+        "url": url,
+        "params": {k: str(v) for k, v in (params or {}).items()},
+        "body": body,
+    }
     fd, tmp = tempfile.mkstemp(dir=p.parent, prefix=".tmp")
     try:
         with os.fdopen(fd, "w") as fh:
             json.dump(rec, fh)
         os.replace(tmp, p)
     except OSError:
-        try:
+        with contextlib.suppress(OSError):
             os.unlink(tmp)
-        except OSError:
-            pass
 
 
 def purge_cache(older_than_days: float = 30.0) -> int:
@@ -246,7 +273,8 @@ def purge_cache(older_than_days: float = 30.0) -> int:
     for p in HTTP_CACHE_DIR.glob("*/*.json"):
         try:
             if p.stat().st_mtime < cutoff:
-                p.unlink(); n += 1
+                p.unlink()
+                n += 1
         except OSError:
             pass
     return n
@@ -258,25 +286,27 @@ def purge_cache(older_than_days: float = 30.0) -> int:
 _SESSION = threading.local()
 
 
-def _session():
+def _session() -> requests.Session:
     if requests is None:
-        raise ImportError("desk_data_client: live Alpaca calls need `requests` in this venv "
-                          f"(local-store reads do not). pip install requests, or run with {_QR.DATA_DIR}/.venv")
+        raise ImportError(
+            "desk_data_client: live Alpaca calls need `requests` in this venv "
+            f"(local-store reads do not). pip install requests, or run with {_QR.DATA_DIR}/.venv"
+        )
     s = getattr(_SESSION, "s", None)
     if s is None:
         s = _SESSION.s = requests.Session()
     return s
 
 
-def _auth_headers() -> Dict[str, str]:
+def _auth_headers() -> dict[str, str]:
     k, s = os.environ.get("ALPACA_API_KEY_ID"), os.environ.get("ALPACA_API_SECRET_KEY")
     if not k or not s:
         missing = [n for n, v in (("ALPACA_API_KEY_ID", k), ("ALPACA_API_SECRET_KEY", s)) if not v]
-        raise RuntimeError(f"missing env vars: {missing}")   # names only, never values
+        raise RuntimeError(f"missing env vars: {missing}")  # names only, never values
     return {"APCA-API-KEY-ID": k, "APCA-API-SECRET-KEY": s, "Accept": "application/json"}
 
 
-def _server_wait(r) -> Optional[float]:
+def _server_wait(r: requests.Response) -> float | None:
     """Seconds the server asked us to wait (Retry-After or X-RateLimit-Reset epoch), if any."""
     ra = r.headers.get("Retry-After")
     if ra:
@@ -285,6 +315,7 @@ def _server_wait(r) -> Optional[float]:
         except ValueError:
             try:
                 from email.utils import parsedate_to_datetime
+
                 return max(0.0, parsedate_to_datetime(ra).timestamp() - time.time())
             except (TypeError, ValueError):
                 pass
@@ -297,9 +328,18 @@ def _server_wait(r) -> Optional[float]:
     return None
 
 
-def alpaca_get(path_or_url: str, params: Optional[Dict[str, Any]] = None, *, ttl: Union[float, None, str] = "auto",
-               use_cache: bool = True, max_retries: int = 8, base_delay: float = 1.0, max_delay: float = 60.0,
-               timeout: float = 60.0, max_total_wait: float = 900.0) -> Any:
+def alpaca_get(
+    path_or_url: str,
+    params: dict[str, Any] | None = None,
+    *,
+    ttl: float | str | None = "auto",
+    use_cache: bool = True,
+    max_retries: int = 8,
+    base_delay: float = 1.0,
+    max_delay: float = 60.0,
+    timeout: float = 60.0,
+    max_total_wait: float = 900.0,
+) -> Any:
     """Throttled, cached GET of one Alpaca market-data endpoint. Returns parsed JSON.
     ttl: "auto" (forever if params['end'] is >1 day ago, else DESK_ALPACA_CACHE_TTL=300 s), a number of seconds,
          or None (forever). use_cache=False bypasses both read and write.
@@ -308,7 +348,7 @@ def alpaca_get(path_or_url: str, params: Optional[Dict[str, Any]] = None, *, ttl
     url = _full_url(path_or_url)
     params = {k: v for k, v in (params or {}).items() if v is not None}
     key = _cache_key(url, params)
-    eff_ttl = _auto_ttl(params) if ttl == "auto" else ttl
+    eff_ttl: float | None = _auto_ttl(params) if ttl == "auto" else cast(float | None, ttl)
     if use_cache:
         hit = _cache_read(key, eff_ttl)
         if hit is not None:
@@ -323,33 +363,38 @@ def alpaca_get(path_or_url: str, params: Optional[Dict[str, Any]] = None, *, ttl
         try:
             r = sess.get(url, headers=_auth_headers(), params=params, timeout=timeout)
         except requests.RequestException as e:
-            wait = random.uniform(0, min(max_delay, base_delay * 2 ** attempt))
+            wait = random.uniform(0, min(max_delay, base_delay * 2**attempt))
             log.warning("network error %s on %s (attempt %d), retry in %.1fs", type(e).__name__, tag, attempt + 1, wait)
             attempt += 1
             time.sleep(wait)
             continue
         if r.status_code == 429 or r.status_code >= 500:
             k = n429 if r.status_code == 429 else attempt
-            backoff = random.uniform(0, min(max_delay, base_delay * 2 ** k))   # exponential, full jitter
+            backoff = random.uniform(0, min(max_delay, base_delay * 2**k))  # exponential, full jitter
             srv = _server_wait(r)
             wait = max(backoff, (srv or 0.0) + random.uniform(0, 1.0))
             if r.status_code == 429:
                 n429 += 1
-                lim.block_until(time.time() + wait)   # everyone pauses, not just this process
+                lim.block_until(time.time() + wait)  # everyone pauses, not just this process
             else:
                 attempt += 1
-            log.warning("HTTP %s on %s (429s=%d, other retries=%d), retry in %.1fs", r.status_code, tag, n429,
-                        attempt, wait)
+            log.warning(
+                "HTTP %s on %s (429s=%d, other retries=%d), retry in %.1fs", r.status_code, tag, n429, attempt, wait
+            )
             time.sleep(wait)
             continue
         if r.status_code != 200:
             raise AlpacaError(r.status_code, tag, r.text)
         rem = r.headers.get("X-RateLimit-Remaining")
         try:
-            if rem is not None and int(rem) <= 3:      # key budget nearly spent (other users of the same key)
+            if rem is not None and int(rem) <= 3:  # key budget nearly spent (other users of the same key)
                 srv = _server_wait(r)
                 if srv:
-                    log.info("key budget nearly spent (X-RateLimit-Remaining=%s); pausing all clients %.1fs", rem, min(srv, max_delay))
+                    log.info(
+                        "key budget nearly spent (X-RateLimit-Remaining=%s); pausing all clients %.1fs",
+                        rem,
+                        min(srv, max_delay),
+                    )
                     lim.block_until(time.time() + min(srv, max_delay))
         except ValueError:
             pass
@@ -357,12 +402,14 @@ def alpaca_get(path_or_url: str, params: Optional[Dict[str, Any]] = None, *, ttl
         if use_cache:
             _cache_write(key, url, params, body)
         return body
-    raise AlpacaError(429 if n429 else -1, tag, f"giving up after {attempt} retries / {n429} x 429 "
-                                                f"({max_total_wait:.0f}s budget)")
+    raise AlpacaError(
+        429 if n429 else -1, tag, f"giving up after {attempt} retries / {n429} x 429 ({max_total_wait:.0f}s budget)"
+    )
 
 
-def alpaca_get_paginated(path_or_url: str, params: Optional[Dict[str, Any]] = None, items_key: str = "bars",
-                         **kw) -> Any:
+def alpaca_get_paginated(
+    path_or_url: str, params: dict[str, Any] | None = None, items_key: str = "bars", **kw: Any
+) -> Any:
     """Follow next_page_token until exhausted. Each page is cached separately (page_token is part of the key).
     Merges `items_key`: dict-of-lists (multi-symbol endpoints) is concatenated per key; a list is concatenated."""
     params = dict(params or {})
@@ -389,13 +436,21 @@ def alpaca_get_paginated(path_or_url: str, params: Optional[Dict[str, Any]] = No
 # --------------------------------------------------------------------------------------------------------------------
 # Bars
 # --------------------------------------------------------------------------------------------------------------------
-_COLS = {"t": "timestamp_utc", "o": "open", "h": "high", "l": "low", "c": "close", "v": "volume",
-         "n": "trade_count", "vw": "vwap"}
+_COLS = {
+    "t": "timestamp_utc",
+    "o": "open",
+    "h": "high",
+    "l": "low",
+    "c": "close",
+    "v": "volume",
+    "n": "trade_count",
+    "vw": "vwap",
+}
 _ADJ_DIR = {"all": "adjusted", "raw": "raw"}
-_coverage: Dict[str, dt.date] = {}
+_coverage: dict[str, dt.date] = {}
 
 
-def _norm_symbols(symbols: Union[str, Iterable[str]]) -> List[str]:
+def _norm_symbols(symbols: str | Iterable[str]) -> list[str]:
     if isinstance(symbols, str):
         symbols = symbols.split(",")
     return list(dict.fromkeys(s.strip().upper() for s in symbols if s and s.strip()))
@@ -411,7 +466,7 @@ def _sip_cap(t: pd.Timestamp) -> pd.Timestamp:
     return min(t, cap)
 
 
-def store_coverage(adjustment: str = "all") -> Optional[dt.date]:
+def store_coverage(adjustment: str = "all") -> dt.date | None:
     """Last session in the local store (max session_date of SPY, which trades every session)."""
     if adjustment in _coverage:
         return _coverage[adjustment]
@@ -420,11 +475,12 @@ def store_coverage(adjustment: str = "all") -> Optional[dt.date]:
         d = pq.read_table(p, columns=["session_date"]).column("session_date").to_pandas().max()
     except (OSError, ValueError):
         return None
-    _coverage[adjustment] = d
-    return d
+    covered = cast(dt.date, d)
+    _coverage[adjustment] = covered
+    return covered
 
 
-def _bars_to_df(sym: str, bars: List[dict], adjustment: str, feed: str) -> pd.DataFrame:
+def _bars_to_df(sym: str, bars: list[dict[str, Any]], adjustment: str, feed: str) -> pd.DataFrame:
     df = pd.DataFrame(bars).rename(columns=_COLS)
     df["timestamp_utc"] = pd.to_datetime(df["timestamp_utc"], utc=True)
     df.insert(0, "symbol", sym)
@@ -433,15 +489,33 @@ def _bars_to_df(sym: str, bars: List[dict], adjustment: str, feed: str) -> pd.Da
     return df
 
 
-def _fetch_bars(symbols: Sequence[str], timeframe: str, start: pd.Timestamp, end: pd.Timestamp, adjustment: str,
-                feed: str, batch: int = 100, asof: Optional[str] = None, **kw) -> pd.DataFrame:
+def _fetch_bars(
+    symbols: Sequence[str],
+    timeframe: str,
+    start: pd.Timestamp,
+    end: pd.Timestamp,
+    adjustment: str,
+    feed: str,
+    batch: int = 100,
+    asof: str | None = None,
+    **kw: Any,
+) -> pd.DataFrame:
     end = _sip_cap(end)
     if end <= start or not symbols:
         return pd.DataFrame()
     frames = []
     for i in range(0, len(symbols), batch):
-        p = {"symbols": ",".join(symbols[i:i + batch]), "timeframe": timeframe, "start": _iso_utc(start),
-             "end": _iso_utc(end), "adjustment": adjustment, "feed": feed, "limit": 10000, "sort": "asc", "asof": asof}
+        p = {
+            "symbols": ",".join(symbols[i : i + batch]),
+            "timeframe": timeframe,
+            "start": _iso_utc(start),
+            "end": _iso_utc(end),
+            "adjustment": adjustment,
+            "feed": feed,
+            "limit": 10000,
+            "sort": "asc",
+            "asof": asof,
+        }
         bars = alpaca_get_paginated("/v2/stocks/bars", p, "bars", **kw)
         for s, b in (bars or {}).items():
             if b:
@@ -451,15 +525,23 @@ def _fetch_bars(symbols: Sequence[str], timeframe: str, start: pd.Timestamp, end
     return pd.concat(frames, ignore_index=True).sort_values(["symbol", "timestamp_utc"], ignore_index=True)
 
 
-def _read_local(sym: str, adjustment: str, start: dt.date, end: dt.date) -> Optional[pd.DataFrame]:
+def _read_local(sym: str, adjustment: str, start: dt.date, end: dt.date) -> pd.DataFrame | None:
     p = BARS_DIR / _ADJ_DIR[adjustment] / f"{sym}.parquet"
     if not p.exists():
         return None
-    return pq.read_table(p).to_pandas()
+    return cast(pd.DataFrame, pq.read_table(p).to_pandas())
 
 
-def get_daily_bars(symbols: Union[str, Iterable[str]], start: Any, end: Any = None, adjustment: str = "all",
-                   *, feed: str = "sip", allow_api: bool = True, include_partial: bool = False) -> pd.DataFrame:
+def get_daily_bars(
+    symbols: str | Iterable[str],
+    start: Any,
+    end: Any = None,
+    adjustment: str = "all",
+    *,
+    feed: str = "sip",
+    allow_api: bool = True,
+    include_partial: bool = False,
+) -> pd.DataFrame:
     """Daily bars, long format (one row per symbol x session), local store first.
 
     adjustment: 'all' (split+dividend adjusted, bars/daily/adjusted) or 'raw' (as traded, bars/daily/raw).
@@ -479,7 +561,7 @@ def get_daily_bars(symbols: Union[str, Iterable[str]], start: Any, end: Any = No
     d1 = pd.Timestamp(end).date() if end is not None else pd.Timestamp.now(tz="America/New_York").date()
     cov = store_coverage(adjustment)
     frames, warnings, tail_syms, missing_syms = [], [], [], []
-    seam_close: Dict[str, float] = {}
+    seam_close: dict[str, float] = {}
     for s in syms:
         df = _read_local(s, adjustment, d0, d1)
         if df is None or df.empty:
@@ -510,13 +592,17 @@ def get_daily_bars(symbols: Union[str, Iterable[str]], start: Any, end: Any = No
             for s, close in seam_close.items():
                 seam = api[(api["symbol"] == s) & (api["session_date"] == cov)]
                 if len(seam) and abs(seam["close"].iloc[0] / close - 1) > 1e-6:
-                    warnings.append(f"{s}: API close on {cov} differs from local ({seam['close'].iloc[0]} vs {close}); "
-                                    "adjustment likely restated (new corporate action). Pipeline full re-pull pending.")
+                    warnings.append(
+                        f"{s}: API close on {cov} differs from local ({seam['close'].iloc[0]} vs {close}); "
+                        "adjustment likely restated (new corporate action). Pipeline full re-pull pending."
+                    )
             if cov is not None:
                 api = api[~((api["symbol"].isin(tail_syms)) & (api["session_date"] <= cov))]
             api = api[(api["session_date"] >= d0) & (api["session_date"] <= d1)]
             if not include_partial:
-                final_after = pd.to_datetime(api["session_date"].astype(str)).dt.tz_localize(ny) + pd.Timedelta(hours=20)
+                final_after = pd.to_datetime(api["session_date"].astype(str)).dt.tz_localize(ny) + pd.Timedelta(
+                    hours=20
+                )
                 api = api[(final_after <= pd.Timestamp.now(tz=ny)).to_numpy()]
             api["zero_volume"] = api["volume"].fillna(0) == 0
             api["source"] = "api"
@@ -524,8 +610,23 @@ def get_daily_bars(symbols: Union[str, Iterable[str]], start: Any, end: Any = No
             frames.append(api)
 
     if not frames:
-        out = pd.DataFrame(columns=["symbol", "session_date", "timestamp_utc", "open", "high", "low", "close",
-                                    "volume", "trade_count", "vwap", "adjustment", "feed", "source"])
+        out = pd.DataFrame(
+            columns=[
+                "symbol",
+                "session_date",
+                "timestamp_utc",
+                "open",
+                "high",
+                "low",
+                "close",
+                "volume",
+                "trade_count",
+                "vwap",
+                "adjustment",
+                "feed",
+                "source",
+            ]
+        )
     else:
         frames = [f.dropna(axis=1, how="all") if len(frames) > 1 else f for f in frames if len(f)]
         out = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
@@ -537,9 +638,18 @@ def get_daily_bars(symbols: Union[str, Iterable[str]], start: Any, end: Any = No
     return out
 
 
-def get_intraday_bars(symbols: Union[str, Iterable[str]], start: Any, end: Any = None, timeframe: str = "1Min",
-                      adjustment: str = "raw", *, feed: str = "sip", tz: str = "America/New_York",
-                      batch: int = 100, **kw) -> pd.DataFrame:
+def get_intraday_bars(
+    symbols: str | Iterable[str],
+    start: Any,
+    end: Any = None,
+    timeframe: str = "1Min",
+    adjustment: str = "raw",
+    *,
+    feed: str = "sip",
+    tz: str = "America/New_York",
+    batch: int = 100,
+    **kw: Any,
+) -> pd.DataFrame:
     """Intraday bars (e.g. '1Min', '5Min', '15Min', '1Hour') from Alpaca, through the shared throttle + cache.
     start/end: anything pd.Timestamp parses; naive values are interpreted in `tz` (default New York). A bare date as
     `end` means the end of that day. `end` is capped at now-16 min (free-plan SIP restriction).
@@ -551,8 +661,10 @@ def get_intraday_bars(symbols: Union[str, Iterable[str]], start: Any, end: Any =
         t1 = pd.Timestamp.now(tz="UTC")
     else:
         t1 = pd.Timestamp(end)
-        is_date = t1 == t1.normalize() and (isinstance(end, (dt.date,)) and not isinstance(end, dt.datetime)
-                                            or (isinstance(end, str) and len(end) <= 10))
+        is_date = t1 == t1.normalize() and (
+            (isinstance(end, (dt.date,)) and not isinstance(end, dt.datetime))
+            or (isinstance(end, str) and len(end) <= 10)
+        )
         t1 = t1.tz_localize(tz) if t1.tzinfo is None else t1
         if is_date:
             t1 = t1 + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
@@ -563,11 +675,15 @@ def get_intraday_bars(symbols: Union[str, Iterable[str]], start: Any, end: Any =
     return df
 
 
-def get_minute_bars(symbols, start, end=None, adjustment: str = "raw", **kw) -> pd.DataFrame:
+def get_minute_bars(
+    symbols: str | Iterable[str], start: Any, end: Any = None, adjustment: str = "raw", **kw: Any
+) -> pd.DataFrame:
     return get_intraday_bars(symbols, start, end, "1Min", adjustment, **kw)
 
 
-def get_hour_bars(symbols, start, end=None, adjustment: str = "raw", **kw) -> pd.DataFrame:
+def get_hour_bars(
+    symbols: str | Iterable[str], start: Any, end: Any = None, adjustment: str = "raw", **kw: Any
+) -> pd.DataFrame:
     return get_intraday_bars(symbols, start, end, "1Hour", adjustment, **kw)
 
 
@@ -578,13 +694,13 @@ def get_hour_bars(symbols, start, end=None, adjustment: str = "raw", **kw) -> pd
 # ====================================================================================================================
 FRED_URL = "https://api.stlouisfed.org/fred/"
 FRED_KEY_FILE = Path(os.environ.get("FRED_API_KEY_FILE", f"{_QR.HOME_DIR}/.secrets/fred_api_key"))
-FRED_RPM = float(os.environ.get("DESK_FRED_RPM", "100"))           # FRED allows 120/min per key
+FRED_RPM = float(os.environ.get("DESK_FRED_RPM", "100"))  # FRED allows 120/min per key
 FRED_BURST = float(os.environ.get("DESK_FRED_BURST", "10"))
 FRED_TTL = float(os.environ.get("DESK_FRED_CACHE_TTL", "3600"))
-ALFRED_MAX_VINTAGES = 1900                                          # FRED limit per request (output_type=1)
+ALFRED_MAX_VINTAGES = 1900  # FRED limit per request (output_type=1)
 FRED_OPEN_END = "9999-12-31"
 _SECRET_PARAMS = {"api_key"}
-_FRED_LIMITER: Optional[RateLimiter] = None
+_FRED_LIMITER: RateLimiter | None = None
 
 
 class FredError(RuntimeError):
@@ -653,29 +769,38 @@ def fred_throttle() -> RateLimiter:
     return _FRED_LIMITER
 
 
-def _fred_auto_ttl(params: Dict[str, Any]) -> Optional[float]:
+def _fred_auto_ttl(params: dict[str, Any]) -> float | None:
     """Forever if the request is fully historical: realtime_end (or, without realtime params, observation_end) is
     more than 1 day ago. Vintage data for a closed real-time window never changes."""
     for k in ("realtime_end", "observation_end"):
         if k in params:
             if k == "observation_end" and "realtime_end" not in params:
-                return FRED_TTL   # latest-vintage values for old dates can still be revised
+                return FRED_TTL  # latest-vintage values for old dates can still be revised
             end = _parse_ts(params[k]) if str(params[k]) != FRED_OPEN_END else None
             if end is not None and end < pd.Timestamp.now(tz="UTC") - HISTORICAL_AGE:
                 return None
     return FRED_TTL
 
 
-def fred_get(endpoint: str, params: Optional[Dict[str, Any]] = None, *, ttl: Union[float, None, str] = "auto",
-             use_cache: bool = True, max_retries: int = 8, base_delay: float = 1.0, max_delay: float = 60.0,
-             timeout: float = 60.0, max_total_wait: float = 900.0) -> Any:
+def fred_get(
+    endpoint: str,
+    params: dict[str, Any] | None = None,
+    *,
+    ttl: float | str | None = "auto",
+    use_cache: bool = True,
+    max_retries: int = 8,
+    base_delay: float = 1.0,
+    max_delay: float = 60.0,
+    timeout: float = 60.0,
+    max_total_wait: float = 900.0,
+) -> Any:
     """Throttled, cached GET of one FRED/ALFRED endpoint (e.g. 'series/observations'). Returns parsed JSON.
     Cache key = endpoint URL + params WITHOUT api_key. 4xx other than 429 raise FredError (message redacted)."""
     url = FRED_URL + endpoint.lstrip("/")
     params = {k: v for k, v in (params or {}).items() if v is not None and k not in _SECRET_PARAMS}
     params.setdefault("file_type", "json")
     key = _cache_key(url, params)
-    eff_ttl = _fred_auto_ttl(params) if ttl == "auto" else ttl
+    eff_ttl: float | None = _fred_auto_ttl(params) if ttl == "auto" else cast(float | None, ttl)
     if use_cache:
         hit = _cache_read(key, eff_ttl)
         if hit is not None:
@@ -689,39 +814,47 @@ def fred_get(endpoint: str, params: Optional[Dict[str, Any]] = None, *, ttl: Uni
         sess = _session()
         try:
             r = sess.get(url, params={**params, "api_key": _fred_key()}, timeout=timeout)
-        except requests.RequestException as e:      # exception text can contain the URL -> log type only
-            wait = random.uniform(0, min(max_delay, base_delay * 2 ** attempt))
+        except requests.RequestException as e:  # exception text can contain the URL -> log type only
+            wait = random.uniform(0, min(max_delay, base_delay * 2**attempt))
             log.warning("network error %s on %s (attempt %d), retry in %.1fs", type(e).__name__, tag, attempt + 1, wait)
             attempt += 1
             time.sleep(wait)
             continue
         if r.status_code == 429 or r.status_code >= 500:
             k = n429 if r.status_code == 429 else attempt
-            backoff = random.uniform(0, min(max_delay, base_delay * 2 ** k))
+            backoff = random.uniform(0, min(max_delay, base_delay * 2**k))
             srv = _server_wait(r)
             wait = max(backoff, (srv or 0.0) + random.uniform(0, 1.0))
             if r.status_code == 429:
                 n429 += 1
-                wait = max(wait, 20.0)                  # FRED's window is per minute; 429 body has no reset header
+                wait = max(wait, 20.0)  # FRED's window is per minute; 429 body has no reset header
                 lim.block_until(time.time() + wait)
             else:
                 attempt += 1
-            log.warning("FRED HTTP %s on %s (429s=%d, other retries=%d), retry in %.1fs", r.status_code, tag, n429,
-                        attempt, wait)
+            log.warning(
+                "FRED HTTP %s on %s (429s=%d, other retries=%d), retry in %.1fs",
+                r.status_code,
+                tag,
+                n429,
+                attempt,
+                wait,
+            )
             time.sleep(wait)
             continue
         if r.status_code != 200:
             raise FredError(r.status_code, tag, r.text)
         body = r.json()
         if use_cache:
-            _cache_write(key, url, params, body)     # params never include api_key
+            _cache_write(key, url, params, body)  # params never include api_key
         return body
     raise FredError(429 if n429 else -1, tag, f"giving up after {attempt} retries / {n429} x 429")
 
 
-def fred_get_all(endpoint: str, params: Dict[str, Any], items_key: str, page_limit: int = 100000, **kw) -> List[dict]:
+def fred_get_all(
+    endpoint: str, params: dict[str, Any], items_key: str, page_limit: int = 100000, **kw: Any
+) -> list[dict[str, Any]]:
     """Offset/limit pagination for FRED list endpoints."""
-    out: List[dict] = []
+    out: list[dict[str, Any]] = []
     offset = 0
     while True:
         j = fred_get(endpoint, {**params, "limit": page_limit, "offset": offset}, **kw)
@@ -734,31 +867,40 @@ def fred_get_all(endpoint: str, params: Dict[str, Any], items_key: str, page_lim
 
 
 def _fred_values(s: pd.Series) -> pd.Series:
-    return pd.to_numeric(s.replace(".", None), errors="coerce")   # '.' = missing (e.g. holiday) -> NaN
+    return pd.to_numeric(s.replace(".", None), errors="coerce")  # '.' = missing (e.g. holiday) -> NaN
 
 
-def fred_series_info(series_id: str, **kw) -> dict:
+def fred_series_info(series_id: str, **kw: Any) -> dict[str, Any]:
     j = fred_get("series", {"series_id": series_id}, **kw)
-    return (j.get("seriess") or [{}])[0]
+    return cast(dict[str, Any], (j.get("seriess") or [{}])[0])
 
 
-def fred_series(series_id: str, start: Any = None, end: Any = None, **kw) -> pd.DataFrame:
+def fred_series(series_id: str, start: Any = None, end: Any = None, **kw: Any) -> pd.DataFrame:
     """Latest-vintage observations: columns series_id, observation_date, value (NaN for FRED '.')."""
-    p = {"series_id": series_id,
-         "observation_start": pd.Timestamp(start).date().isoformat() if start is not None else None,
-         "observation_end": pd.Timestamp(end).date().isoformat() if end is not None else None}
+    p = {
+        "series_id": series_id,
+        "observation_start": pd.Timestamp(start).date().isoformat() if start is not None else None,
+        "observation_end": pd.Timestamp(end).date().isoformat() if end is not None else None,
+    }
     obs = fred_get_all("series/observations", p, "observations", **kw)
     df = pd.DataFrame(obs, columns=["date", "value"])
-    return pd.DataFrame({"series_id": series_id, "observation_date": pd.to_datetime(df["date"]).dt.date,
-                         "value": _fred_values(df["value"])})
+    return pd.DataFrame(
+        {
+            "series_id": series_id,
+            "observation_date": pd.to_datetime(df["date"]).dt.date,
+            "value": _fred_values(df["value"]),
+        }
+    )
 
 
-def fred_vintage_dates(series_id: str, **kw) -> List[str]:
-    return [str(d) for d in fred_get_all("series/vintagedates", {"series_id": series_id}, "vintage_dates",
-                                         page_limit=10000, **kw)]
+def fred_vintage_dates(series_id: str, **kw: Any) -> list[str]:
+    return [
+        str(d)
+        for d in fred_get_all("series/vintagedates", {"series_id": series_id}, "vintage_dates", page_limit=10000, **kw)
+    ]
 
 
-def alfred_vintages(series_id: str, start: Any = None, end: Any = None, **kw) -> pd.DataFrame:
+def alfred_vintages(series_id: str, start: Any = None, end: Any = None, **kw: Any) -> pd.DataFrame:
     """Every vintage of every observation (ALFRED, output_type=1 = observations by real-time period).
     Columns: series_id, observation_date, value, realtime_start, realtime_end (date; 9999-12-31 = still current).
     FRED allows <= 2000 vintage dates per request, so the real-time axis is split on the series' vintage dates and
@@ -766,17 +908,23 @@ def alfred_vintages(series_id: str, start: Any = None, end: Any = None, **kw) ->
     vds = fred_vintage_dates(series_id, **kw)
     if not vds:
         return pd.DataFrame(columns=["series_id", "observation_date", "value", "realtime_start", "realtime_end"])
-    obs_p = {"series_id": series_id, "output_type": 1,
-             "observation_start": pd.Timestamp(start).date().isoformat() if start is not None else None,
-             "observation_end": pd.Timestamp(end).date().isoformat() if end is not None else None}
-    rows: List[dict] = []
-    chunks = [vds[i:i + ALFRED_MAX_VINTAGES] for i in range(0, len(vds), ALFRED_MAX_VINTAGES)]
+    obs_p = {
+        "series_id": series_id,
+        "output_type": 1,
+        "observation_start": pd.Timestamp(start).date().isoformat() if start is not None else None,
+        "observation_end": pd.Timestamp(end).date().isoformat() if end is not None else None,
+    }
+    rows: list[dict[str, Any]] = []
+    chunks = [vds[i : i + ALFRED_MAX_VINTAGES] for i in range(0, len(vds), ALFRED_MAX_VINTAGES)]
     for ci, ch in enumerate(chunks):
         last = ci == len(chunks) - 1
         # the last chunk is left open-ended so it also returns the current vintage (realtime_end 9999-12-31)
         rt_end = FRED_OPEN_END if last else (pd.Timestamp(chunks[ci + 1][0]) - pd.Timedelta(days=1)).date().isoformat()
-        rows.extend(fred_get_all("series/observations", {**obs_p, "realtime_start": ch[0], "realtime_end": rt_end},
-                                 "observations", **kw))
+        rows.extend(
+            fred_get_all(
+                "series/observations", {**obs_p, "realtime_start": ch[0], "realtime_end": rt_end}, "observations", **kw
+            )
+        )
     df = pd.DataFrame(rows, columns=["date", "value", "realtime_start", "realtime_end"])
     df["value"] = _fred_values(df["value"])
     df = df.sort_values(["date", "realtime_start"], ignore_index=True)
@@ -786,25 +934,41 @@ def alfred_vintages(series_id: str, start: Any = None, end: Any = None, **kw) ->
     same_val = df["value"].eq(df["value"].shift()) | (df["value"].isna() & df["value"].shift().isna())
     contiguous = pd.to_datetime(df["realtime_start"]).eq(prev_end.shift() + pd.Timedelta(days=1))
     grp = (~(same_obs & same_val & contiguous)).cumsum()
-    m = df.groupby(grp, sort=False).agg(date=("date", "first"), value=("value", "first"),
-                                        realtime_start=("realtime_start", "first"), realtime_end=("realtime_end", "last"))
-    out = pd.DataFrame({
-        "series_id": series_id,
-        "observation_date": pd.to_datetime(m["date"]).dt.date.values,
-        "value": m["value"].values,
-        "realtime_start": pd.to_datetime(m["realtime_start"]).dt.date.values,
-        "realtime_end": [dt.date(9999, 12, 31) if x == FRED_OPEN_END else pd.Timestamp(x).date() for x in m["realtime_end"]],
-    })
+    m = df.groupby(grp, sort=False).agg(
+        date=("date", "first"),
+        value=("value", "first"),
+        realtime_start=("realtime_start", "first"),
+        realtime_end=("realtime_end", "last"),
+    )
+    out = pd.DataFrame(
+        {
+            "series_id": series_id,
+            "observation_date": pd.to_datetime(m["date"]).dt.date.values,
+            "value": m["value"].values,
+            "realtime_start": pd.to_datetime(m["realtime_start"]).dt.date.values,
+            "realtime_end": [
+                dt.date(9999, 12, 31) if x == FRED_OPEN_END else pd.Timestamp(x).date() for x in m["realtime_end"]
+            ],
+        }
+    )
     return out.sort_values(["observation_date", "realtime_start"], ignore_index=True)
 
 
-def fred_release_dates(release_id: int, start: Any = None, end: Any = None, include_empty: bool = True,
-                       **kw) -> pd.DataFrame:
+def fred_release_dates(
+    release_id: int,
+    start: Any = None,
+    end: Any = None,
+    include_empty: bool = True,
+    **kw: Any,
+) -> pd.DataFrame:
     """Release dates for a FRED release (e.g. 18 = H.15 Selected Interest Rates). Columns release_id, date."""
-    p = {"release_id": release_id, "include_release_dates_with_no_data": str(include_empty).lower(),
-         "realtime_start": pd.Timestamp(start).date().isoformat() if start is not None else "1776-07-04",
-         "realtime_end": pd.Timestamp(end).date().isoformat() if end is not None else FRED_OPEN_END,
-         "sort_order": "asc"}
+    p = {
+        "release_id": release_id,
+        "include_release_dates_with_no_data": str(include_empty).lower(),
+        "realtime_start": pd.Timestamp(start).date().isoformat() if start is not None else "1776-07-04",
+        "realtime_end": pd.Timestamp(end).date().isoformat() if end is not None else FRED_OPEN_END,
+        "sort_order": "asc",
+    }
     rows = fred_get_all("release/dates", p, "release_dates", page_limit=10000, **kw)
     df = pd.DataFrame(rows, columns=["release_id", "date"])
     df["date"] = pd.to_datetime(df["date"]).dt.date
@@ -812,10 +976,14 @@ def fred_release_dates(release_id: int, start: Any = None, end: Any = None, incl
 
 
 # ---- point-in-time view over the local ALFRED store ------------------------------------------------------------------
-FRED_STORE_DIRS = [DATA_DIR / "macro" / "treasury", DATA_DIR / "macro" / "carry" / "g10_3m", DATA_DIR / "sentiment" / "credit"]
+FRED_STORE_DIRS = [
+    DATA_DIR / "macro" / "treasury",
+    DATA_DIR / "macro" / "carry" / "g10_3m",
+    DATA_DIR / "sentiment" / "credit",
+]
 
 
-def _local_vintage_file(series_id: str) -> Optional[Path]:
+def _local_vintage_file(series_id: str) -> Path | None:
     """Newest frozen vintages file (…_vintages_YYYYMMDD.parquet) in the FRED store dirs that contains series_id."""
     cands = []
     for d in FRED_STORE_DIRS:
@@ -838,7 +1006,9 @@ def alfred_store(series_id: str) -> pd.DataFrame:
         return pd.read_parquet(p, filters=[("series_id", "==", series_id)])
     log.info("%s not in local FRED store; pulling ALFRED vintages live", series_id)
     df = alfred_vintages(series_id)
-    t = pd.to_datetime(df["realtime_start"].astype(str)).dt.tz_localize("America/New_York") + pd.Timedelta(hours=23, minutes=59)
+    t = pd.to_datetime(df["realtime_start"].astype(str)).dt.tz_localize("America/New_York") + pd.Timedelta(
+        hours=23, minutes=59
+    )
     df["available_at_et"] = t
     df["available_at_sgt"] = t.dt.tz_convert("Asia/Singapore")
     df["availability_method"] = "realtime_start_end_of_day_et_live"
@@ -860,8 +1030,16 @@ def alfred_asof(series_id: str, asof: Any, start: Any = None, end: Any = None) -
     v = v.sort_values(["observation_date", "available_at_et"])
     n = v.groupby("observation_date").size().rename("vintage_count_to_date")
     out = v.groupby("observation_date", as_index=False).tail(1).merge(n, on="observation_date")
-    cols = ["series_id", "observation_date", "value", "realtime_start", "available_at_et", "available_at_sgt",
-            "availability_method", "vintage_count_to_date"]
+    cols = [
+        "series_id",
+        "observation_date",
+        "value",
+        "realtime_start",
+        "available_at_et",
+        "available_at_sgt",
+        "availability_method",
+        "vintage_count_to_date",
+    ]
     return out[[c for c in cols if c in out.columns]].reset_index(drop=True)
 
 

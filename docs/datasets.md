@@ -62,8 +62,9 @@ Status snapshot for the CIO: `STATUS.md`. Machine-readable run summary (counts, 
 
 ```python
 import pandas as pd
-adj = pd.read_parquet("$QR_DATA_DIR/bars/daily/adjusted")            # all symbols, one frame
-raw = pd.read_parquet("$QR_DATA_DIR/bars/daily/raw", filters=[("symbol","in",["AAPL","SPY"])])
+
+adj = pd.read_parquet("$QR_DATA_DIR/bars/daily/adjusted")  # all symbols, one frame
+raw = pd.read_parquet("$QR_DATA_DIR/bars/daily/raw", filters=[("symbol", "in", ["AAPL", "SPY"])])
 close = adj.pivot(index="session_date", columns="symbol", values="close")
 one = pd.read_parquet("$QR_DATA_DIR/bars/daily/adjusted/AAPL.parquet")
 ```
@@ -83,8 +84,10 @@ one = pd.read_parquet("$QR_DATA_DIR/bars/daily/adjusted/AAPL.parquet")
 - Update: `pipelines/total_return.py`. Local only, recomputed in full, about 10 s. Run after `daily_bars.py` and `corporate_actions.py`.
 
 ```python
-tr = pd.read_parquet("$QR_DATA_DIR/bars/daily/total_return/daily_total_return.parquet",
-                     columns=["symbol","session_date","ret_total_best","tr_index_best","tr_mismatch_gt50bps"])
+tr = pd.read_parquet(
+    "$QR_DATA_DIR/bars/daily/total_return/daily_total_return.parquet",
+    columns=["symbol", "session_date", "ret_total_best", "tr_index_best", "tr_mismatch_gt50bps"],
+)
 R = tr.pivot(index="session_date", columns="symbol", values="ret_total_best")
 ```
 
@@ -126,10 +129,14 @@ R = tr.pivot(index="session_date", columns="symbol", values="ret_total_best")
 
 ```python
 mem = pd.read_parquet("$QR_DATA_DIR/universe/sp500_membership.parquet")
+
+
 def members_on(d):
     d = pd.Timestamp(d).date()
     ok = (mem.start_date_filled <= d) & (mem.end_date.isna() | (mem.end_date > d))
     return set(mem.loc[ok, "symbol"])
+
+
 panel = pd.read_parquet("$QR_DATA_DIR/universe/sp500_monthend_members.parquet")
 ```
 
@@ -189,7 +196,8 @@ panel = pd.read_parquet("$QR_DATA_DIR/universe/sp500_monthend_members.parquet")
 
 ```python
 ff = pd.read_parquet("$QR_DATA_DIR/factors/ken_french/ff5_daily.parquet").merge(
-     pd.read_parquet("$QR_DATA_DIR/factors/ken_french/mom_daily.parquet").drop(columns="source_file"), on="date")
+    pd.read_parquet("$QR_DATA_DIR/factors/ken_french/mom_daily.parquet").drop(columns="source_file"), on="date"
+)
 ```
 
 ### 9. FOMC calendar: `macro/fomc_meetings.parquet`
@@ -218,10 +226,13 @@ ff = pd.read_parquet("$QR_DATA_DIR/factors/ken_french/ff5_daily.parquet").merge(
 ```python
 # for Ethan: ticker -> CIK valid on a date (prefer high confidence)
 ref = pd.read_parquet("$QR_DATA_DIR/reference/ticker_cik_map.parquet").dropna(subset=["cik"])
+
+
 def cik_for(ticker, d):
-    d = pd.Timestamp(d).date(); r = ref[ref.ticker == ticker]
+    d = pd.Timestamp(d).date()
+    r = ref[ref.ticker == ticker]
     r = r[(r.valid_from.isna() | (r.valid_from <= d)) & (r.valid_to.isna() | (r.valid_to > d))]
-    return r.sort_values("confidence").cik.iloc[0] if len(r) else None   # 'high' < 'medium' alphabetically
+    return r.sort_values("confidence").cik.iloc[0] if len(r) else None  # 'high' < 'medium' alphabetically
 ```
 
 ### 12. QA reports: `qa/`
@@ -333,8 +344,11 @@ Dave's numbered requests:
 The desk shares one Alpaca key (free plan: 200 req/min for the whole key). Direct `requests.get` calls from several agents are what cause the HTTP 429s.
 
 ```python
-import sys; sys.path.insert(0, "$QR_DATA_DIR/lib")
+import sys
+
+sys.path.insert(0, "$QR_DATA_DIR/lib")
 import desk_data_client as ddc
+
 df = ddc.get_daily_bars(["AAPL", "SPY"], "2020-01-01", "2026-10-29", adjustment="all")  # or "raw"
 ```
 It works from any desk venv: it needs only the stdlib, pandas and pyarrow, plus `requests` for live calls (no new dependencies, so the lock file is unchanged). `statarb/.venv` has no `requests`: local reads work there, but live calls raise a clear ImportError.
@@ -361,8 +375,10 @@ It works from any desk venv: it needs only the stdlib, pandas and pyarrow, plus 
 - **Credentials:** read from `ALPACA_API_KEY_ID` / `ALPACA_API_SECRET_KEY` and sent only as headers. They are never logged, cached or written. Error messages carry only the status, the path and the response body.
 - **Scripts with their own HTTP code** (including future runs of `pipelines/*.py`, which use `common.get`) should either call `ddc.alpaca_get(url, params)` in place of their own GET, or at minimum take a shared token before each data-API request:
   ```python
-  sys.path.insert(0, "$QR_DATA_DIR/lib"); import desk_data_client as ddc
-  ddc.throttle().acquire("my_script")      # then do the existing requests.get(...)
+  sys.path.insert(0, "$QR_DATA_DIR/lib")
+  import desk_data_client as ddc
+
+  ddc.throttle().acquire("my_script")  # then do the existing requests.get(...)
   ```
   The bucket covers market data (`data.alpaca.markets`) only. Trading-API calls (`paper-api.alpaca.markets`, e.g. `/v2/calendar`, `/v2/assets`) are not routed through it.
 
@@ -388,9 +404,13 @@ It works from any desk venv: it needs only the stdlib, pandas and pyarrow, plus 
   - A series that is not in the store is pulled live, with conservative end-of-day availability.
 
 ```python
-import sys, pandas as pd; sys.path.insert(0, "$QR_DATA_DIR/lib"); import desk_data_client as ddc
-y10 = ddc.alfred_asof("DGS10", "2022-04-04 17:00")         # what was known at 17:00 ET that day
-hy  = ddc.alfred_asof("BAMLH0A0HYM2", pd.Timestamp("2026-10-29 22:30", tz="Asia/Singapore"))
+import sys, pandas as pd
+
+sys.path.insert(0, "$QR_DATA_DIR/lib")
+import desk_data_client as ddc
+
+y10 = ddc.alfred_asof("DGS10", "2022-04-04 17:00")  # what was known at 17:00 ET that day
+hy = ddc.alfred_asof("BAMLH0A0HYM2", pd.Timestamp("2026-10-29 22:30", tz="Asia/Singapore"))
 ```
 
 ### 13. ALFRED vintage datasets (Maya: curve / carry / credit): frozen, dated, sha256-verified
@@ -449,7 +469,8 @@ The live store is mutable: fixes land in place (v1.0, v1.1, ...). A snapshot has
 - **Dave batch pin (2026-11-06):** use `releases/v1.3/` (top_hash d137eea39928ec8d27b4e8ace5266c01bf74a81ca7e6d07a9d84f9a71b6dc13a). SIP bar definitions: `docs/SIP_DAILY_BAR_METHODOLOGY.md` (sha256 5e0767cef725197d69f67b4334b4a3dcaaa2a15dbacc426692a7addb99370b8d). SUE table not in v1.3.
 ```python
 R = "$QR_DATA_DIR/releases/v1.2"
-raw = pd.read_parquet(f"{R}/bars/daily/raw"); tr = pd.read_parquet(f"{R}/bars/daily/total_return/daily_total_return.parquet")
+raw = pd.read_parquet(f"{R}/bars/daily/raw")
+tr = pd.read_parquet(f"{R}/bars/daily/total_return/daily_total_return.parquet")
 ```
 
 ## Staleness reporting (added 2026-11-06 06:15 SGT)

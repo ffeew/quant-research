@@ -1,23 +1,33 @@
 """Regenerate rich old_to_new_reconciliation (v2 pinned schema) into --output-dir.
 Does not modify the reviewed v2 parquet. Use --check-reproduction to compare to pinned artefacts.
 """
+
 from __future__ import annotations
-from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DATA_DIR, ...)
-import argparse, hashlib, os, shutil, sys
-import pandas as pd
+
+import argparse
+import hashlib
+import os
+import sys
+from typing import cast
+
 import numpy as np
+import pandas as pd
+
+from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DATA_DIR, ...)
 
 V1_HASH = "d568a60d19348ad2948083df6a95f64e501f25615d773cdac14ebd9629216d2e"
 OLD_HASH = "d07358318c6b0016afa9b5e3d885b1ce508bdd5af83328e692bcba2653a9fe5f"
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 V2 = os.path.join(ROOT, "v2")
 
-def sha(p):
+
+def sha(p: str) -> str:
     h = hashlib.sha256()
     with open(p, "rb") as f:
         for c in iter(lambda: f.read(1 << 20), b""):
             h.update(c)
     return h.hexdigest()
+
 
 def build_recon(v2: pd.DataFrame, old: pd.DataFrame) -> pd.DataFrame:
     member_to_kept = {}
@@ -28,7 +38,7 @@ def build_recon(v2: pd.DataFrame, old: pd.DataFrame) -> pd.DataFrame:
     cluster_members = set(member_to_kept)
     v1_acc = set(v2.accession)
     old_g = old.groupby("accession").agg(
-        old_ciks=("cik", lambda s: sorted(set(int(x) for x in s))),
+        old_ciks=("cik", lambda s: sorted({int(x) for x in s})),
         old_symbols=("symbol", lambda s: sorted(set(s))),
         old_sec_name=("sec_name", "first"),
         old_acceptance_utc=("acceptance_datetime_utc", "first"),
@@ -36,58 +46,93 @@ def build_recon(v2: pd.DataFrame, old: pd.DataFrame) -> pd.DataFrame:
     )
     v2i = v2.set_index("accession")
     recs = []
-    for a, r in old_g.iterrows():
+    for raw_a, r in old_g.iterrows():
+        a = cast(str, raw_a)
         if a in v1_acc:
             v = v2i.loc[a]
-            vc = int(v.cik)
-            comps = [int(x) for x in str(v.cik_components).split(",") if x]
+            vc = int(cast(int, v.cik))
+            _comps = [int(x) for x in str(v.cik_components).split(",") if x]
             if vc not in r.old_ciks:
                 status = "dual_cik_alias_other_canonical"
                 reason = f"old_ciks={r.old_ciks} old_symbols={r.old_symbols}; v2 canonical={vc} components={v.cik_components}"
-            elif len(r.old_ciks) > 1 or int(v.n_component_ciks) > 1:
+            elif len(r.old_ciks) > 1 or int(cast(int, v.n_component_ciks)) > 1:
                 status = "dual_cik_components_preserved"
                 reason = f"old_ciks={r.old_ciks} old_symbols={r.old_symbols}; v2 canonical={vc} components={v.cik_components}"
             else:
                 status, reason = "kept_exact", "accession present with same CIK"
-            recs.append(dict(
-                old_accession=a, old_ciks=",".join(map(str, r.old_ciks)),
-                old_symbols=",".join(r.old_symbols), old_sec_name=r.old_sec_name,
-                n_old_rows=int(r.n_old_rows), new_accession=a, new_cik=vc,
-                new_cik_components=v.cik_components, status=status, reason=reason,
-                old_acceptance_utc=r.old_acceptance_utc, new_acceptance_utc=v.acceptance_utc,
-            ))
+            recs.append(
+                dict(
+                    old_accession=a,
+                    old_ciks=",".join(map(str, r.old_ciks)),
+                    old_symbols=",".join(r.old_symbols),
+                    old_sec_name=r.old_sec_name,
+                    n_old_rows=int(r.n_old_rows),
+                    new_accession=a,
+                    new_cik=vc,
+                    new_cik_components=v.cik_components,
+                    status=status,
+                    reason=reason,
+                    old_acceptance_utc=r.old_acceptance_utc,
+                    new_acceptance_utc=v.acceptance_utc,
+                )
+            )
         elif a in cluster_members:
             kept = member_to_kept[a]
             v = v2i.loc[kept]
-            recs.append(dict(
-                old_accession=a, old_ciks=",".join(map(str, r.old_ciks)),
-                old_symbols=",".join(r.old_symbols), old_sec_name=r.old_sec_name,
-                n_old_rows=int(r.n_old_rows), new_accession=kept, new_cik=int(v.cik),
-                new_cik_components=v.cik_components, status="cluster_member",
-                reason=f"absorbed into cluster kept accession {kept}",
-                old_acceptance_utc=r.old_acceptance_utc, new_acceptance_utc=v.acceptance_utc,
-            ))
+            recs.append(
+                dict(
+                    old_accession=a,
+                    old_ciks=",".join(map(str, r.old_ciks)),
+                    old_symbols=",".join(r.old_symbols),
+                    old_sec_name=r.old_sec_name,
+                    n_old_rows=int(r.n_old_rows),
+                    new_accession=kept,
+                    new_cik=int(v.cik),
+                    new_cik_components=v.cik_components,
+                    status="cluster_member",
+                    reason=f"absorbed into cluster kept accession {kept}",
+                    old_acceptance_utc=r.old_acceptance_utc,
+                    new_acceptance_utc=v.acceptance_utc,
+                )
+            )
         elif 1675149 in r.old_ciks:
-            recs.append(dict(
-                old_accession=a, old_ciks=",".join(map(str, r.old_ciks)),
-                old_symbols=",".join(r.old_symbols), old_sec_name=r.old_sec_name,
-                n_old_rows=int(r.n_old_rows), new_accession=None, new_cik=None,
-                new_cik_components=None, status="excluded_outside_membership_aa_post_split",
-                reason="Alcoa Corp post-split; AA membership ended 2016-11-01",
-                old_acceptance_utc=r.old_acceptance_utc, new_acceptance_utc=None,
-            ))
+            recs.append(
+                dict(
+                    old_accession=a,
+                    old_ciks=",".join(map(str, r.old_ciks)),
+                    old_symbols=",".join(r.old_symbols),
+                    old_sec_name=r.old_sec_name,
+                    n_old_rows=int(r.n_old_rows),
+                    new_accession=None,
+                    new_cik=None,
+                    new_cik_components=None,
+                    status="excluded_outside_membership_aa_post_split",
+                    reason="Alcoa Corp post-split; AA membership ended 2016-11-01",
+                    old_acceptance_utc=r.old_acceptance_utc,
+                    new_acceptance_utc=None,
+                )
+            )
         elif 1578318 in r.old_ciks:
-            recs.append(dict(
-                old_accession=a, old_ciks=",".join(map(str, r.old_ciks)),
-                old_symbols=",".join(r.old_symbols), old_sec_name=r.old_sec_name,
-                n_old_rows=int(r.n_old_rows), new_accession=None, new_cik=None,
-                new_cik_components=None, status="excluded_before_membership_evhc_holdings",
-                reason="Envision Healthcare Holdings filings before EVHC membership start 2016-12-02",
-                old_acceptance_utc=r.old_acceptance_utc, new_acceptance_utc=None,
-            ))
+            recs.append(
+                dict(
+                    old_accession=a,
+                    old_ciks=",".join(map(str, r.old_ciks)),
+                    old_symbols=",".join(r.old_symbols),
+                    old_sec_name=r.old_sec_name,
+                    n_old_rows=int(r.n_old_rows),
+                    new_accession=None,
+                    new_cik=None,
+                    new_cik_components=None,
+                    status="excluded_before_membership_evhc_holdings",
+                    reason="Envision Healthcare Holdings filings before EVHC membership start 2016-12-02",
+                    old_acceptance_utc=r.old_acceptance_utc,
+                    new_acceptance_utc=None,
+                )
+            )
         else:
             raise RuntimeError(f"unresolved {a}")
     return pd.DataFrame(recs)
+
 
 def df_equal(a: pd.DataFrame, b: pd.DataFrame) -> tuple[bool, str]:
     if list(a.columns) != list(b.columns):
@@ -111,11 +156,15 @@ def df_equal(a: pd.DataFrame, b: pd.DataFrame) -> tuple[bool, str]:
             return False, f"col {c} mismatches {bad}"
     return True, "dataframe_equality_ok"
 
-def main():
+
+def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--output-dir", required=True)
-    ap.add_argument("--check-reproduction", action="store_true",
-                    help="compare regenerated recon to pinned v2/old_to_new_reconciliation.parquet")
+    ap.add_argument(
+        "--check-reproduction",
+        action="store_true",
+        help="compare regenerated recon to pinned v2/old_to_new_reconciliation.parquet",
+    )
     args = ap.parse_args()
     os.makedirs(args.output_dir, exist_ok=True)
     assert sha(os.path.join(ROOT, "earnings_events_8k202.parquet")) == V1_HASH
@@ -140,6 +189,7 @@ def main():
         if not ok:
             sys.exit(2)
         print("REPRODUCTION_OK")
+
 
 if __name__ == "__main__":
     main()

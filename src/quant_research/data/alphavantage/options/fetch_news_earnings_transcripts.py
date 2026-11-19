@@ -2,8 +2,8 @@
 """Pilot NEWS_SENTIMENT, EARNINGS, EARNINGS_CALENDAR, EARNINGS_CALL_TRANSCRIPT.
 Rate <=40/min. Never logs API key. Resumable. Run AFTER options pull.
 """
+
 from __future__ import annotations
-from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DATA_DIR, ...)
 
 import csv
 import gzip
@@ -17,16 +17,37 @@ import traceback
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
+
+from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DATA_DIR, ...)
 
 ROOT = Path(f"{_QR.DATA_DIR}/alphavantage")
 NEWS_ROOT = ROOT / "news"
 TRANS_ROOT = ROOT / "transcripts"
 LOG_DIR = ROOT / "logs"
 PILOT = [
-    "AAPL","NVDA","MSFT","GOOGL","AMZN","META","TSLA","AVGO","LLY","BRK.B",
-    "WMT","JPM","V","MU","AMD","XOM","JNJ","MA","ABBV","COST",
+    "AAPL",
+    "NVDA",
+    "MSFT",
+    "GOOGL",
+    "AMZN",
+    "META",
+    "TSLA",
+    "AVGO",
+    "LLY",
+    "BRK.B",
+    "WMT",
+    "JPM",
+    "V",
+    "MU",
+    "AMD",
+    "XOM",
+    "JNJ",
+    "MA",
+    "ABBV",
+    "COST",
 ]
 MAX_RPM = 40
 MIN_INTERVAL = 60.0 / MAX_RPM
@@ -43,7 +64,7 @@ def redact(s: str, key: str) -> str:
 
 
 def log(msg: str, key: str, logfile: Path) -> None:
-    ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    ts = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     line = f"{ts} {redact(str(msg), key)}\n"
     logfile.parent.mkdir(parents=True, exist_ok=True)
     with open(logfile, "a", encoding="utf-8") as f:
@@ -97,7 +118,7 @@ def atomic_write_bytes(path: Path, raw: bytes) -> str:
     return sha
 
 
-def classify(data) -> str:
+def classify(data: Any) -> str:
     if not isinstance(data, dict):
         return "OK_RAW"
     if "Error Message" in data:
@@ -117,7 +138,7 @@ def classify(data) -> str:
     return "OK"
 
 
-def av_get(params: dict, key: str, bucket: TokenBucket, logf: Path) -> tuple[str, bytes, object]:
+def av_get(params: dict[str, Any], key: str, bucket: TokenBucket, logf: Path) -> tuple[str, bytes, object]:
     params = dict(params)
     params["apikey"] = key
     url = "https://www.alphavantage.co/query?" + urllib.parse.urlencode(params)
@@ -136,26 +157,26 @@ def av_get(params: dict, key: str, bucket: TokenBucket, logf: Path) -> tuple[str
                 return "OK_RAW", raw, None
             kind = classify(data)
             if kind in ("INVALID_KEY", "PREMIUM"):
-                log(f"FATAL {kind} params={ {k:v for k,v in params.items() if k!='apikey'} }", key, logf)
+                log(f"FATAL {kind} params={ {k: v for k, v in params.items() if k != 'apikey'} }", key, logf)
                 return "FATAL", raw, data
             if kind == "THROTTLE":
-                wait = BASE_BACKOFF * (2 ** attempt) + 5
+                wait = BASE_BACKOFF * (2**attempt) + 5
                 log(f"THROTTLE attempt={attempt} wait={wait:.1f} url={url_safe}", key, logf)
                 time.sleep(wait)
                 continue
             if kind == "ERROR":
                 log(f"ERR attempt={attempt} {redact(str(data.get('Error Message')), key)}", key, logf)
-                time.sleep(BASE_BACKOFF * (2 ** attempt))
+                time.sleep(BASE_BACKOFF * (2**attempt))
                 continue
             return "OK", raw, data
         except urllib.error.HTTPError as e:
             log(f"HTTP {e.code} attempt={attempt} {url_safe}", key, logf)
             if e.code in (401, 403):
                 return "FATAL", b"", None
-            time.sleep(BASE_BACKOFF * (2 ** attempt) + 2)
+            time.sleep(BASE_BACKOFF * (2**attempt) + 2)
         except Exception as e:
             log(f"EXC attempt={attempt} {redact(str(e), key)}", key, logf)
-            time.sleep(BASE_BACKOFF * (2 ** attempt) + 2)
+            time.sleep(BASE_BACKOFF * (2**attempt) + 2)
     return "FAIL", b"", None
 
 
@@ -166,18 +187,29 @@ def ensure_csv_manifest(path: Path, fields: list[str]) -> None:
             csv.DictWriter(f, fieldnames=fields).writeheader()
 
 
-def append_csv(path: Path, fields: list[str], row: dict) -> None:
+def append_csv(path: Path, fields: list[str], row: dict[str, Any]) -> None:
     with open(path, "a", newline="", encoding="utf-8") as f:
         csv.DictWriter(f, fieldnames=fields).writerow(row)
 
 
 # ---------- NEWS_SENTIMENT ----------
-def fetch_news_for_ticker(ticker: str, key: str, bucket: TokenBucket, logf: Path) -> dict:
+def fetch_news_for_ticker(ticker: str, key: str, bucket: TokenBucket, logf: Path) -> dict[str, Any]:
     """Page through time with limit=1000; split windows that hit the cap."""
     out_dir = NEWS_ROOT / ticker
     out_dir.mkdir(parents=True, exist_ok=True)
     man_path = NEWS_ROOT / "NEWS_MANIFEST.csv"
-    fields = ["ticker","window_from","window_to","path","sha256","articles","status","hit_cap","fetched_at_utc","coverage_note"]
+    fields = [
+        "ticker",
+        "window_from",
+        "window_to",
+        "path",
+        "sha256",
+        "articles",
+        "status",
+        "hit_cap",
+        "fetched_at_utc",
+        "coverage_note",
+    ]
     ensure_csv_manifest(man_path, fields)
 
     # load done windows
@@ -187,22 +219,30 @@ def fetch_news_for_ticker(ticker: str, key: str, bucket: TokenBucket, logf: Path
             if row["ticker"] == ticker and row["status"] in ("OK", "EMPTY"):
                 done.add((row["window_from"], row["window_to"]))
 
-    now = datetime.now(timezone.utc)
-    end_str = now.strftime("%Y%m%dT%H%M")
+    now = datetime.now(UTC)
+    _end_str = now.strftime("%Y%m%dT%H%M")
     # Strategy: walk forward from NEWS_START in ~90-day windows with sort=EARLIEST;
     # if a window returns 1000, bisect until <1000 or min window (~1 day).
     # Also try a probe for earliest article.
 
-    summary = {"ticker": ticker, "windows": 0, "articles_raw": 0, "articles_dedup": 0,
-               "hit_cap_windows": 0, "earliest": None, "latest": None, "urls": set()}
+    summary: dict[str, Any] = {
+        "ticker": ticker,
+        "windows": 0,
+        "articles_raw": 0,
+        "articles_dedup": 0,
+        "hit_cap_windows": 0,
+        "earliest": None,
+        "latest": None,
+        "urls": set(),
+    }
 
     def parse_tf(s: str) -> datetime:
-        return datetime.strptime(s[:13], "%Y%m%dT%H%M").replace(tzinfo=timezone.utc)
+        return datetime.strptime(s[:13], "%Y%m%dT%H%M").replace(tzinfo=UTC)
 
     def fmt(dt: datetime) -> str:
         return dt.strftime("%Y%m%dT%H%M")
 
-    def fetch_window(t_from: str, t_to: str) -> tuple[str, list, bytes]:
+    def fetch_window(t_from: str, t_to: str) -> tuple[str, list[Any], bytes]:
         params = {
             "function": "NEWS_SENTIMENT",
             "tickers": ticker,
@@ -219,33 +259,44 @@ def fetch_news_for_ticker(ticker: str, key: str, bucket: TokenBucket, logf: Path
         feed = data.get("feed") or []
         return "OK", feed, raw
 
-    def save_window(t_from: str, t_to: str, feed: list, raw: bytes, hit_cap: bool) -> None:
+    def save_window(t_from: str, t_to: str, feed: list[Any], raw: bytes, hit_cap: bool) -> None:
         if (t_from, t_to) in done:
             return
         fname = f"{t_from}_{t_to}.json.gz"
         path = out_dir / fname
         # wrap feed with meta for reproducibility
-        payload = json.dumps({"time_from": t_from, "time_to": t_to, "ticker": ticker,
-                              "items": len(feed), "feed": feed}, separators=(",", ":")).encode()
+        payload = json.dumps(
+            {"time_from": t_from, "time_to": t_to, "ticker": ticker, "items": len(feed), "feed": feed},
+            separators=(",", ":"),
+        ).encode()
         # Prefer saving the raw AV response when available & parseable as our structure;
         # store our normalized payload for consistent schema.
         sha = atomic_write_gz(path, payload)
         status = "EMPTY" if len(feed) == 0 else "OK"
         note = ""
-        append_csv(man_path, fields, {
-            "ticker": ticker, "window_from": t_from, "window_to": t_to,
-            "path": str(path), "sha256": sha, "articles": len(feed),
-            "status": status, "hit_cap": int(hit_cap),
-            "fetched_at_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "coverage_note": note,
-        })
+        append_csv(
+            man_path,
+            fields,
+            {
+                "ticker": ticker,
+                "window_from": t_from,
+                "window_to": t_to,
+                "path": str(path),
+                "sha256": sha,
+                "articles": len(feed),
+                "status": status,
+                "hit_cap": int(hit_cap),
+                "fetched_at_utc": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "coverage_note": note,
+            },
+        )
         done.add((t_from, t_to))
         summary["windows"] += 1
         summary["articles_raw"] += len(feed)
         if hit_cap:
             summary["hit_cap_windows"] += 1
         for a in feed:
-            url = a.get("url") or a.get("banner_image") or ""
+            _url = a.get("url") or a.get("banner_image") or ""
             # prefer url
             u = a.get("url")
             if u:
@@ -269,13 +320,22 @@ def fetch_news_for_ticker(ticker: str, key: str, bucket: TokenBucket, logf: Path
             return "FATAL"
         if status == "FAIL":
             log(f"NEWS_FAIL {ticker} {fs}-{ts}", key, logf)
-            append_csv(man_path, fields, {
-                "ticker": ticker, "window_from": fs, "window_to": ts,
-                "path": "", "sha256": "", "articles": 0, "status": "FAIL",
-                "hit_cap": 0,
-                "fetched_at_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                "coverage_note": "give_up",
-            })
+            append_csv(
+                man_path,
+                fields,
+                {
+                    "ticker": ticker,
+                    "window_from": fs,
+                    "window_to": ts,
+                    "path": "",
+                    "sha256": "",
+                    "articles": 0,
+                    "status": "FAIL",
+                    "hit_cap": 0,
+                    "fetched_at_utc": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "coverage_note": "give_up",
+                },
+            )
             return "FAIL"
         hit = len(feed) >= 1000
         if hit:
@@ -287,8 +347,7 @@ def fetch_news_for_ticker(ticker: str, key: str, bucket: TokenBucket, logf: Path
                 r1 = walk(t_from, mid)
                 if r1 == "FATAL":
                     return "FATAL"
-                r2 = walk(mid, t_to)
-                return r2
+                return walk(mid, t_to)
             # min window still capped — save and flag
             save_window(fs, ts, feed, raw, True)
             return "OK"
@@ -304,7 +363,7 @@ def fetch_news_for_ticker(ticker: str, key: str, bucket: TokenBucket, logf: Path
     st = walk(probe_from, probe_to)
     if st == "FATAL":
         summary["articles_dedup"] = len(summary["urls"])
-        return {"fatal": True, **{k: (len(v) if k=="urls" else v) for k,v in summary.items()}}
+        return {"fatal": True, **{k: (len(v) if k == "urls" else v) for k, v in summary.items()}}
 
     cursor = parse_tf("20190101T0000")
     end = now
@@ -328,16 +387,20 @@ def fetch_news_for_ticker(ticker: str, key: str, bucket: TokenBucket, logf: Path
         "hit_cap_windows": summary["hit_cap_windows"],
     }
     (out_dir / "COVERAGE.json").write_text(json.dumps(cov, indent=2), encoding="utf-8")
-    log(f"NEWS_DONE {ticker} windows={summary['windows']} raw={summary['articles_raw']} uniq={summary['articles_dedup']} earliest={summary['earliest']}", key, logf)
+    log(
+        f"NEWS_DONE {ticker} windows={summary['windows']} raw={summary['articles_raw']} uniq={summary['articles_dedup']} earliest={summary['earliest']}",
+        key,
+        logf,
+    )
     return {k: (len(v) if k == "urls" else v) for k, v in summary.items()}
 
 
 # ---------- EARNINGS ----------
-def fetch_earnings(ticker: str, key: str, bucket: TokenBucket, logf: Path) -> dict:
+def fetch_earnings(ticker: str, key: str, bucket: TokenBucket, logf: Path) -> dict[str, Any]:
     out_dir = NEWS_ROOT / "earnings_history"
     out_dir.mkdir(parents=True, exist_ok=True)
     man = NEWS_ROOT / "EARNINGS_MANIFEST.csv"
-    fields = ["ticker","path","sha256","annual_rows","quarterly_rows","status","fetched_at_utc"]
+    fields = ["ticker", "path", "sha256", "annual_rows", "quarterly_rows", "status", "fetched_at_utc"]
     ensure_csv_manifest(man, fields)
     # skip if done
     with open(man, newline="", encoding="utf-8") as f:
@@ -362,32 +425,52 @@ def fetch_earnings(ticker: str, key: str, bucket: TokenBucket, logf: Path) -> di
             continue
         path = out_dir / f"{ticker}.json.gz"
         sha = atomic_write_gz(path, raw)
-        append_csv(man, fields, {
-            "ticker": ticker, "path": str(path), "sha256": sha,
-            "annual_rows": len(annual), "quarterly_rows": len(quarterly),
-            "status": "OK",
-            "fetched_at_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        })
+        append_csv(
+            man,
+            fields,
+            {
+                "ticker": ticker,
+                "path": str(path),
+                "sha256": sha,
+                "annual_rows": len(annual),
+                "quarterly_rows": len(quarterly),
+                "status": "OK",
+                "fetched_at_utc": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            },
+        )
         log(f"EARNINGS_OK {ticker} via={sym} annual={len(annual)} quarterly={len(quarterly)}", key, logf)
-        return {"ticker": ticker, "status": "OK", "annual_rows": len(annual), "quarterly_rows": len(quarterly),
-                "symbol_used": sym}
+        return {
+            "ticker": ticker,
+            "status": "OK",
+            "annual_rows": len(annual),
+            "quarterly_rows": len(quarterly),
+            "symbol_used": sym,
+        }
     # empty
     path = out_dir / f"{ticker}.EMPTY.json.gz"
     payload = json.dumps({"symbol": ticker, "annualEarnings": [], "quarterlyEarnings": []}).encode()
     sha = atomic_write_gz(path, payload)
-    append_csv(man, fields, {
-        "ticker": ticker, "path": str(path), "sha256": sha,
-        "annual_rows": 0, "quarterly_rows": 0, "status": "EMPTY",
-        "fetched_at_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-    })
+    append_csv(
+        man,
+        fields,
+        {
+            "ticker": ticker,
+            "path": str(path),
+            "sha256": sha,
+            "annual_rows": 0,
+            "quarterly_rows": 0,
+            "status": "EMPTY",
+            "fetched_at_utc": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        },
+    )
     return {"ticker": ticker, "status": "EMPTY", "annual_rows": 0, "quarterly_rows": 0}
 
 
-def fetch_earnings_calendar(key: str, bucket: TokenBucket, logf: Path) -> dict:
+def fetch_earnings_calendar(key: str, bucket: TokenBucket, logf: Path) -> dict[str, Any]:
     out_dir = NEWS_ROOT / "earnings_calendar"
     out_dir.mkdir(parents=True, exist_ok=True)
     man = NEWS_ROOT / "EARNINGS_CALENDAR_MANIFEST.csv"
-    fields = ["horizon","path","sha256","rows","status","fetched_at_utc","note"]
+    fields = ["horizon", "path", "sha256", "rows", "status", "fetched_at_utc", "note"]
     ensure_csv_manifest(man, fields)
     results = []
     for horizon in ("3month", "6month", "12month"):
@@ -400,20 +483,32 @@ def fetch_earnings_calendar(key: str, bucket: TokenBucket, logf: Path) -> dict:
                     results.append({"horizon": horizon, "status": "SKIP", "rows": int(row["rows"] or 0)})
         if skip:
             continue
-        status, raw, data = av_get({
-            "function": "EARNINGS_CALENDAR",
-            "horizon": horizon,
-        }, key, bucket, logf)
+        status, raw, _data = av_get(
+            {
+                "function": "EARNINGS_CALENDAR",
+                "horizon": horizon,
+            },
+            key,
+            bucket,
+            logf,
+        )
         # EARNINGS_CALENDAR returns CSV
         if status == "FATAL":
             return {"fatal": True, "results": results}
         if status == "FAIL":
-            append_csv(man, fields, {
-                "horizon": horizon, "path": "", "sha256": "", "rows": 0,
-                "status": "FAIL",
-                "fetched_at_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                "note": "forward-looking calendar",
-            })
+            append_csv(
+                man,
+                fields,
+                {
+                    "horizon": horizon,
+                    "path": "",
+                    "sha256": "",
+                    "rows": 0,
+                    "status": "FAIL",
+                    "fetched_at_utc": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "note": "forward-looking calendar",
+                },
+            )
             results.append({"horizon": horizon, "status": "FAIL"})
             continue
         text = raw.decode("utf-8", errors="replace")
@@ -422,12 +517,19 @@ def fetch_earnings_calendar(key: str, bucket: TokenBucket, logf: Path) -> dict:
         nrows = max(0, len(lines) - 1)
         path = out_dir / f"earnings_calendar_{horizon}.csv"
         sha = atomic_write_bytes(path, raw)
-        append_csv(man, fields, {
-            "horizon": horizon, "path": str(path), "sha256": sha, "rows": nrows,
-            "status": "OK" if nrows > 0 else "EMPTY",
-            "fetched_at_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "note": "FORWARD-LOOKING; not historical event dates",
-        })
+        append_csv(
+            man,
+            fields,
+            {
+                "horizon": horizon,
+                "path": str(path),
+                "sha256": sha,
+                "rows": nrows,
+                "status": "OK" if nrows > 0 else "EMPTY",
+                "fetched_at_utc": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "note": "FORWARD-LOOKING; not historical event dates",
+            },
+        )
         log(f"EARNINGS_CAL {horizon} rows={nrows}", key, logf)
         results.append({"horizon": horizon, "status": "OK", "rows": nrows, "sha": sha})
     # also write a note file
@@ -441,11 +543,11 @@ def fetch_earnings_calendar(key: str, bucket: TokenBucket, logf: Path) -> dict:
 
 
 # ---------- TRANSCRIPTS ----------
-def fetch_transcripts(ticker: str, key: str, bucket: TokenBucket, logf: Path) -> dict:
+def fetch_transcripts(ticker: str, key: str, bucket: TokenBucket, logf: Path) -> dict[str, Any]:
     out_dir = TRANS_ROOT / ticker
     out_dir.mkdir(parents=True, exist_ok=True)
     man = TRANS_ROOT / "TRANSCRIPTS_MANIFEST.csv"
-    fields = ["ticker","quarter","path","sha256","chars","status","fetched_at_utc"]
+    fields = ["ticker", "quarter", "path", "sha256", "chars", "status", "fetched_at_utc"]
     ensure_csv_manifest(man, fields)
 
     done = set()
@@ -456,7 +558,7 @@ def fetch_transcripts(ticker: str, key: str, bucket: TokenBucket, logf: Path) ->
 
     # Probe earliest: try from 2010Q1 forward; AV often has ~2010s+
     # Generate quarters from 2010Q1 through current
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     quarters = []
     for y in range(2010, now.year + 1):
         for q in (1, 2, 3, 4):
@@ -465,7 +567,7 @@ def fetch_transcripts(ticker: str, key: str, bucket: TokenBucket, logf: Path) ->
             quarters.append(f"{y}Q{q}")
 
     # Find earliest available with a coarse probe (sample every year Q1) then fill
-    summary = {"ticker": ticker, "ok": 0, "empty": 0, "fail": 0, "earliest_ok": None, "latest_ok": None}
+    summary: dict[str, Any] = {"ticker": ticker, "ok": 0, "empty": 0, "fail": 0, "earliest_ok": None, "latest_ok": None}
 
     def one(qtr: str) -> str:
         if qtr in done:
@@ -475,11 +577,16 @@ def fetch_transcripts(ticker: str, key: str, bucket: TokenBucket, logf: Path) ->
         if ticker == "BRK.B":
             symbols = ["BRK.B", "BRK-B"]
         for sym in symbols:
-            status, raw, data = av_get({
-                "function": "EARNINGS_CALL_TRANSCRIPT",
-                "symbol": sym,
-                "quarter": qtr,
-            }, key, bucket, logf)
+            status, raw, data = av_get(
+                {
+                    "function": "EARNINGS_CALL_TRANSCRIPT",
+                    "symbol": sym,
+                    "quarter": qtr,
+                },
+                key,
+                bucket,
+                logf,
+            )
             if status == "FATAL":
                 return "FATAL"
             if status != "OK" or not isinstance(data, dict):
@@ -498,11 +605,19 @@ def fetch_transcripts(ticker: str, key: str, bucket: TokenBucket, logf: Path) ->
                 if not data.get("transcript") and len(json.dumps(data)) < 200:
                     path = out_dir / f"{qtr}.json.gz"
                     sha = atomic_write_gz(path, raw if raw else b"{}")
-                    append_csv(man, fields, {
-                        "ticker": ticker, "quarter": qtr, "path": str(path), "sha256": sha,
-                        "chars": 0, "status": "EMPTY",
-                        "fetched_at_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                    })
+                    append_csv(
+                        man,
+                        fields,
+                        {
+                            "ticker": ticker,
+                            "quarter": qtr,
+                            "path": str(path),
+                            "sha256": sha,
+                            "chars": 0,
+                            "status": "EMPTY",
+                            "fetched_at_utc": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        },
+                    )
                     done.add(qtr)
                     summary["empty"] += 1
                     return "EMPTY"
@@ -510,21 +625,37 @@ def fetch_transcripts(ticker: str, key: str, bucket: TokenBucket, logf: Path) ->
             if len(text) < 50:
                 path = out_dir / f"{qtr}.json.gz"
                 sha = atomic_write_gz(path, raw)
-                append_csv(man, fields, {
-                    "ticker": ticker, "quarter": qtr, "path": str(path), "sha256": sha,
-                    "chars": len(text), "status": "EMPTY",
-                    "fetched_at_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                })
+                append_csv(
+                    man,
+                    fields,
+                    {
+                        "ticker": ticker,
+                        "quarter": qtr,
+                        "path": str(path),
+                        "sha256": sha,
+                        "chars": len(text),
+                        "status": "EMPTY",
+                        "fetched_at_utc": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    },
+                )
                 done.add(qtr)
                 summary["empty"] += 1
                 return "EMPTY"
             path = out_dir / f"{qtr}.json.gz"
             sha = atomic_write_gz(path, raw)
-            append_csv(man, fields, {
-                "ticker": ticker, "quarter": qtr, "path": str(path), "sha256": sha,
-                "chars": len(text), "status": "OK",
-                "fetched_at_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            })
+            append_csv(
+                man,
+                fields,
+                {
+                    "ticker": ticker,
+                    "quarter": qtr,
+                    "path": str(path),
+                    "sha256": sha,
+                    "chars": len(text),
+                    "status": "OK",
+                    "fetched_at_utc": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                },
+            )
             done.add(qtr)
             summary["ok"] += 1
             if summary["earliest_ok"] is None:
@@ -536,11 +667,19 @@ def fetch_transcripts(ticker: str, key: str, bucket: TokenBucket, logf: Path) ->
         path = out_dir / f"{qtr}.json.gz"
         payload = json.dumps({"symbol": ticker, "quarter": qtr, "transcript": ""}).encode()
         sha = atomic_write_gz(path, payload)
-        append_csv(man, fields, {
-            "ticker": ticker, "quarter": qtr, "path": str(path), "sha256": sha,
-            "chars": 0, "status": "EMPTY",
-            "fetched_at_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        })
+        append_csv(
+            man,
+            fields,
+            {
+                "ticker": ticker,
+                "quarter": qtr,
+                "path": str(path),
+                "sha256": sha,
+                "chars": 0,
+                "status": "EMPTY",
+                "fetched_at_utc": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            },
+        )
         done.add(qtr)
         summary["empty"] += 1
         return "EMPTY"

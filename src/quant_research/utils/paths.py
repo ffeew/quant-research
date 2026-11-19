@@ -8,6 +8,7 @@ HOME_DIR        the user's home directory (e.g. FRED key-file fallback).
 Values are plain strings, so path building in the (frozen) research code is byte-for-byte
 unchanged when the variables point at the original desk locations.
 """
+
 import os
 import tempfile
 
@@ -20,6 +21,7 @@ HOME_DIR = os.path.expanduser("~").rstrip("/")
 def data_path(*parts: str) -> str:
     """Join parts under QR_DATA_DIR."""
     return os.path.join(DATA_DIR, *parts)
+
 
 # Shared cost models live inside the package (formerly the desk's tca/tca_scripts folder).
 COSTS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "backtest", "costs")

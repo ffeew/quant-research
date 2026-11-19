@@ -4,12 +4,16 @@ the same day overwrites that day only). History only exists from the first run o
 Knowledge time = snapshot_utc. Run once a day, ideally pre-open (e.g. 08:00-09:00 ET).
 Also rebuilds assets/universe_asset_flags_history.parquet (universe symbols x snapshot dates, bool flags).
 One command (from anywhere):  $QR_DATA_DIR/.venv/bin/python $QR_DATA_DIR/pipelines/assets_snapshot.py"""
-from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DATA_DIR, ...)
+
+from __future__ import annotations
+
 import pandas as pd
-from quant_research.data.pipelines.common import DATA, TRADING_URL, get, write_parquet, update_manifest, log
+
+from quant_research.data.pipelines.common import DATA, TRADING_URL, get, log, update_manifest, write_parquet
+from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DATA_DIR, ...)
 
 
-def main():
+def main() -> None:
     a = pd.DataFrame(get(TRADING_URL + "/v2/assets", {"status": "all", "asset_class": "us_equity"}))
     now = pd.Timestamp.now(tz="UTC")
     a["snapshot_utc"] = now
@@ -19,25 +23,52 @@ def main():
     write_parquet(a, f)
     u = pd.read_parquet(DATA / "universe" / "universe.parquet")
     m = a[a.symbol.isin(set(u.symbol))]
-    info = {"file": str(f), "assets": len(a), "universe_matched": len(m),
-            "universe_shortable": int((m.shortable.astype(str) == "True").sum()), "universe_easy_to_borrow": int((m.easy_to_borrow.astype(str) == "True").sum())}
+    info = {
+        "file": str(f),
+        "assets": len(a),
+        "universe_matched": len(m),
+        "universe_shortable": int((m.shortable.astype(str) == "True").sum()),
+        "universe_easy_to_borrow": int((m.easy_to_borrow.astype(str) == "True").sum()),
+    }
     # rebuild the universe flag history from all daily snapshots (idempotent)
-    cols = ["symbol", "snapshot_date_et", "snapshot_utc", "status", "tradable", "shortable", "easy_to_borrow", "marginable", "fractionable", "exchange"]
+    cols = [
+        "symbol",
+        "snapshot_date_et",
+        "snapshot_utc",
+        "status",
+        "tradable",
+        "shortable",
+        "easy_to_borrow",
+        "marginable",
+        "fractionable",
+        "exchange",
+    ]
     snaps = sorted((DATA / "assets" / "snapshots").glob("assets_*.parquet"))
     h = pd.concat([pd.read_parquet(x, columns=[c for c in cols if c in pd.read_parquet(x).columns]) for x in snaps])
     h = h[h.symbol.isin(set(u.symbol))]
     for c in ("tradable", "shortable", "easy_to_borrow", "marginable", "fractionable"):
-        if c in h: h[c] = h[c].astype(str).eq("True")
-    write_parquet(h.sort_values(["symbol", "snapshot_date_et"]).reset_index(drop=True), DATA / "assets" / "universe_asset_flags_history.parquet")
-    info["history_snapshots"] = len(snaps); info["history_rows"] = len(h)
-    update_manifest("assets_snapshot", info); log.info("%s", info)
+        if c in h:
+            h[c] = h[c].astype(str).eq("True")
+    write_parquet(
+        h.sort_values(["symbol", "snapshot_date_et"]).reset_index(drop=True),
+        DATA / "assets" / "universe_asset_flags_history.parquet",
+    )
+    info["history_snapshots"] = len(snaps)
+    info["history_rows"] = len(h)
+    update_manifest("assets_snapshot", info)
+    log.info("%s", info)
 
 
-def _staleness(*names):
+def _staleness(*names: str) -> None:
     """Write data/staleness/<name>.json from on-disk observation maxima (lib/staleness.py). Never changes exit code."""
     try:
-        import sys as _s; _s.path.insert(0, f"{_QR.DATA_DIR}/lib"); from quant_research.data.client import staleness
-        for n in names: staleness.record(n)
+        import sys as _s
+
+        _s.path.insert(0, f"{_QR.DATA_DIR}/lib")
+        from quant_research.data.client import staleness
+
+        for n in names:
+            staleness.record(n)
     except Exception as e:
         print(f"STALENESS record failed: {e}", file=__import__("sys").stderr)
 

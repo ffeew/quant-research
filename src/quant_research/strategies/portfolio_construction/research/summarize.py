@@ -1,6 +1,7 @@
 import json,glob,sys
 for f in sorted(glob.glob('out/wf_*.json')):
-    d=json.load(open(f)); m=d['meta']
+    d=json.load(open(f))
+    m=d['meta']
     print(f"\n== {f}: N={m['universe_n']} OOS {m['oos_start']}..{m['oos_end']} days={m['oos_days']} rebals={m['n_rebal']}")
     print(f"{'method':8} {'ret':>7} {'vol':>6} {'SR':>6} {'maxDD':>7} {'turn/yr':>7} {'costbp':>6} {'fcvol':>6} {'r/f':>5} {'bias':>5} {'delta':>5}  volCI  SRCI  biasCI")
     for k,v in d['table'].items():

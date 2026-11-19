@@ -23,21 +23,25 @@ quant-research/
 ├── scripts/             run_trial.py, build_data.py, data/ shell fetchers
 ├── tests/               mirrors src/ (backtest, strategies, utils)
 ├── docs/                architecture, data pipeline, adding a trial, dataset specs, paper registry
-├── requirements/        pinned lock files from the original research environments
-├── pyproject.toml       package, extras, ruff and pytest config
-├── Makefile             install / test / lint / build-data
-└── .github/workflows/   CI (Python 3.12: compileall, ruff, pytest)
+├── pyproject.toml       package, dependency groups, ruff, mypy, and pytest
+├── uv.lock              locked environment (uv sync --locked)
+├── .python-version      3.12
+├── Makefile             install / lint / typecheck / test / build-data
+└── .github/workflows/   CI (Python 3.12: ruff, mypy, pytest)
 ```
 
 ## Quick start
 
 ```bash
-python3.12 -m venv .venv && . .venv/bin/activate
-make install            # pip install -e ".[dev]"; extras: plots, nlp, data, all
-make test               # data-dependent tests skip without QR_DATA_DIR
-qr list                 # trials, status, verdict
-qr run trend_tsmom      # run a trial's entry module (needs data)
+# Install uv: https://docs.astral.sh/uv/getting-started/installation/
+uv sync                 # Python 3.12, project, and the dev group (ruff, mypy, pytest)
+uv run qr list          # trials, status, verdict
+uv run qr run trend_tsmom   # run a trial's entry module (needs data)
+make test               # compileall + pytest; data-dependent tests skip without QR_DATA_DIR
 ```
+
+Optional extras (plots, nlp, data) are not installed by a plain `uv sync`. Add them with
+`uv sync --all-extras` when a dataset builder needs openpyxl, yfinance, or lxml.
 
 ## Regenerating data
 

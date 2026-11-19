@@ -3,38 +3,72 @@
 Builds target weights for every pre-registered variant in config.V1_VARIANTS (AL s-scores cached once per factor
 model), backtests both lagged executions (open_t1 primary - STANDARD 'next-bar open'; close_t1 secondary), and
 writes per-trial daily gross/net under every cost scenario in config.SCENARIOS to ../results/v1/daily/."""
-from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DATA_DIR, ...)
-import sys, json, time, importlib, pickle
+
+from __future__ import annotations
+
+import importlib
+import json
+import pickle
+import sys
+import time
 from pathlib import Path
+from typing import Any, cast
+
 import numpy as np
 import pandas as pd
-sys.path.insert(0, str(Path(__file__).parent))
-from quant_research.strategies.statarb_v1 import config as CFG
-from quant_research.strategies.statarb_v1.statarb.data import load_panel, CIO, ETFS
-from quant_research.strategies.statarb_v1.statarb import backtest as bt, costs as C, papers
 
+from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DATA_DIR, ...)
+
+sys.path.insert(0, str(Path(__file__).parent))
 import argparse
-ap = argparse.ArgumentParser(); ap.add_argument("only", nargs="?", default=None)
-ap.add_argument("--mode", default="base", choices=["base", "complete", "delist_stress"],
-                help="complete: drop reused/re-added/gap tickers (data_issues); delist_stress: -30%% on non-merger delistings")
+
+from quant_research.strategies.statarb_v1 import config as CFG
+from quant_research.strategies.statarb_v1.statarb import backtest as bt
+from quant_research.strategies.statarb_v1.statarb import costs as C
+from quant_research.strategies.statarb_v1.statarb import papers
+from quant_research.strategies.statarb_v1.statarb.data import CIO, ETFS, load_panel
+
+ap = argparse.ArgumentParser()
+ap.add_argument("only", nargs="?", default=None)
+ap.add_argument(
+    "--mode",
+    default="base",
+    choices=["base", "complete", "delist_stress"],
+    help="complete: drop reused/re-added/gap tickers (data_issues); delist_stress: -30%% on non-merger delistings",
+)
 A = ap.parse_args()
 OUT = Path(__file__).resolve().parents[1] / "results" / ("v1" if A.mode == "base" else f"v1_{A.mode}")
-(OUT / "daily").mkdir(parents=True, exist_ok=True); (OUT / "cache").mkdir(exist_ok=True); (OUT / "trades").mkdir(exist_ok=True); (OUT / "cache").mkdir(exist_ok=True)
+(OUT / "daily").mkdir(parents=True, exist_ok=True)
+(OUT / "cache").mkdir(exist_ok=True)
+(OUT / "trades").mkdir(exist_ok=True)
+(OUT / "cache").mkdir(exist_ok=True)
 only = A.only.split(",") if A.only else None
 t0 = time.time()
-P = load_panel("cio_data", price_set=CFG.PRICE_SET, jump_filter=CFG.JUMP_FILTER, jump_abs_ret=CFG.JUMP_ABS_RET,
-               split_ratios=CFG.SPLIT_RATIOS, split_tol=CFG.SPLIT_TOL)
+P = load_panel(
+    "cio_data",
+    price_set=CFG.PRICE_SET,
+    jump_filter=CFG.JUMP_FILTER,
+    jump_abs_ret=CFG.JUMP_ABS_RET,
+    split_ratios=CFG.SPLIT_RATIOS,
+    split_tol=CFG.SPLIT_TOL,
+)
 from quant_research.strategies.statarb_v1.statarb import data_issues as DI
 from quant_research.strategies.statarb_v1.statarb.data import _membership
+
 FLAG = DI.flagged_symbols(P.close, _membership(P.close.index, P.close.columns))
 EVENTS = DI.delisting_events(-0.30)
 if A.mode == "complete":
     drop = [s for s in FLAG["all"] if s in P.member.columns]
     P.member.loc[:, drop] = False
     print("complete-history mode: excluded", len(drop), "symbols", flush=True)
-CACHE = (Path(__file__).resolve().parents[1] / "results" / "v1" / "cache") if A.mode == "delist_stress" else OUT / "cache"
-print("loaded", P.close.shape, P.close.index[0].date(), P.close.index[-1].date(), f"{time.time()-t0:.0f}s", flush=True)
-O = pd.concat([P.open, P.etf_open], axis=1); Cl = pd.concat([P.close, P.etf_close], axis=1)
+CACHE = (
+    (Path(__file__).resolve().parents[1] / "results" / "v1" / "cache") if A.mode == "delist_stress" else OUT / "cache"
+)
+print(
+    "loaded", P.close.shape, P.close.index[0].date(), P.close.index[-1].date(), f"{time.time() - t0:.0f}s", flush=True
+)
+O = pd.concat([P.open, P.etf_open], axis=1)
+Cl = pd.concat([P.close, P.etf_close], axis=1)
 BAD = pd.concat([P.bad, pd.DataFrame(False, index=P.etf_close.index, columns=P.etf_close.columns)], axis=1)
 # ETF $ADV from raw bars (real consolidated volume, not a placeholder)
 edv = {}
@@ -49,7 +83,7 @@ SIG = pd.concat([P.ret_cc, P.etf_close.pct_change(fill_method=None)], axis=1).ro
 FLOOR = {"L1": 5.0, "L2": 5.0, "L3": 5.0, "L4": 20.0}
 
 
-def floor_bps(adv, cols):
+def floor_bps(adv: pd.DataFrame, cols: pd.Index) -> pd.DataFrame:
     hs, _ = C.bucket_params(adv)
     f = pd.DataFrame(20.0, index=adv.index, columns=adv.columns)
     for name, (lo, *_r) in sorted(C.cm.BUCKETS.items(), key=lambda x: x[1][0]):
@@ -59,17 +93,19 @@ def floor_bps(adv, cols):
     return f + hs  # + full half-spread (market order)
 
 
-def get_weights(v):
+def get_weights(v: dict[str, Any]) -> pd.DataFrame:
     f = CACHE / f"W_{v['name'].replace('/', '-')}.pkl"
     if f.exists():
-        return pickle.load(open(f, "rb"))
+        return cast(pd.DataFrame, pickle.load(open(f, "rb")))
     if v["kind"] == "al":
         sf = CACHE / f"ALscores_{v['factors']}.pkl"
         if sf.exists():
             S, B = pickle.load(open(sf, "rb"))
         else:
-            t1 = time.time(); S, B = papers.al_scores(P, v["factors"], k=15); pickle.dump((S, B), open(sf, "wb"))
-            print("  AL scores", v["factors"], f"{time.time()-t1:.0f}s", flush=True)
+            t1 = time.time()
+            S, B = papers.al_scores(P, v["factors"], k=15)
+            pickle.dump((S, B), open(sf, "wb"))
+            print("  AL scores", v["factors"], f"{time.time() - t1:.0f}s", flush=True)
         so, cl, cs = v["bands"]
         W = papers.al_weights(P, S, B, v["factors"], so, cl, cs)
     else:
@@ -99,9 +135,11 @@ for v in CFG.V1_VARIANTS:
         short = w.clip(upper=0).abs().sum(axis=1)
         out = res[["gross", "turnover", "gross_exposure", "net_exposure", "n_names", "n_name_trades"]].copy()
         for sc, p in CFG.SCENARIOS.items():
-            cb = C.cost_bps(trades, CFG.AUM_GROSS[0], adv.loc[trades.index], sig.loc[trades.index], bt.VENUE[ex], p["k"])
+            cb = C.cost_bps(
+                trades, CFG.AUM_GROSS[0], adv.loc[trades.index], sig.loc[trades.index], bt.VENUE[ex], p["k"]
+            )
             if p["floor"]:
-                cb = np.maximum(cb, fl.loc[trades.index])
+                cb = cast(pd.DataFrame, np.maximum(cb, fl.loc[trades.index]))
             tc = (trades * cb).sum(axis=1) / 1e4 * p["mult"]
             bc = short * p["borrow"] * caldays / 360 * p["mult"]
             out[f"tcost_{sc}"], out[f"bcost_{sc}"], out[f"net_{sc}"] = tc, bc, out["gross"] - tc - bc
@@ -113,13 +151,24 @@ for v in CFG.V1_VARIANTS:
         out.attrs = {}
         out.to_parquet(OUT / "daily" / f"{v['name'].replace('/', '-')}__{ex}.parquet")
         cap = bt.capacity(w, trades, ADV.reindex(columns=cols))
-        rec = {"trial": f"{v['name']}__{ex}", "family": v["family"], "variant": v["name"], "exec": ex, "buffer": v["buffer"],
-               "params": json.dumps(v.get("kw", {"bands(open,close_long,close_short)": v.get("bands"), "factors": v.get("factors")})),
-               "replication": v["replication"], "cap_1pctADV_$": cap[0.01], "cap_5pctADV_$": cap[0.05]}
+        rec = {
+            "trial": f"{v['name']}__{ex}",
+            "family": v["family"],
+            "variant": v["name"],
+            "exec": ex,
+            "buffer": v["buffer"],
+            "params": json.dumps(
+                v.get("kw", {"bands(open,close_long,close_short)": v.get("bands"), "factors": v.get("factors")})
+            ),
+            "replication": v["replication"],
+            "cap_1pctADV_$": cap[0.01],
+            "cap_5pctADV_$": cap[0.05],
+        }
         if "trades" in W.attrs and len(W.attrs["trades"]):
-            tr = W.attrs["trades"].copy(); pr = []
+            tr = W.attrs["trades"].copy()
+            pr = []
             for _, t in tr.iterrows():
-                rng = fwd.loc[t.entry:t.exit].iloc[:-1]
+                rng = fwd.loc[t.entry : t.exit].iloc[:-1]
                 gy, gx = 1 / (1 + t.beta), t.beta / (1 + t.beta)
                 pr.append((t.side * gy * rng[t.y].fillna(0) - t.side * gx * rng[t.x].fillna(0)).sum())
             tr["gross_ret_per_pair_notional"] = pr
@@ -128,24 +177,46 @@ for v in CFG.V1_VARIANTS:
             rec["pair_round_trips_holdout"] = int((tr.entry >= pd.Timestamp(CFG.HOLDOUT_START)).sum())
         Wt = W.attrs.get("trades") if "trades" in W.attrs else None
         aud = DI.straddle_audit(w, Cl[[c for c in cols if c in Cl]], FLAG["all"], Wt)
-        rec["straddle_flags"] = len(aud); rec["straddle_detail"] = json.dumps(aud[:20])
+        rec["straddle_flags"] = len(aud)
+        rec["straddle_detail"] = json.dumps(aud[:20])
         zomb = DI.end_of_data_holdings(w, Cl[[c for c in cols if c in Cl]])
-        rec["held_after_last_bar"] = len(zomb); rec["held_after_last_bar_detail"] = json.dumps(zomb[:20])
+        rec["held_after_last_bar"] = len(zomb)
+        rec["held_after_last_bar_detail"] = json.dumps(zomb[:20])
         flg = [c for c in cols if c in FLAG["all"]]
-        rec["share_gross_in_flagged_names"] = float(w[flg].abs().sum(axis=1).mean() / w.abs().sum(axis=1).replace(0, np.nan).mean()) if flg else 0.0
+        rec["share_gross_in_flagged_names"] = (
+            float(w[flg].abs().sum(axis=1).mean() / w.abs().sum(axis=1).replace(0, np.nan).mean()) if flg else 0.0
+        )
         if A.mode == "delist_stress":
-            held = [(s_, str(d_.date()), r_, float(w.loc[d_, s_])) for s_, d_, r_ in hits if d_ in w.index and abs(w.loc[d_, s_]) > 1e-9]
+            held = [
+                (s_, str(d_.date()), r_, float(w.loc[d_, s_]))
+                for s_, d_, r_ in hits
+                if d_ in w.index and abs(w.loc[d_, s_]) > 1e-9
+            ]
             rec["delisting_positions_hit"] = json.dumps(held)
             rec["delisting_pnl_impact"] = float(sum(r_ * wt for *_x, r_, wt in held))
         log.append(rec)
-    print(v["name"], f"{time.time()-t1:.0f}s (total {time.time()-t0:.0f}s)", flush=True)
+    print(v["name"], f"{time.time() - t1:.0f}s (total {time.time() - t0:.0f}s)", flush=True)
     prev = pd.read_csv(OUT / "trial_meta.csv") if (OUT / "trial_meta.csv").exists() else pd.DataFrame()
     allm = pd.concat([prev[~prev.trial.isin([r["trial"] for r in log])] if len(prev) else prev, pd.DataFrame(log)])
     allm.to_csv(OUT / "trial_meta.csv", index=False)
-json.dump({"label": CFG.LABEL, "dataset": f"{_QR.DATA_DIR} (DE final build; manifest.json)", "price_set": CFG.PRICE_SET,
-           "notes": P.notes, "first": str(P.close.index[0].date()), "last": str(P.close.index[-1].date()),
-           "n_symbols": int(P.close.shape[1]), "avg_pit_members": float(P.member.sum(axis=1).mean()),
-           "cost_model_check": C.validate(), "mode": A.mode,
-           "flagged_symbols": {k: sorted(v) for k, v in FLAG.items()}, "scenarios": CFG.SCENARIOS, "floor_bps": FLOOR},
-          open(OUT / "run_info.json", "w"), indent=1, default=str)
-print("ALL DONE", f"{time.time()-t0:.0f}s")
+json.dump(
+    {
+        "label": CFG.LABEL,
+        "dataset": f"{_QR.DATA_DIR} (DE final build; manifest.json)",
+        "price_set": CFG.PRICE_SET,
+        "notes": P.notes,
+        "first": str(P.close.index[0].date()),
+        "last": str(P.close.index[-1].date()),
+        "n_symbols": int(P.close.shape[1]),
+        "avg_pit_members": float(P.member.sum(axis=1).mean()),
+        "cost_model_check": C.validate(),
+        "mode": A.mode,
+        "flagged_symbols": {k: sorted(v) for k, v in FLAG.items()},
+        "scenarios": CFG.SCENARIOS,
+        "floor_bps": FLOOR,
+    },
+    open(OUT / "run_info.json", "w"),
+    indent=1,
+    default=str,
+)
+print("ALL DONE", f"{time.time() - t0:.0f}s")

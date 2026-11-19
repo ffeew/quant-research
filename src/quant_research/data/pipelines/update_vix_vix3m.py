@@ -34,10 +34,11 @@ Exit codes
   4  output conflict (dated file exists with different sha256)
   5  fetch error
 """
+
 from __future__ import annotations
-from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DATA_DIR, ...)
 
 import argparse
+import contextlib
 import datetime as dt
 import hashlib
 import io
@@ -49,6 +50,7 @@ import time
 import traceback
 from email.utils import parsedate_to_datetime
 from pathlib import Path
+from typing import Any
 
 import exchange_calendars as xc
 import numpy as np
@@ -56,6 +58,8 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 import requests
+
+from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DATA_DIR, ...)
 
 ET, SGT, UTC = "America/New_York", "Asia/Singapore", "UTC"
 CLOSE_KNOWN = pd.Timedelta(hours=16, minutes=15)  # VIX/VIX3M official close
@@ -108,17 +112,15 @@ def atomic_write_bytes(path: Path, data: bytes, mode: int = 0o644) -> None:
         os.replace(tmp, path)
     finally:
         if os.path.exists(tmp):
-            try:
+            with contextlib.suppress(OSError):
                 os.remove(tmp)
-            except OSError:
-                pass
 
 
 def atomic_write_text(path: Path, text: str, mode: int = 0o644) -> None:
     atomic_write_bytes(path, text.encode(), mode=mode)
 
 
-def last_completed_session(cal, now_utc: pd.Timestamp) -> dt.date:
+def last_completed_session(cal: Any, now_utc: pd.Timestamp) -> dt.date:
     """Last XNYS session whose 16:15 ET official VIX close has passed."""
     now_et = now_utc.tz_convert(ET)
     d = pd.Timestamp(now_et.date())
@@ -131,8 +133,8 @@ def last_completed_session(cal, now_utc: pd.Timestamp) -> dt.date:
 def http_get(url: str, timeout: int = 90) -> requests.Response:
     """GET with redirects, strict final HTTP 200, modest retries on 429/5xx/network."""
     delay = HTTP_BACKOFF
-    last_err = None
-    for attempt in range(HTTP_RETRIES):
+    last_err: Exception | None = None
+    for _attempt in range(HTTP_RETRIES):
         try:
             r = requests.get(url, headers=UA, timeout=timeout, allow_redirects=True)
         except requests.RequestException as e:
@@ -165,13 +167,13 @@ def parse_last_modified(resp: requests.Response) -> pd.Timestamp | None:
     try:
         t = parsedate_to_datetime(lm)
         if t.tzinfo is None:
-            t = t.replace(tzinfo=dt.timezone.utc)
+            t = t.replace(tzinfo=dt.UTC)
         return pd.Timestamp(t).tz_convert(ET)
     except Exception:
         return None
 
 
-def load_cboe_csv(content: bytes, label: str) -> tuple[pd.DataFrame, dict]:
+def load_cboe_csv(content: bytes, label: str) -> tuple[pd.DataFrame, dict[str, Any]]:
     """Parse Cboe OHLC CSV. Official files are oldest→newest (verified); we sort defensively."""
     text = content.decode("utf-8-sig")
     df = pd.read_csv(io.StringIO(text))
@@ -179,14 +181,16 @@ def load_cboe_csv(content: bytes, label: str) -> tuple[pd.DataFrame, dict]:
     for need in ("DATE", "OPEN", "HIGH", "LOW", "CLOSE"):
         if need not in cols:
             raise Fail(5, f"{label} CSV missing column {need}; got {list(df.columns)}")
-    out = pd.DataFrame({
-        "session_date": pd.to_datetime(df[cols["DATE"]], format="%m/%d/%Y").dt.date,
-        "open": pd.to_numeric(df[cols["OPEN"]], errors="coerce"),
-        "high": pd.to_numeric(df[cols["HIGH"]], errors="coerce"),
-        "low": pd.to_numeric(df[cols["LOW"]], errors="coerce"),
-        "close": pd.to_numeric(df[cols["CLOSE"]], errors="coerce"),
-    })
-    info = {
+    out = pd.DataFrame(
+        {
+            "session_date": pd.to_datetime(df[cols["DATE"]], format="%m/%d/%Y").dt.date,
+            "open": pd.to_numeric(df[cols["OPEN"]], errors="coerce"),
+            "high": pd.to_numeric(df[cols["HIGH"]], errors="coerce"),
+            "low": pd.to_numeric(df[cols["LOW"]], errors="coerce"),
+            "close": pd.to_numeric(df[cols["CLOSE"]], errors="coerce"),
+        }
+    )
+    info: dict[str, Any] = {
         "rows_raw": int(len(out)),
         "date_min": str(out.session_date.min()) if len(out) else None,
         "date_max": str(out.session_date.max()) if len(out) else None,
@@ -207,6 +211,7 @@ def load_cboe_csv(content: bytes, label: str) -> tuple[pd.DataFrame, dict]:
 def fetch_yahoo_closes(symbol: str, start: dt.date, end: dt.date) -> pd.Series | None:
     try:
         import yfinance as yf
+
         t = yf.Ticker(symbol)
         h = t.history(start=str(start), end=str(end + dt.timedelta(days=1)), auto_adjust=False)
         if h is None or h.empty:
@@ -214,19 +219,19 @@ def fetch_yahoo_closes(symbol: str, start: dt.date, end: dt.date) -> pd.Series |
         s = h["Close"].copy()
         s.index = pd.to_datetime(s.index).tz_localize(None).date
         s.name = symbol
-        return s
+        return s  # type: ignore[no-any-return]  # yfinance Close series
     except Exception as e:
         print(f"WARNING: Yahoo {symbol} fetch failed: {type(e).__name__}: {e}", file=sys.stderr)
         return None
 
 
-def ohlc_inconsistent(o, h, l, c) -> bool:
+def ohlc_inconsistent(o: Any, h: Any, l: Any, c: Any) -> bool:
     if any(pd.isna(x) for x in (o, h, l, c)):
         return True
     return bool((l > h) or (l > o + 1e-9) or (l > c + 1e-9) or (h < o - 1e-9) or (h < c - 1e-9))
 
 
-def next_session_open(cal, session_date: dt.date) -> pd.Timestamp:
+def next_session_open(cal: Any, session_date: dt.date) -> pd.Timestamp:
     d = pd.Timestamp(session_date)
     if cal.is_session(d):
         nxt = cal.next_session(d)
@@ -242,6 +247,10 @@ def close_available_ts(session_date: dt.date) -> pd.Timestamp:
     return pd.Timestamp(session_date).tz_localize(ET) + CLOSE_KNOWN
 
 
+def _num(value: Any) -> float:
+    return float(value)
+
+
 def flag_join(parts: list[str]) -> str:
     return ";".join(p for p in parts if p)
 
@@ -250,7 +259,7 @@ def build_new_combo_rows(
     dates: list[dt.date],
     vix: pd.DataFrame,
     vix3m: pd.DataFrame,
-    cal,
+    cal: Any,
     yahoo_vix: pd.Series | None,
     yahoo_vix3m: pd.Series | None,
     fetched_vix: pd.Timestamp,
@@ -272,60 +281,62 @@ def build_new_combo_rows(
             parts.append("vix3m_missing")
             v3o = v3h = v3l = v3c = np.nan
         else:
-            v3o, v3h, v3l, v3c = float(v3.open), float(v3.high), float(v3.low), float(v3.close)
+            v3o, v3h, v3l, v3c = _num(v3.open), _num(v3.high), _num(v3.low), _num(v3.close)
         if ohlc_inconsistent(vr.open, vr.high, vr.low, vr.close):
             parts.append("vix_ohlc_inconsistent")
         if v3 is not None and ohlc_inconsistent(v3o, v3h, v3l, v3c):
             parts.append("vix3m_ohlc_inconsistent")
-        yv = float(yahoo_vix.loc[d]) if yahoo_vix is not None and d in yahoo_vix.index else np.nan
-        y3 = float(yahoo_vix3m.loc[d]) if yahoo_vix3m is not None and d in yahoo_vix3m.index else np.nan
-        if pd.notna(yv) and abs(float(vr.close) - yv) > YAHOO_CLOSE_TOL:
+        yv = _num(yahoo_vix.loc[d]) if yahoo_vix is not None and d in yahoo_vix.index else np.nan
+        y3 = _num(yahoo_vix3m.loc[d]) if yahoo_vix3m is not None and d in yahoo_vix3m.index else np.nan
+        if pd.notna(yv) and abs(_num(vr.close) - yv) > YAHOO_CLOSE_TOL:
             parts.append("vix_close_vs_yahoo_gt0.05")
         if pd.notna(y3) and pd.notna(v3c) and abs(v3c - y3) > YAHOO_CLOSE_TOL:
             parts.append("vix3m_close_vs_yahoo_gt0.05")
         # ratios: null before VIX3M / on non-NYSE / when vix3m missing (matches original)
-        if is_xnys and pd.notna(v3c) and float(v3c) != 0.0:
-            ratio = float(vr.close) / float(v3c)
-            ratio_o = float(vr.open) / float(v3o) if pd.notna(v3o) and float(v3o) != 0.0 else np.nan
+        if is_xnys and pd.notna(v3c) and _num(v3c) != 0.0:
+            ratio = _num(vr.close) / _num(v3c)
+            ratio_o = _num(vr.open) / _num(v3o) if pd.notna(v3o) and _num(v3o) != 0.0 else np.nan
         else:
             ratio = np.nan
             ratio_o = np.nan
         ca = close_available_ts(d)
         fu = next_session_open(cal, d)
-        rows.append({
-            "session_date": d,
-            "is_xnys_session": is_xnys,
-            "vix_open": float(vr.open),
-            "vix_high": float(vr.high),
-            "vix_low": float(vr.low),
-            "vix_close": float(vr.close),
-            "vix3m_open": v3o,
-            "vix3m_high": v3h,
-            "vix3m_low": v3l,
-            "vix3m_close": v3c,
-            "vix_vix3m": ratio,
-            "vix_vix3m_open": ratio_o,
-            "qa_flag": flag_join(parts),
-            "vix_yahoo_close": yv,
-            "vix3m_yahoo_close": y3,
-            "close_available_et": ca,
-            "close_available_utc": ca.tz_convert(UTC),
-            "close_available_sgt": ca.tz_convert(SGT),
-            "close_available_et_str": ca.strftime("%Y-%m-%d %H:%M %Z"),
-            "close_available_sgt_str": ca.tz_convert(SGT).strftime("%Y-%m-%d %H:%M SGT"),
-            "first_usable_session_open_et": fu,
-            "source": SOURCE,
-            "fetched_at_utc": fetched_vix,
-            "vix3m_fetched_at_utc": fetched_vix3m,
-            "csv_update_observed_et": pd.NaT,
-        })
+        rows.append(
+            {
+                "session_date": d,
+                "is_xnys_session": is_xnys,
+                "vix_open": _num(vr.open),
+                "vix_high": _num(vr.high),
+                "vix_low": _num(vr.low),
+                "vix_close": _num(vr.close),
+                "vix3m_open": v3o,
+                "vix3m_high": v3h,
+                "vix3m_low": v3l,
+                "vix3m_close": v3c,
+                "vix_vix3m": ratio,
+                "vix_vix3m_open": ratio_o,
+                "qa_flag": flag_join(parts),
+                "vix_yahoo_close": yv,
+                "vix3m_yahoo_close": y3,
+                "close_available_et": ca,
+                "close_available_utc": ca.tz_convert(UTC),
+                "close_available_sgt": ca.tz_convert(SGT),
+                "close_available_et_str": ca.strftime("%Y-%m-%d %H:%M %Z"),
+                "close_available_sgt_str": ca.tz_convert(SGT).strftime("%Y-%m-%d %H:%M SGT"),
+                "first_usable_session_open_et": fu,
+                "source": SOURCE,
+                "fetched_at_utc": fetched_vix,
+                "vix3m_fetched_at_utc": fetched_vix3m,
+                "csv_update_observed_et": pd.NaT,
+            }
+        )
     return pd.DataFrame(rows)
 
 
 def build_new_vix_daily_rows(
     dates: list[dt.date],
     vix: pd.DataFrame,
-    cal,
+    cal: Any,
     yahoo_vix: pd.Series | None,
     fetched_vix: pd.Timestamp,
 ) -> pd.DataFrame:
@@ -340,31 +351,33 @@ def build_new_vix_daily_rows(
         if ohlc_inconsistent(vr.open, vr.high, vr.low, vr.close):
             parts.append("ohlc_inconsistent")
         # open_equals_prev_close is history-only artifact; not re-derived for new rows unless true vs prior
-        yv = float(yahoo_vix.loc[d]) if yahoo_vix is not None and d in yahoo_vix.index else np.nan
-        xdiff = (float(vr.close) - yv) if pd.notna(yv) else np.nan
+        yv = _num(yahoo_vix.loc[d]) if yahoo_vix is not None and d in yahoo_vix.index else np.nan
+        xdiff = (_num(vr.close) - yv) if pd.notna(yv) else np.nan
         if pd.notna(xdiff) and abs(xdiff) > YAHOO_CLOSE_TOL:
             parts.append("close_vs_yahoo_gt0.05")
         ca = close_available_ts(d)
-        rows.append({
-            "session_date": d,
-            "open": float(vr.open),
-            "high": float(vr.high),
-            "low": float(vr.low),
-            "close": float(vr.close),
-            "source": SOURCE_VIX_ONLY,
-            "knowledge_time_utc": ca.tz_convert(UTC),
-            "knowledge_time_note": KNOTE,
-            "yahoo_close": yv,
-            "xcheck_close_diff_vs_yahoo": xdiff,
-            "is_xnys_session": is_xnys,
-            "qa_flag": flag_join(parts),
-            "fetched_at_utc": fetched_vix,
-        })
+        rows.append(
+            {
+                "session_date": d,
+                "open": _num(vr.open),
+                "high": _num(vr.high),
+                "low": _num(vr.low),
+                "close": _num(vr.close),
+                "source": SOURCE_VIX_ONLY,
+                "knowledge_time_utc": ca.tz_convert(UTC),
+                "knowledge_time_note": KNOTE,
+                "yahoo_close": yv,
+                "xcheck_close_diff_vs_yahoo": xdiff,
+                "is_xnys_session": is_xnys,
+                "qa_flag": flag_join(parts),
+                "fetched_at_utc": fetched_vix,
+            }
+        )
     return pd.DataFrame(rows)
 
 
-def validate_frame(combo: pd.DataFrame, cal, last: dt.date, available: dt.date, want: dt.date) -> dict:
-    v = {
+def validate_frame(combo: pd.DataFrame, cal: Any, last: dt.date, available: dt.date, want: dt.date) -> dict[str, Any]:
+    v: dict[str, Any] = {
         "target_completed": str(want),
         "available_through": str(available),
         "checks": {},
@@ -375,8 +388,10 @@ def validate_frame(combo: pd.DataFrame, cal, last: dt.date, available: dt.date, 
     dups = combo.session_date[combo.session_date.duplicated()].tolist()
     v["checks"]["duplicate_dates"] = [str(x) for x in dups]
     # nonnegativity / non-positive
-    for prefix, cols in (("vix", ["vix_open", "vix_high", "vix_low", "vix_close"]),
-                         ("vix3m", ["vix3m_open", "vix3m_high", "vix3m_low", "vix3m_close"])):
+    for prefix, cols in (
+        ("vix", ["vix_open", "vix_high", "vix_low", "vix_close"]),
+        ("vix3m", ["vix3m_open", "vix3m_high", "vix3m_low", "vix3m_close"]),
+    ):
         sub = combo[cols]
         bad = combo.index[((sub <= 0) & sub.notna()).any(axis=1)].tolist()
         v["checks"][f"{prefix}_nonpositive_rows"] = [str(combo.loc[i, "session_date"]) for i in bad]
@@ -388,7 +403,7 @@ def validate_frame(combo: pd.DataFrame, cal, last: dt.date, available: dt.date, 
             # known historical exception kept flagged
             if str(r.session_date) != "2006-02-08":
                 vix_bad.append(str(r.session_date))
-        if pd.notna(r.vix3m_close) and ohlc_inconsistent(r.vix3m_open, r.vix3m_high, r.vix3m_low, r.vix3m_close):
+        if pd.notna(r.vix3m_close) and ohlc_inconsistent(r.vix3m_open, r.vix3m_high, r.vix3m_low, r.vix3m_close):  # type: ignore[arg-type]  # vix3m cells are numeric
             v3_bad.append(str(r.session_date))
     v["checks"]["vix_ohlc_inconsistent_new_or_unflagged"] = vix_bad
     v["checks"]["vix3m_ohlc_inconsistent"] = v3_bad
@@ -434,36 +449,45 @@ def validate_frame(combo: pd.DataFrame, cal, last: dt.date, available: dt.date, 
     return v
 
 
-def compare_overlap(base: pd.DataFrame, vix: pd.DataFrame, vix3m: pd.DataFrame) -> dict:
+def compare_overlap(base: pd.DataFrame, vix: pd.DataFrame, vix3m: pd.DataFrame) -> dict[str, Any]:
     """Report Cboe restatements vs frozen overlap (informational; history kept unchanged)."""
     b = base.copy()
     b["session_date"] = pd.to_datetime(b["session_date"]).dt.date
     vm = vix.set_index("session_date")
     v3m = vix3m.set_index("session_date")
-    rest = []
+    rest: list[dict[str, Any]] = []
     for r in b.itertuples():
         d = r.session_date
         if d not in vm.index:
             rest.append({"session_date": str(d), "field": "vix", "kind": "missing_from_cboe_now"})
             continue
-        cur = vm.loc[d]
+        cur = vm.loc[d]  # type: ignore[index]  # session_date cells are dates
         for col, src in (("vix_open", "open"), ("vix_high", "high"), ("vix_low", "low"), ("vix_close", "close")):
             old, new = float(getattr(r, col)), float(getattr(cur, src))
             if abs(old - new) > 1e-6:
                 rest.append({"session_date": str(d), "field": col, "frozen": old, "cboe_now": new, "diff": new - old})
-        if pd.notna(r.vix3m_close):
+        if pd.notna(r.vix3m_close):  # type: ignore[arg-type]  # vix3m close cells are numeric
             if d not in v3m.index:
                 rest.append({"session_date": str(d), "field": "vix3m", "kind": "missing_from_cboe_now"})
             else:
-                cur3 = v3m.loc[d]
-                for col, src in (("vix3m_open", "open"), ("vix3m_high", "high"), ("vix3m_low", "low"), ("vix3m_close", "close")):
+                cur3 = v3m.loc[d]  # type: ignore[index]  # session_date cells are dates
+                for col, src in (
+                    ("vix3m_open", "open"),
+                    ("vix3m_high", "high"),
+                    ("vix3m_low", "low"),
+                    ("vix3m_close", "close"),
+                ):
                     old, new = float(getattr(r, col)), float(getattr(cur3, src))
                     if abs(old - new) > 1e-6:
-                        rest.append({"session_date": str(d), "field": col, "frozen": old, "cboe_now": new, "diff": new - old})
+                        rest.append(
+                            {"session_date": str(d), "field": col, "frozen": old, "cboe_now": new, "diff": new - old}
+                        )
     return {"restatement_count": len(rest), "restatements": rest[:50], "restatements_truncated": max(0, len(rest) - 50)}
 
 
-def write_parquet_atomic(df: pd.DataFrame, schema: pa.Schema, path: Path, meta_key: bytes, meta_obj: dict) -> str:
+def write_parquet_atomic(
+    df: pd.DataFrame, schema: pa.Schema, path: Path, meta_key: bytes, meta_obj: dict[str, Any]
+) -> str:
     # Align column order to schema; cast via pandas→arrow using schema
     df = df[[f.name for f in schema]]
     tbl = pa.Table.from_pandas(df, schema=schema.remove_metadata(), preserve_index=False)
@@ -485,7 +509,7 @@ def write_parquet_atomic(df: pd.DataFrame, schema: pa.Schema, path: Path, meta_k
 
 
 def determine_available(
-    cal,
+    cal: Any,
     last: dt.date,
     want: dt.date,
     vix: pd.DataFrame,
@@ -532,7 +556,7 @@ def determine_available(
     return available, dates, None
 
 
-def write_qa_log(path: Path, payload: dict) -> None:
+def write_qa_log(path: Path, payload: dict[str, Any]) -> None:
     lines = [
         f"# VIX/VIX3M QA {payload.get('available_through')} (built {payload.get('built_at_sgt')})",
         "",
@@ -572,10 +596,11 @@ def write_qa_log(path: Path, payload: dict) -> None:
     atomic_write_text(path, "\n".join(lines) + "\n")
 
 
-def record_staleness():
+def record_staleness() -> None:
     try:
         sys.path.insert(0, f"{_QR.DATA_DIR}/lib")
         from quant_research.data.client import staleness
+
         staleness.record("vix_vix3m")
     except Exception as e:
         print(f"STALENESS record failed: {e}", file=sys.stderr)
@@ -590,7 +615,11 @@ def run_update(dir_path: Path, now_utc: pd.Timestamp, skip_yahoo: bool = False) 
         if sha256_file(base_path) != L["sha256"]:
             raise Fail(2, f"LATEST.json sha256 does not match {base_path}")
         vix_daily_base = Path(L.get("vix_daily_path") or (dir_path / BOOTSTRAP_VIX))
-        if L.get("vix_daily_sha256") and vix_daily_base.exists() and sha256_file(vix_daily_base) != L["vix_daily_sha256"]:
+        if (
+            L.get("vix_daily_sha256")
+            and vix_daily_base.exists()
+            and sha256_file(vix_daily_base) != L["vix_daily_sha256"]
+        ):
             raise Fail(2, f"LATEST.json vix_daily sha256 does not match {vix_daily_base}")
     else:
         base_path = dir_path / BOOTSTRAP_COMBO
@@ -670,7 +699,7 @@ def run_update(dir_path: Path, now_utc: pd.Timestamp, skip_yahoo: bool = False) 
 
     # ---- yahoo optional
     yahoo_vix = yahoo_vix3m = None
-    yahoo_note = "skipped"
+    yahoo_note: Any = "skipped"
     if not skip_yahoo:
         yahoo_vix = fetch_yahoo_closes("^VIX", WINDOW_START, available)
         yahoo_vix3m = fetch_yahoo_closes("^VIX3M", VIX3M_START, available)
@@ -687,7 +716,9 @@ def run_update(dir_path: Path, now_utc: pd.Timestamp, skip_yahoo: bool = False) 
             file=sys.stderr,
         )
 
-    new_combo = build_new_combo_rows(dates_to_add, vix_w, vix3m_w, cal, yahoo_vix, yahoo_vix3m, fetched_vix, fetched_vix3m)
+    new_combo = build_new_combo_rows(
+        dates_to_add, vix_w, vix3m_w, cal, yahoo_vix, yahoo_vix3m, fetched_vix, fetched_vix3m
+    )
     # open_equals_prev_close style flag for vix_daily continuity only; combo keeps yahoo flags
 
     A = pd.concat([B, new_combo], ignore_index=True).sort_values("session_date").reset_index(drop=True)
@@ -766,7 +797,11 @@ def run_update(dir_path: Path, now_utc: pd.Timestamp, skip_yahoo: bool = False) 
     qa_name = f"vix_vix3m_qa_{available:%Y%m%d}.md"
     # Prefer shared data/qa when running against the live sentiment/vix tree; else sandbox-local.
     live_qa = Path(f"{_QR.DATA_DIR}/qa")
-    qa_path = (live_qa / qa_name) if dir_path.resolve() == Path(f"{_QR.DATA_DIR}/sentiment/vix").resolve() else (dir_path / "qa" / qa_name)
+    qa_path = (
+        (live_qa / qa_name)
+        if dir_path.resolve() == Path(f"{_QR.DATA_DIR}/sentiment/vix").resolve()
+        else (dir_path / "qa" / qa_name)
+    )
     qa_path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "target_completed": str(want),
@@ -852,12 +887,13 @@ def self_test(dir_path: Path) -> int:
     import shutil
     from unittest import mock
 
-    cal = xc.get_calendar("XNYS", start="1990-01-01")
+    _cal = xc.get_calendar("XNYS", start="1990-01-01")
     failures = []
 
     # --- staleness helper command on VIX ---
     print("SELFTEST staleness helper…", flush=True)
     import subprocess
+
     r = subprocess.run(
         [f"{_QR.DATA_DIR}/.venv/bin/python", f"{_QR.DATA_DIR}/lib/staleness.py", "vix_vix3m"],
         capture_output=True,
@@ -880,8 +916,9 @@ def self_test(dir_path: Path) -> int:
 
         # --- no-op: now just after 2026-10-28 close, already at last ---
         print("SELFTEST no-op…", flush=True)
+
         # Build a tiny fake Cboe response ending at 2026-10-28 so determine_available yields nothing new
-        def fake_get_noop(url, **kw):
+        def fake_get_noop(url: str, **kw: Any) -> requests.Response:
             if "VIX3M" in url:
                 # minimal CSV with last row 10/28/2026 — use real cached if present else synthesize from parquet
                 body = Path("/tmp/VIX3M_History.csv").read_bytes() if Path("/tmp/VIX3M_History.csv").exists() else None
@@ -949,7 +986,7 @@ def self_test(dir_path: Path) -> int:
         for p in sandbox.glob("LATEST.json"):
             p.unlink()
 
-        def fake_get_partial(url, **kw):
+        def fake_get_partial(url: str, **kw: Any) -> requests.Response:
             if "VIX3M" in url:
                 return fake_get_noop(url)
             # VIX includes 10/29
@@ -1010,7 +1047,7 @@ def self_test(dir_path: Path) -> int:
     return 0
 
 
-def main(argv=None) -> int:
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--dir", default=f"{_QR.DATA_DIR}/sentiment/vix")
     ap.add_argument("--now-utc", default=None, help="override clock (testing), e.g. 2026-11-06T00:00Z")
