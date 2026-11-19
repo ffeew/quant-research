@@ -650,36 +650,49 @@ def last_print_index(PX: pd.DataFrame, s: str) -> int:
     return int(idx[-1]) if len(idx) else -1
 
 
-def h2_delisting_receipts(bars: dict[str, Any], positions: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Pre-registered base for H2 on raw prices: a position whose name
-    stops printing before its planned exit is closed at its last close (R is NaN after the
-    last bar, so apply_costs_and_returns adds 0; no exit cost at a NaN price; the ETF hedge
-    leg and short borrow run to the planned exit). Reporting only: this
-    function changes no weight and no return. Supplied delisting returns: none (raw prices)."""
-    out = []
+def h2_delisting_receipts(
+    bars: dict[str, Any], W: pd.DataFrame, positions: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """Pre-registered base for H2 on raw prices: a name still HELD past its last print (after
+    the fills at its last close) is closed at that last close (R is NaN after the last bar, so
+    apply_costs_and_returns adds 0; the ETF hedge leg and short borrow run to the planned exit).
+    Keyed on the position actually held (see _fills), not the planned window: a capped exit
+    remainder, or a last print at exit_i-1, still gets a receipt. One receipt per name.
+    Reporting only: this function changes no weight and no return. Supplied delisting returns:
+    none (raw prices)."""
+    out: list[dict[str, Any]] = []
     PX = bars["PX"]
-    dates = PX.index
-    for p in positions:
-        s = p["sym"]
-        if s not in PX.columns:
-            continue
+    dates = W.index
+    held: pd.DataFrame | None = None
+    for s in dict.fromkeys(p["sym"] for p in positions):
         last_i = last_print_index(PX, s)
-        if last_i < 0:
+        if last_i < 0 or last_i + 1 >= len(dates) or s not in W.columns:
             continue
-        if p["entry_i"] <= last_i < p["exit_i"] - 1:
-            out.append(
-                {
-                    "symbol": s,
-                    "side": "long" if p["w_sym"] > 0 else "short",
-                    "entry_session": str(dates[p["entry_i"]].date()),
-                    "last_close_session": str(dates[last_i].date()),
-                    "last_close": float(PX[s].iloc[last_i]),
-                    "planned_exit_session": str(dates[min(p["exit_i"], len(dates) - 1)].date()),
-                    "treatment": "base: closed at last close (null delisting return)",
-                    "hedge_leg": p["etf"],
-                    "hedge_held_to_planned_exit": True,
-                }
-            )
+        if held is None:
+            held = held_positions(bars, W)
+        w = float(held[s].iloc[last_i + 1])  # after the last fill it can get (close last_i)
+        if abs(w) < 1e-15:
+            continue
+        ps = [p for p in positions if p["sym"] == s and p["entry_i"] <= last_i]
+        if not ps:
+            continue
+        p = ps[-1]
+        exit_i = max(int(q["exit_i"]) for q in ps)
+        out.append(
+            {
+                "symbol": s,
+                "side": "long" if w > 0 else "short",
+                "held_weight": w,
+                "entry_session": str(dates[int(p["entry_i"])].date()),
+                "last_close_session": str(dates[last_i].date()),
+                "last_close": float(PX[s].iloc[last_i]),
+                "planned_exit_session": str(dates[min(exit_i, len(dates) - 1)].date()),
+                "held_past_planned_exit": bool(last_i >= exit_i - 1),
+                "treatment": "base: held remainder closed at last close (null delisting return)",
+                "hedge_leg": p["etf"],
+                "hedge_held_to_planned_exit": True,
+            }
+        )
     return out
 
 
@@ -1608,27 +1621,22 @@ def h2_delisting_stress(
     supplied_delist_returns: dict[str, Any] | None = None,
 ) -> tuple[pd.Series, list[dict[str, Any]]]:
     """Pre-registered counted stress for H2, pure computation: on any NULL delisting return,
-    -30% for longs and 0% for shorts. Applied to every position h2_delisting_receipts flags (name
-    stops printing before its planned exit). The charge is the position actually held over the
-    session after the last close (after the ADV cap, not the target) times the shock, booked at
+    -30% for longs and 0% for shorts. Applied to every nonzero position actually held past the
+    last print (h2_delisting_receipts; after the ADV cap, not the target or the planned window),
+    times the shock, booked at
     last+1 as an equity overlay added to daily net. A supplied (non-null) delisting return gets no stress.
     Returns (overlay indexed like W, receipts)."""
     sup = supplied_delist_returns or {}
     dates = W.index
     overlay = pd.Series(0.0, index=dates)
     out = []
-    held: pd.DataFrame | None = None
-    for r in h2_delisting_receipts(bars, positions):
+    for r in h2_delisting_receipts(bars, W, positions):
         s = r["symbol"]
         if sup.get(s) is not None:
             out.append(dict(r, stress="not applied: supplied (non-null) delisting return"))
             continue
         li = int(cast(int, dates.get_loc(pd.Timestamp(r["last_close_session"]))))
-        if li + 1 >= len(dates):
-            continue
-        if held is None:
-            held = held_positions(bars, W)
-        w = float(held[s].iloc[li + 1]) if s in held.columns else 0.0  # after the last fill (close li)
+        w = float(r["held_weight"])
         shock = H2_DELISTING_STRESS_LONG if w > 0 else H2_DELISTING_STRESS_SHORT
         charge = w * shock if w > 0 else 0.0
         overlay.iloc[li + 1] += charge
@@ -1841,7 +1849,7 @@ def main(argv: list[str] | None = None) -> int:
                 eval_end=eval_end,
                 last_exit_i=last_exit_i,
             )
-            results["H2_delisting_receipts"] = h2_delisting_receipts(bars, h2_positions)
+            results["H2_delisting_receipts"] = h2_delisting_receipts(bars, W, h2_positions)
             if args.delisting_stress:
                 stress_overlay, results["H2_delisting_stress_receipts"] = h2_delisting_stress(bars, W, h2_positions)
         h1_paths: list[Any] = [None]
