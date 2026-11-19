@@ -543,7 +543,17 @@ def run_all(mod: Any, tmp: Path) -> dict[str, Any]:
     return out
 
 
+# Computations changed on purpose by the review fixes (see test_v1_3f_fixes.py) and therefore
+# excluded from old == new: signal_h1 weights (B1: held from the session after the signal bar),
+# apply_costs_and_returns and everything priced from it (B2 ADV cap on the trade, B3 calendar-day
+# borrow), and h1_terminal_bound (built on the H1 weights; B3 borrow overlay). Everything else,
+# including every pin and config value, must still match the pre-cleanup module exactly.
+FIXED = {"W1": "B1", "r1": "B1", "tb": "B1", "sharpe": "B1"}
+
+
 def test_computations_identical_on_synthetic_fixtures(old_src, tmp_path):
+    """Old == new on every computation except the FIXED ones (the three review fixes). For those,
+    H1's weights must be exactly the old weights moved one session later."""
     w = world(tmp_path, old_src)
     r18 = tmp_path / "r18.json"
     r18.write_text(
@@ -564,7 +574,10 @@ def test_computations_identical_on_synthetic_fixtures(old_src, tmp_path):
     a, b = run_all(old, tmp_path), run_all(new, tmp_path)
     assert a.keys() == b.keys()
     for k in a:
-        _eq(a[k], b[k])
+        if k not in FIXED:
+            _eq(a[k], b[k])
+    _eq(a["W1"].shift(1).fillna(0.0), b["W1"])  # B1 only moves H1 one session later
+    _eq(a["tr"], b["tr"])
     assert (a["W1"].abs().sum(axis=1) > 0).any() and a["pos"] and a["r1"]["n_sessions"] > 0  # paths exercised
     rec = a["universe"][3]
     assert rec["final_list_excluded"] == [{"symbol": "GGG", "reason": "reuse"}] and rec["r18_removed"] == ["DDD"]
