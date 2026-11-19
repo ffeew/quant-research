@@ -1,21 +1,21 @@
 # Signal-combination & portfolio-construction framework (DRAFT v0.7.1)
 
 - **Owner:** Portfolio Construction Quant (combine stage of the SPRINT pipeline)
-- **Drafted:** Fri 30 Oct 2026, 01:10 SGT. **v0.2:** ~01:35 SGT, after follow-up. The fallback is now shadow / de-risk only (confirmed and implemented). Also new: the TCA §5 cost model, the GP option, and LW-vs-HRP results. **v0.3:** ~01:30 SGT, aligned with `risk/LIMITS.md` §1, §3 and §5 (see §4a): one sleeve-level vol overlay, Risk's panic flag and drawdown breakers read from `risk/state/` with fail-safe defaults, new compliance rows, and crypto ruled out entirely (hard exclusion). **v0.4:** 01:35 SGT. Covariance now uses the Ledoit–Wolf (2004) optimal δ* (fixed 0.5 kept as an option), and the 6% vol cap uses a risk-forecast inflation factor k = 1.25 (§3). HRP and GP partial trading stay off. **v0.5:** 01:43 SGT. The shadow book has a stable ID `shadow_fallback_composite_v1` (§8a). Every run writes new timestamped files that are never overwritten, plus an append-only JSONL run log (§8b). k was re-estimated on the store's 10.8-year PIT S&P 500 SIP data, using the L/S shadow construction: bias 1.14–1.23, so k = 1.25 is kept (§3). **v0.6:** 02:08 SGT, aligned with `risk/LIMITS.md` (LIMITS header then **v0.3.5**; current header **v0.3.7** as of this verification). Changes:
+- **Drafted:** Fri 30 Oct 2026. **v0.2:** after follow-up. The fallback is now shadow / de-risk only (confirmed and implemented). Also new: the TCA §5 cost model, the GP option, and LW-vs-HRP results. **v0.3:** aligned with `risk/LIMITS.md` §1, §3 and §5 (see §4a): one sleeve-level vol overlay, Risk's panic flag and drawdown breakers read from `risk/state/` with fail-safe defaults, new compliance rows, and crypto ruled out entirely (hard exclusion). **v0.4:**. Covariance now uses the Ledoit–Wolf (2004) optimal δ* (fixed 0.5 kept as an option), and the 6% vol cap uses a risk-forecast inflation factor k = 1.25 (§3). HRP and GP partial trading stay off. **v0.5:**. The shadow book has a stable ID `shadow_fallback_composite_v1` (§8a). Every run writes new timestamped files that are never overwritten, plus an append-only JSONL run log (§8b). k was re-estimated on the store's 10.8-year PIT S&P 500 SIP data, using the L/S shadow construction: bias 1.14–1.23, so k = 1.25 is kept (§3). **v0.6:** aligned with `risk/LIMITS.md` (LIMITS header then **v0.3.5**; current header **v0.3.7** as of this verification). Changes:
   - **Earnings (H7):** shorts are never held through their own release. The rule uses the data owner's earnings calendar (`data/earnings/`). An unknown next date blocks new or larger shorts in the tradable book and is flagged in the shadow book (§4a.7).
   - **σ_target (§5 T12):** the expanding median of the 126d proxy vol once ≥3 years of history exist (§4a.1).
   - **Provisional panic flag:** context only, not applied. The fail-safe is kept (§4a.2).
   - **Breaker:** new RESUMED_DISARMED state, with `backstop_equity` logged. An unknown state goes to HALVED (§4a.3).
   - **Crypto:** no caps remain (§4a.6).
-  - **The validator's data defects:** every result built on the data owner's SIP/PIT store is marked **PROVISIONAL – data defects pending the data owner's fixes**. Today's books are not affected (§4a.8). k stays 1.25.
+  - **The review's data defects:** every result built on the data owner's SIP/PIT store is marked **PROVISIONAL – data defects pending the data owner's fixes**. Today's books are not affected (§4a.8). k stays 1.25.
   - **Run log:** schema v2.
-- **v0.7:** 02:22 SGT, after the 02:12 and 02:13 risk decisions. Changes:
+- **v0.7:** after the 02:12 and 02:13 risk decisions. Changes:
   - **Data-provenance rule (§4a.9):** all history now comes from the shared store, and live Alpaca market data only through `data/lib/desk_data_client.py`. data.json and direct HTTP are gone from construct.py and from every research script.
-  - **Sleeve proxy:** now a PIT S&P 500 proxy on the store (`--proxy_src store_pit`). The validator's 59 defect names (incl. SNDK) are excluded, and the proxy is **PROVISIONAL** until the data owner's fixes land. The derivatives researcher's deprecated file is used by the tests only (audit copy). Old vs new m / σ_target are in §4a.9.
+  - **Sleeve proxy:** now a PIT S&P 500 proxy on the store (`--proxy_src store_pit`). The review's 59 defect names (incl. SNDK) are excluded, and the proxy is **PROVISIONAL** until the data owner's fixes land. The derivatives researcher's deprecated file is used by the tests only (audit copy). Old vs new m / σ_target are in §4a.9.
   - **Shadow v2:** the shadow book is now `shadow_fallback_composite_v2` (§8a). Every new log line carries `method_version`. Log schema 3 adds correction records (§8b).
   - **LIMITS v0.3.5 T4:** construction reads Risk's current *episode* backstop from `breaker_state.json` and never infers a lift (§4a.3). Discrepancies are listed in §4a.3.
   - **Unchanged per Risk's decisions:** the strict earnings gate (no estimated dates); and the provisional panic flag stays non-applied, with the ×0.5 fail-safe on a missing or stale file.
-- **v0.7.1 verification (2026-11-06 ~06:05 SGT):** after the risk manager's post-outage risk-state refresh. Confirmed FINAL panic is binding; provisional remains context-only; `momentum_short_notional_multiplier` / `new_loser_shorts_allowed` / `net_beta_floor` honored from the file (null floor with panic off is valid). LIMITS references updated to **v0.3.7**. No construction-rule gaps found in v0.3.6–v0.3.7 beyond fields already wired. Default `--asof_bar_cutoff` now derives from `--now` (ET session; prior session if before 09:30 ET) instead of the hardcoded 2026-10-29.
+- **v0.7.1 verification (2026-11-06):** after the risk manager's post-outage risk-state refresh. Confirmed FINAL panic is binding; provisional remains context-only; `momentum_short_notional_multiplier` / `new_loser_shorts_allowed` / `net_beta_floor` honored from the file (null floor with panic off is valid). LIMITS references updated to **v0.3.7**. No construction-rule gaps found in v0.3.6–v0.3.7 beyond fields already wired. Default `--asof_bar_cutoff` now derives from `--now` (ET session; prior session if before 09:30 ET) instead of the hardcoded 2026-10-29.
 - **Applies to:** `$QR_DESK_DIR/portfolio/construct.py` (v0.7; the pre-rule-5 v0.6 file is archived at `archive/construct_v6_pre-rule5_2026-10-30.py`)
 - **Research results:** `research/RESULTS_2026-10-30.md`
 - **Evidence:** cards in `$QR_DESK_DIR/research/papers/` for:
@@ -27,7 +27,7 @@
 - **Risk limits:** `risk/LIMITS.md` **v0.3.7** (read-only; header parsed at run time by `limits_version`). State files: `risk/state/panic_flag.json`, `risk/state/breaker_state.json` (read-only).
 - **Validation standard:** the validation pass bar (a recorded PASS or CONDITIONAL PASS verdict).
 
-## 0. Desk constraints (hard; from risk/ and the project brief)
+## 0. Hard constraints (from risk/ and the project brief)
 - About $100k Alpaca **paper** equity (99,997.56 in performance/history.csv on 2026-10-30).
 - Long/short US-listed equities and ETFs only: no options, no leverage. **Crypto is ruled out entirely** (CIO, 2026-10-30): hard exclusion in code, see §4a.6.
 - Limits:
@@ -36,7 +36,7 @@
   - max 60% gross
 - Stops on every position.
 - Drawdown breakers (LIMITS H8/H9): 5% drawdown → gross cap 30%; 8% → no new trades (exits, trims, stop tightening only).
-- About 290 daily bars of history in data.json. That is too short for the validator's ≥10-year requirement, so any signal must be validated on the data owner's longer data, not on data.json.
+- About 290 daily bars of history in data.json. That is too short for the review's ≥10-year requirement, so any signal must be validated on the data owner's longer data, not on data.json.
 
 ## 1. Admission gate: what may enter the combiner
 A signal reaches `construct.py`'s alpha only if it passes **both** stages below.
@@ -56,9 +56,9 @@ A CONDITIONAL PASS enters with its conditions copied into the targets file. For 
 **Stage B: live combine check (Portfolio Construction; soft gate).** Computed on the desk's own recent cross-section:
 - rank IC on non-overlapping 5-day windows, 60% in-sample / 40% OOS
 - the signal keeps its IC weight only if OOS IC > 0 and t ≥ 1 (current code)
-- a signal with OOS t ≤ −2 is muted (weight 0) even if validator passed it, and the conflict is reported to the validator
+- a signal with OOS t ≤ −2 is muted (weight 0) even if it passed validation, and the conflict is reported for review
 
-Stage B can only **down-weight** a passed signal. It can never admit a signal the validator has not passed.
+Stage B can only **down-weight** a passed signal. It can never admit a signal that has not passed validation.
 
 **Status on 2026-10-30:**
 - Validation FAILED all 5 current trades for insufficient evidence (2026-10-30 01:00).
@@ -76,7 +76,7 @@ For admitted signals k = 1..K, each a cross-sectional z-score winsorised at ±3:
 4. **Composite IC:** IC_c = sqrt(IC_shrᵀ C_shr⁻¹ IC_shr), floored at 0.02 in fallback.
 5. **Alpha per name:** α_i = IC_c · σ_i · score_i, Grinold's "alpha = volatility × IC × score" (*JPM* 1994, [doi:10.3905/jpm.1994.409482](https://doi.org/10.3905/jpm.1994.409482); citation verified, text not read).
 
-**To do:** replace in-sample/OOS IC from data.json with the validator's walk-forward IC and decay profile once a signal passes. Add a per-signal risk-budget cap of 40% of composite variance so no single signal dominates (many small edges).
+**To do:** replace in-sample/OOS IC from data.json with the review's walk-forward IC and decay profile once a signal passes. Add a per-signal risk-budget cap of 40% of composite variance so no single signal dominates (many small edges).
 
 ## 3. Covariance
 - **Current (v0.4):**
@@ -101,7 +101,7 @@ For admitted signals k = 1..K, each a cross-sectional z-score winsorised at ±3:
 
   With k = 1.25, realised vol lands at 5.6–5.8%, and 6% is inside the CI on both data sets. With k = 1.0 it overshoots by 17–20%, and 6% is outside the CI on statarb. The k=1.25 minus k=1.0 Δvol CI is [−1.56, −1.32] pp on statarb and [−1.60, −1.16] pp on data.json.
 - **v0.5 re-estimate of k on ≥10 years of PIT data, L/S shadow construction** (`research/ls_volcap_wf.py`; RESULTS Addendum 3). **PROVISIONAL – data defects pending the data owner's fixes.**
-  - The validator's `validation/backtests/pead_long_pit/data_issues.json` (2026-10-30) affects this result:
+  - The review's `validation/backtests/pead_long_pit/data_issues.json` (2026-10-30) affects this result:
     - missing delisting returns (70 of 120 unmatched → 0% exit);
     - missing history for former members and predecessors (59 symbols with member-days but no bars);
     - SNDK ticker reuse.
@@ -152,7 +152,7 @@ For admitted signals k = 1..K, each a cross-sectional z-score winsorised at ±3:
   - ~~Re-estimate k on ≥10 years of PIT data and on the L/S book~~ Done in v0.5 (below). Result: keep k = 1.25.
   - Consider a regime-dependent k. Bias was 1.47–1.61 in 2020 and ≈1.0 in 2017 and 2019.
   - Keep cross-asset ETFs (TLT, HYG, GLD, SLV, EEM, EFA) out of the constant-correlation block (LW footnote 4).
-  - Consider EWMA vol × shrunk correlation once the validator's walk-forward can compare them.
+  - Consider EWMA vol × shrunk correlation once the review's walk-forward can compare them.
 
 ## 4. Sizing
 | Option | Role | Status |
@@ -187,7 +187,7 @@ The composite is Σ_k sw_k·m_s(k)·p_s(k)·Z_k, divided by the cross-sectional 
   - Once the proxy has ≥3 years (`--sigma_min_days` 756) of daily history, σ_target is the **median of the rolling 126d realised vol over the expanding window** up to the cutoff.
   - Before that, it is the proxy's full-sample realised vol.
   - The 1× cap (m ≤ 1) is unchanged.
-  - Code: `sigma_target_rule()`. `--sigma_target_rule fullsample` restores v0.5. `--sigma_target momentum=0.12,...` still overrides.
+  - Code: `sigma_target_rule()`. `--sigma_target_rule fullsample` restores v0.5. `--sigma_target momentum=0.12...` still overrides.
   - LIMITS says "own live/paper daily returns once ≥3 years exist". The sleeves have no live history (the pilot started 2026-10-30), so the **backtest proxy** is used, as LIMITS allows before 3 years.
   - The statarb proxy (pre-v0.7) ran 2020-07 → 2026-10-28, with 1,370–1,564 proxy days per sleeve. The store_pit proxy (v0.7) runs 2016-01..2016-10 → 2026-10-28, with 2,521–2,715 proxy days. Both are ≥756 for every sleeve, so every sleeve uses the median rule.
   - 2026-10-30 values (σ_target median vs the old full-sample value):
@@ -200,7 +200,7 @@ The composite is Σ_k sw_k·m_s(k)·p_s(k)·Z_k, divided by the cross-sectional 
     | event | 9.49% | 9.73% | 14.06% | 0.675 | 0.692 |
 
   - T13 (σ̂/σ_target > 1.5) is logged as an INFO alert for Risk. Today it fires for momentum (2.22), trend (2.15) and reversal (1.75).
-  - The data owner's 10.8-year SIP store could supply a longer proxy, but that would make σ_target PROVISIONAL under the validator's defects, so it is **not** used (`--proxy_src` has no SIP option).
+  - The data owner's 10.8-year SIP store could supply a longer proxy, but that would make σ_target PROVISIONAL under the review's defects, so it is **not** used (`--proxy_src` has no SIP option).
 - m = min(1, σ_target/σ̂) ∈ [0, 1]. If the proxy has fewer than 126 days, m = 1 and a note is logged.
 - The window is 126 days for m. The covariance and beta stay on 120 days (Blume 0.67β + 0.33). Both windows are acceptable under LIMITS §5 when documented, as here.
 
@@ -286,7 +286,7 @@ The composite is Σ_k sw_k·m_s(k)·p_s(k)·Z_k, divided by the cross-sectional 
 - **Calendar: yes, one exists on the box.** It is the data owner's (read-only), described in `data/README.md` §6:
   - `data/earnings/earnings_events.parquet`: 26,780 events, columns symbol, announce_date_et, timing BMO/AMC/INTRADAY/UNKNOWN, source and knowledge_time. Sources: edgar_8k_2.02 25,085, nasdaq_reported_or_past 1,460, **nasdaq_scheduled 235**.
   - `data/earnings/nasdaq_calendar.parquet`: 3,129 scheduled rows, report dates up to 2026-11-27, last fetched 2026-10-29 17:14 UTC = 01:14 SGT 30 Oct.
-  - We use `announce_date_et` + `timing` only, **not** `first_tradable_session`, which has the validator's DURING_MKT alignment defect.
+  - We use `announce_date_et` + `timing` only, **not** `first_tradable_session`, which has the review's DURING_MKT alignment defect.
 - **Horizon:**
   - The execution session is today (ET) if it is a session and before 16:00 ET, else the next session.
   - The horizon ends `--earn_horizon_sessions` (6) sessions later: on 2026-10-30 that is 2026-10-29 → 2026-11-06.
@@ -308,13 +308,13 @@ The composite is Σ_k sw_k·m_s(k)·p_s(k)·Z_k, divided by the cross-sectional 
 - Compliance rows: H7 no hold through release; H7 no new/added risk into release; unknown date (FAIL-SAFE in tradable, flag in shadow); calendar freshness.
 - Tests: `tests/test_earnings.py` (20 tests; risk manager 2026-11-06 rejection regressions included).
 
-### 4a.8 Data provenance and the validator's data defects (v0.6)
-- The validator's `validation/backtests/pead_long_pit/data_issues.json` lists defects in **the data owner's SIP/PIT store**: missing delisting returns, history gaps for former members and predecessors, and SNDK ticker reuse.
+### 4a.8 Data provenance and the review's data defects (v0.6)
+- The review's `validation/backtests/pead_long_pit/data_issues.json` lists defects in **the data owner's SIP/PIT store**: missing delisting returns, history gaps for former members and predecessors, and SNDK ticker reuse.
 - **Today's books are not affected.**
   - *(v0.6, superseded by §4a.9.)* Prices, betas, vols and the LW Σ came from `data.json` (Alpaca IEX via quant.py), and sleeve m and σ_target from the legacy statarb bars. Neither was the data owner's store.
   - The 120-name data.json universe and the 117-name statarb universe contain **no former member and no SNDK**.
   - The only overlap with the defect list is **LIN**: the defect is the missing pre-2018-10-31 Praxair history *in the data owner's store*. data.json's LIN bars are a separate source, and only 120 days are used.
-- **The earnings calendar** is from the data owner's store but is a separate dataset. Forward dates come from Nasdaq scheduled rows; the validator's earnings caveats (DURING_MKT alignment; 105/220 coverage of former members) do not touch current names. It is listed in `data_provenance`.
+- **The earnings calendar** is from the data owner's store but is a separate dataset. Forward dates come from Nasdaq scheduled rows; the review's earnings caveats (DURING_MKT alignment; 105/220 coverage of former members) do not touch current names. It is listed in `data_provenance`.
 - **Marked PROVISIONAL – data defects pending the data owner's fixes:**
   - the v0.5 L/S k re-estimate (`research/ls_volcap_wf.py`, `research/out/ls_volcap_sip_*`), in §3 and RESULTS Addenda 3 and 4;
   - the `risk_inflation.ten_year_pit_check_status` field in every targets file.
@@ -371,7 +371,7 @@ Research scripts:
   - ADV20 is SIP from the TCA file where available. Otherwise, from v0.7, it is SIP ADV20 from the data owner's store (×1.0). The median TCA/store ratio on the 5 pilot names is 0.999. *(Pre-v0.7: IEX ADV from data.json × 21.6.)*
   - H = 2 bps.
   - Borrow: 25 bps/yr on short MV (a `tca/cost_model.md` §4 assumption; Alpaca paper charges none).
-  - On 2026-10-30 the per-side cost was 2.4–9.8 bps, median 5.0 bps. It is close to the validator's ≥5 bps/side bar on average, but below it for GOOGL/XLE. Use `--cost_model flat --tc_bps 10` as the conservative stress.
+  - On 2026-10-30 the per-side cost was 2.4–9.8 bps, median 5.0 bps. It is close to the review's ≥5 bps/side bar on average, but below it for GOOGL/XLE. Use `--cost_model flat --tc_bps 10` as the conservative stress.
 - The penalty is amortised over `--hold_periods` 5-day periods (default 4). In fallback there is no amortisation (H = 1).
 - 1% no-trade band on held names, applied only while still inside the buffered hard limits.
 - Shares rounded toward zero.
@@ -386,7 +386,7 @@ Research scripts:
 - **Known issue:** blending from a non-beta-neutral current book breaks the |β| ≤ 0.02 check (shadow β −0.09 to −0.18 on 2026-10-30). To do: re-project or re-hedge beta after blending.
 - Walk-forward results are in RESULTS §3. On the MV-LW book, τ = 0.5 roughly halves cost (115 → 70 bp/yr at flat 10 bps) for 0.8% TE to the full-rebalance book.
 
-**To do:** calibrate ℓ from the TCA owner's per-name costs and the desk's risk aversion; use IC-decay curves from validated signals for φ_k instead of signal autocorrelation.
+**To do:** calibrate ℓ from the TCA owner's per-name costs and the book's risk aversion; use IC-decay curves from validated signals for φ_k instead of signal autocorrelation.
 
 ## 7. Stops and limit enforcement
 **Implemented:**
@@ -404,7 +404,7 @@ Research scripts:
 - Remove hard-coded date defaults (`--date`, `--asof_bar_cutoff`).
 
 ## 8. Fallback: zero validated signals: SHADOW / DE-RISK ONLY (CIO-confirmed 2026-10-30, implemented in v2)
-**Policy:** with no validator-passed signal, the tradable output may only **reduce or close existing risk**:
+**Policy:** with no validated signal, the tradable output may only **reduce or close existing risk**:
 - trim, cover or sell;
 - tighten stops;
 - **never** open a new name, increase a position or flip its sign.
@@ -499,7 +499,7 @@ Every targets file carries `sleeve_id`, `book_name` and `description`. The shado
 |---|---|---|---|
 | `shadow_fallback_composite_v1` | Shadow fallback composite v1 | `shadow/targets_<stamp>SGT.json` | Non-tradable tracking book (description below) |
 | `tradable_derisk_only_v1` | Tradable de-risk-only book v1 | `targets/targets_<stamp>SGT.json` | No validated signal or HALTED: trim, close or cover, and tighten stops only |
-| `tradable_validated_composite_v1` | Tradable validated composite v1 | `targets/…` | Only once validator validates a signal |
+| `tradable_validated_composite_v1` | Tradable validated composite v1 | `targets/…` | Only once a signal is validated |
 | `research_full_fallback_v1` | Research full fallback v1 | `targets/…` (research runs only) | `--fallback full` on unvalidated signals; not CIO policy |
 
 **Shadow description (verbatim, `SHADOW_DESCRIPTION` in construct.py):** "Non-tradable tracking book (paper, never executed). Five price signals (MOM_12_1, RS63, TREND, REV5, PEAD) are equal-weighted in the fallback (any signal with OOS t <= -2 gets weight 0; RS63 on 2026-10-30), grouped into momentum/trend/reversal/event sleeves, each scaled by its 126d vol multiplier m (<= 1) and the panic factor, then sized long/short by a mean-variance optimiser on a 120d Ledoit-Wolf constant-correlation covariance with a 6% ex-ante vol cap (forecast x1.25), |beta| <= 0.01 via an SPY hedge, sector, 9.5% position, 0.95% risk-to-stop and 58% (or breaker) gross caps, TCA cost model; 2xATR(14) stops. US equities/ETFs only."
@@ -542,7 +542,7 @@ The earlier label "equal-risk" was inaccurate and has been retired. The signal w
 | Component | construct.py today | To do |
 |---|---|---|
 | Admission gate | ✅ `--validator_passed` AND internal OOS test | Parse the recorded verdicts automatically |
-| IC weights + shrinkage + correlation adjustment | ✅ (n0 = 20, C_shr, 50/50 blend) | Walk-forward IC and decay from the validator; per-signal budget cap |
+| IC weights + shrinkage + correlation adjustment | ✅ (n0 = 20, C_shr, 50/50 blend) | Walk-forward IC and decay from the review; per-signal budget cap |
 | Covariance shrinkage | ✅ LW 2004 optimal δ\* to constant correlation (fixed 0.5 optional) | Exclude cross-asset ETFs from the CC block |
 | Risk-forecast inflation | ✅ k = 1.25 in the 6% cap only (short-sample bias 1.15–1.37; v0.5 10y PIT L/S bias 1.14–1.23, **PROVISIONAL – data defects pending the data owner's fixes**) | Regime-dependent k (2020 bias ~1.5); re-run ls_volcap_wf after the data owner's fixes |
 | MV optimiser + 6% ex-ante vol **constraint** | ✅ 6% annualised (constraint, not scaler) | – |
@@ -562,7 +562,7 @@ The earlier label "equal-risk" was inaccurate and has been retired. The signal w
 ## 10. Open questions
 1. ~~Should the fallback trade at all?~~ Resolved: shadow / de-risk only (CIO, 2026-10-30). Still open: should de-risk trims follow the shadow book, or the limits only?
 2. Card owner naming: the pipeline lists "the portfolio-construction lead" for combine; cards use "Portfolio Construction Quant". Confirm.
-3. Status vocabulary for method papers: validator uses "reference (methodology)" in REGISTRY. My cards use "candidate" as SPRINT.md specifies.
+3. Status vocabulary for method papers: the review uses "reference (methodology)" in REGISTRY. My cards use "candidate" as SPRINT.md specifies.
 4. Data needed:
    - borrow rates and HTB flags (Alpaca)
    - ~~an earnings calendar~~ Found: the data owner's `data/earnings/` (v0.6, §4a.7)
@@ -570,7 +570,7 @@ The earlier label "equal-risk" was inaccurate and has been retired. The signal w
 5. ~~the TCA owner's per-name cost curve~~ Done: baseline_report.md §5 is in use. Open: k (0.75 vs 1.0) and live borrow.
 
 ### §8c Post-run note (02:10 SGT 2026-10-30): sleeve-proxy source deprecated
-At 02:09 SGT, one minute after the v0.6 run (20261030T020824SGT), `statarb/data/daily_bars.json` was moved to `statarb/data/_deprecated/` (DEPRECATED.md: retired direct-Alpaca IEX pull, survivorship-biased universe, audit only). That file was the default `--proxy_src statarb` input for the §4a.1 sleeve m / σ_target. The 02:08 books were built from it, so the sleeve multipliers in that run rest on a source that is now deprecated. construct.py now **fails closed** with an explicit message when the proxy file is missing (no targets written). `--proxy_path` was added as an override. The tests point it at the audit copy to exercise the logic only; that does not endorse the data. The replacement source (e.g. a survivorship-correct proxy from the store, which carries the known validation defects) was an open decision. **Resolved 02:12 SGT:** store_pit PIT proxy, PROVISIONAL (§4a.9). `statarb` + `--proxy_path` remains for tests and audit only.
+One minute after the v0.6 run, `statarb/data/daily_bars.json` was moved to `statarb/data/_deprecated/` (DEPRECATED.md: retired direct-Alpaca IEX pull, survivorship-biased universe, audit only). That file was the default `--proxy_src statarb` input for the §4a.1 sleeve m / σ_target. The 02:08 books were built from it, so the sleeve multipliers in that run rest on a source that is now deprecated. construct.py now **fails closed** with an explicit message when the proxy file is missing (no targets written). `--proxy_path` was added as an override. The tests point it at the audit copy to exercise the logic only; that does not endorse the data. The replacement source (e.g. a survivorship-correct proxy from the store, which carries the known validation defects) was an open decision. **Resolved:** store_pit PIT proxy, PROVISIONAL (§4a.9). `statarb` + `--proxy_path` remains for tests and audit only.
 
 
 ### §8d 2026-11-06 verification (post-outage)

@@ -25,7 +25,7 @@ PY = sys.executable
 NOW = "2026-10-30T02:00:00+08:00"
 TS = "2026-10-30T01:22:00+08:00"
 PROV = "PROVISIONAL: Alpaca-only (synthetic test)"
-# Derivatives researcher deprecated statarb/data/daily_bars.json at 02:09 SGT; tests read the audit copy explicitly (logic tests, not a data endorsement)
+# Derivatives researcher deprecated statarb/data/daily_bars.json; tests read the audit copy explicitly (logic tests, not a data endorsement)
 sys.path.insert(0, HERE)
 from quant_research.strategies.portfolio_construction.risk_state import limits_version
 
@@ -164,7 +164,7 @@ def test_D_store_pit_proxy_defects_excluded_v2():
     )
     assert {"SNDK", "LIN"} <= set(sp["excluded_defects"]) and len(
         sp["excluded_defects"]
-    ) == 59  # The validator's 59 names (SNDK already among them; added explicitly too, no double count)
+    ) == 59  # The review's 59 names (SNDK already among them; added explicitly too, no double count)
     assert prov["live_row"]["source"] == "offline_test" and "store" in prov["book_history"]["source"].lower()
     assert all(v["proxy_status"].startswith("PROVISIONAL") for v in sh["risk_overlays"]["vol_scaling"].values())
     assert all(l["method_version"] == "v2" and l["data_source"]["sleeve_proxy"] == "store_pit" for l in log)

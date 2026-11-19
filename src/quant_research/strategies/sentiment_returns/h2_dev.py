@@ -25,7 +25,7 @@ from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DA
 from quant_research.utils.pins import desk_pin
 
 NOTE = "50 DEV calls excluded as not-yet-due (erratum 7584b5b5, S6b readback b4652cef)"
-HDR = "EXPLORATORY: cannot PASS; DEV only; for the validator"
+HDR = "EXPLORATORY: cannot PASS; DEV only; for review"
 OUT = f"{_QR.DESK_DIR}/research/original/sentiment_returns_h2_dev_20261111"
 RET = f"{_QR.DATA_DIR}/av_returns_events_20261111/partitioned/dev"
 CLEAN = f"{_QR.DATA_DIR}/av_sentiment_20261110/clean"

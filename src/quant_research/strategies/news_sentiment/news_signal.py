@@ -98,7 +98,7 @@ vader = SentimentIntensityAnalyzer()
 
 # analyse only months completed in the PRIMARY raw dir (alias dir only supplements those months)
 months_loaded = sorted(fn.split("/")[-1][:7] for fn in glob.glob(f"{a.raw[0]}/*.jsonl"))
-# ---- OOS LOCK (the validator, 2026-10-30): months before 2025-06 are the untouched hold-out for
+# ---- OOS LOCK (the review, 2026-10-30): months before 2025-06 are the untouched hold-out for
 # PREREG_sector_lm_5d.md. They are skipped unless NEWS_OOS_UNLOCK equals the sha256 of the frozen
 # pre-registration file AND that hash is recorded in PREREG_sector_lm_5d.sha256 (written only at freeze).
 import hashlib
@@ -114,7 +114,7 @@ _ok = (
     and _unlock
     and _unlock == hashlib.sha256(open(_pr, "rb").read()).hexdigest() == open(_ph).read().split()[0]
 )
-# Sequencing (validator final decision X1 / interim #4): even with a valid unlock, this exploratory script (36 cells,
+# Sequencing (validation final decision X1 / interim #4): even with a valid unlock, this exploratory script (36 cells,
 # VADER, analyst cells) may touch hold-out months only AFTER the single gating run (prereg_run.py) is logged.
 sys.path.insert(0, f"{_QR.DESK_DIR}/equity")
 from quant_research.strategies.news_sentiment import holdout_guard as _hg
@@ -305,7 +305,7 @@ for comp in ("rating_chg", "pt_chg"):
     res[f"analyst_{comp}"] = daily_tests(sd, comp, "prev_open", deciles=False)
     variants += 1
     res[f"analyst_{comp}"]["stock_days"] = int(len(sd))
-# Stock-day panel with all components kept separate (for the validator)
+# Stock-day panel with all components kept separate (for review)
 P = ex[ex.in_primary]
 txt = (
     P[~P.is_analyst]

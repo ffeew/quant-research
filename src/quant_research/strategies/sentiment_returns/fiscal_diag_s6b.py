@@ -1,4 +1,4 @@
-# fiscal_diag_s6b.py - S6b rerun of prereg v5 §2 step-4 fiscal-label diagnostic under validator decision (S1,S2,S4,S5)
+# fiscal_diag_s6b.py - S6b rerun of prereg v5 §2 step-4 fiscal-label diagnostic under validation decision (S1,S2,S4,S5)
 # as amended by Erratum 1 (S3 and S4 denominator replaced by the DUE-quarter rule).
 # Based on fiscal_diag_s6.py; only S3/S4 logic changed, plus: S2 months are READ from the frozen table
 # FYE_MONTH_FROZEN.tsv (copied byte-for-byte) and cross-checked against the S1 recomputation; EDGE is a parameter.

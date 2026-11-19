@@ -1,6 +1,6 @@
 """stat-arb researcher H1/H2 Alpha Vantage DATA REBUILD (data only; no returns/signals/backtests).
 Key: read from env ALPHAVANTAGE_API_KEY only; never printed/logged/written. All messages redacted.
-Limiter: <=15 requests per rolling 60s AND >=4.1s spacing (stat-arb researcher share of desk 75/min).
+Limiter: <=15 requests per rolling 60s AND >=4.1s spacing (this pull's share of the 75/min key limit).
 No-overwrite: skip if any file for symbol exists; write temp then os.link (atomic EXCL) to final."""
 
 from __future__ import annotations

@@ -3,8 +3,8 @@
 # textual edits (EDITS below; each must match exactly once). The SAME transformed source runs in both modes:
 # --mode dev_rehearsal: DEV window/data (parity proof vs DEV_FREEZE). Refuses any HOLDOUT/raw path or news >= 2025-01.
 #   --mode oos           : H1b only, both readings (A3), decisions 2025-01-01..2026-10-31. One run; no retries.
-# No network. No trading. Output = raw stats for the validator (he rules PASS/FAIL, (d)).
-# v2 (validator C2): interpreter environment pinned via oos_config.json 'env_pin'; verified right after the config is parsed, before any
+# No network. No trading. Output = raw stats for review (he rules PASS/FAIL, (d)).
+# v2 (validation C2): interpreter environment pinned via oos_config.json 'env_pin'; verified right after the config is parsed, before any
 #   other input is read and before the lock/output folder exist (exit 5 on mismatch). Observed values logged in RUNNER_LOG + *_RAW.json.
 from __future__ import annotations
 
@@ -135,10 +135,10 @@ def transformed_source(src: str) -> str:
     return src[:i]
 
 
-# ---------------- pass bars (prereg v5 s5, A1-A5; validator seal note on Holm step-down) ----------------
+# ---------------- pass bars (prereg v5 s5, A1-A5; validation seal note on Holm step-down) ----------------
 def holm_h1b(p_h1b: float, p_h1a: float = 1.0, alpha: float = 0.05) -> dict[str, dict[str, Any]]:
     # s5 / A5: family N = 2 {H1a, H1b}, one-sided, Holm at 0.05 within each reading. A2 + seal record: H1a failed DEV,
-    # keeps its Holm slot with p := 1. Step-down (the validator, seal): smallest p tested at alpha/2 = 0.025; the larger at
+    # keeps its Holm slot with p := 1. Step-down (the review, seal): smallest p tested at alpha/2 = 0.025; the larger at
     # 0.05 only if the smaller is rejected. Ties (p_h1b == 1) -> H1b ordered first; it is not rejected either way.
     fam = sorted([("H1b", p_h1b), ("H1a", p_h1a)], key=lambda x: (x[1], x[0] != "H1b"))
     m = len(fam)
@@ -180,7 +180,7 @@ def evaluate_h1b(oos: Mapping[str, Mapping[str, Any]], dev: Mapping[str, Mapping
             half_dev_mean_ic=0.5 * d["mean_ic"],
         )
     out["PASS_both_readings (A3 conjunctive gate)"] = bool(out["UTC"]["all_met"] and out["ET"]["all_met"])
-    out["note"] = "Runner-computed against v5 s5 bars; the validator rules PASS/FAIL (d). A pass is evidence only (e)."
+    out["note"] = "Runner-computed against v5 s5 bars; the review rules PASS/FAIL (d). A pass is evidence only (e)."
     return out
 
 
@@ -392,7 +392,7 @@ def main() -> None:
     O = dict(
         mode=a.mode,
         prereg=desk_pin("strategies.sentiment_returns.oos_runner", "O.prereg"),
-        conditions="one H1b OOS sitting; no reruns; the validator rules",
+        conditions="one H1b OOS sitting; no reruns; the review rules",
         oos_runner_sha256=me,
         dev_run_sha256=DEV_RUN_SHA,
         oos_config_sha256=cfg_sha,

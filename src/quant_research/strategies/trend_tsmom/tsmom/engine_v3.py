@@ -1,6 +1,6 @@
 """PREREG-v3 engine: limits-compliant ETF trend sleeve (dollar NAV accounting, open fills, H6 stops, H8/H9 breakers).
 
-Spec: PREREG-v3.md §3-§5 + the validator's amendments A1-A6 (§9.A) + implementation clarifications (§9.B).
+Spec: PREREG-v3.md §3-§5 + the review's amendments A1-A6 (§9.A) + implementation clarifications (§9.B).
 The v1/v2 engine (tsmom/engine.py) is untouched; this is a separate module.
 
 Panel (all DataFrames indexed by session date, columns = symbols):
@@ -81,7 +81,7 @@ class V3Config:
     venue: str = "continuous"
     impact_k: float = 1.0
     borrow_rate: float = 0.01  # STANDARD floor
-    split_tol: float = 1.3  # §9.B(7) heuristic: cross-check only (validator decision 9B-7)
+    split_tol: float = 1.3  # §9.B(7) heuristic: cross-check only (validation decision 9B-7)
     split_source: str = (
         "table"  # "table" = the data owner's corporate-action table (required for the run); "heuristic" = tests only
     )

@@ -708,7 +708,7 @@ check("run gate: refuses while the corporate-action table hash is a placeholder"
 check("option (b): refuses while the v2 substitution-diff hash is a placeholder", _refuses((A_, C_, None, R_)))
 check("option (b): refuses while the reference-source table is TBD (TBD-2)", _refuses((A_, C_, F_, None)))
 check("run gate: all four hashes pinned -> guard passes", run_v3.guard_pin(A_, C_, F_, R_) == (A_, C_, F_, R_))
-# Validator 2026-11-06: placeholder assertion uses a temporary PREREG fixture only; live state asserts the pin.
+# Review 2026-11-06: placeholder assertion uses a temporary PREREG fixture only; live state asserts the pin.
 import contextlib
 import tempfile as _tf
 

@@ -31,7 +31,7 @@
 
 **Implementation.** See FRAMEWORK.md §8; v1 is archived at `archive/construct_v1_2026-10-30.py`.
 - `--fallback derisk` is the default.
-- `--validator_passed` is empty, since no validator PASS exists as of 2026-10-30.
+- `--validator_passed` is empty, since no validation PASS exists as of 2026-10-30.
 - The default cost model is `--cost_model tca`:
   - per side = measured pilot half-spread (or bucket default) + 0.75·σ·√(Q/ADV20) + H;
   - ADV is SIP where measured, else IEX × 21.6, the median SIP/IEX ratio over the 5 pilot names;
@@ -95,7 +95,7 @@
 - data.json gives only 167 OOS days (34 weekly rebalances) after a 120-day lookback. Its Sharpe CIs span about 4.5 units, so treat it as indicative only.
 - statarb gives 1,448 OOS days (2021-01..2026-10), which is better, but uses a survivorship-biased universe on the IEX feed.
 - Close-to-close fills.
-- Neither sample meets the validator's ≥10y PIT bar.
+- Neither sample meets the review's ≥10y PIT bar.
 
 #### A. statarb bars, L120, weekly: N=94, OOS 2021-01-20..2026-10-28 (1448 days, 290 rebalances)
 
@@ -281,8 +281,8 @@ GP map (ℓ → a/γ, τ): ℓ=0.5: (0.366, 0.7321), ℓ=2: (1.000, 0.5000), ℓ
    - GP tradable de-risk files (`research/gp_runs/ell_*`) still pass every hard limit. Their trims are smaller than the default de-risk, e.g. ℓ = 2 gives XLE 146→101 and GOOGL −35→−21.
    - **Fix before enabling GP:** re-project the blended weights onto the beta constraint, or put the |β| constraint on the blended weights inside the optimiser.
 4. **Parameters.**
-   - ℓ = λ/γ is not yet calibrated. λ needs the TCA owner's per-name costs at our size, and γ the desk's risk aversion.
-   - φ_k uses signal autocorrelation as a proxy for alpha decay. Proper IC-decay curves need validator-validated signals.
+   - ℓ = λ/γ is not yet calibrated. λ needs the TCA owner's per-name costs at our size, and γ the book's risk aversion.
+   - φ_k uses signal autocorrelation as a proxy for alpha decay. Proper IC-decay curves need validated signals.
    - Measured mean φ on statarb: MOM_12_1 0.031, RS63 0.096, TREND 0.050, REV5 0.992. On data.json, at the latest 120 days: MOM 0.018, RS63 0.121, TREND 0.071, REV5 1.0, PEAD 0.362.
 
 ## 4. Recommendations
@@ -292,7 +292,7 @@ GP map (ℓ → a/γ, τ): ℓ=0.5: (0.366, 0.7321), ℓ=2: (1.000, 0.5000), ℓ
 3. **Recalibrate risk forecasts.** Either scale forecasts by the trailing realised/forecast ratio, or set the ex-ante cap to about 5% to deliver about 6%.
 4. **Keep GP off** until the beta re-projection is in and ℓ is calibrated. Then a τ of about 0.5 (ℓ ≈ 2) is a reasonable starting point: about 40% less cost for <1% TE on risk books.
 5. **Keep the de-risk fallback.** Decide whether de-risk trims follow the shadow book (current) or limits only.
-6. **Costs.** Keep the TCA §5 model as default and flat 10 bp as stress. k (0.75 vs 1.0) and live borrow are open. GOOGL and XLE per-side costs are below the validator's 5 bp bar, so validation should still use ≥5 bp.
+6. **Costs.** Keep the TCA §5 model as default and flat 10 bp as stress. k (0.75 vs 1.0) and live borrow are open. GOOGL and XLE per-side costs are below the review's 5 bp bar, so validation should still use ≥5 bp.
 
 ## 5. Files
 
@@ -357,7 +357,7 @@ GP map (ℓ → a/γ, τ): ℓ=0.5: (0.366, 0.7321), ℓ=2: (1.000, 0.5000), ℓ
 
 ## Addendum 3 (~01:55 SGT): k re-estimated on ≥10 years of PIT data, L/S shadow construction (v0.5)
 
-> **PROVISIONAL – data defects pending the data owner's fixes.** the validator's 2026-10-30 data_issues.json applies to the store this addendum uses: missing delisting returns, former-member and predecessor history gaps, and SNDK ticker reuse. See Addendum 4 for exposure and a sensitivity check. k stays 1.25.
+> **PROVISIONAL – data defects pending the data owner's fixes.** the review's 2026-10-30 data_issues.json applies to the store this addendum uses: missing delisting returns, former-member and predecessor history gaps, and SNDK ticker reuse. See Addendum 4 for exposure and a sensitivity check. k stays 1.25.
 
 **Data check (the data owner, `$QR_DATA_DIR/`, read-only):**
 - **Span and coverage:** `bars/daily/adjusted/` covers SIP daily bars from **2016-01-04 → 2026-10-28** (10.81 years). There are 774 files for 772 symbols:
@@ -430,10 +430,10 @@ GP map (ℓ → a/γ, τ): ℓ=0.5: (0.366, 0.7321), ℓ=2: (1.000, 0.5000), ℓ
 8. **Performance:** the Sharpe and drawdown figures are reported only for context. They are not evidence for any signal.
 
 
-## Addendum 4 (02:10 SGT): LIMITS alignment (then cited as v0.2; current header v0.3.5) (construct.py v0.6) and the validator's data defects
+## Addendum 4: LIMITS alignment (then cited as v0.2; current header v0.3.5) (construct.py v0.6) and the review's data defects
 
 ### A. Data defects: what is affected
-Source: `validation/backtests/pead_long_pit/data_issues.json` and `results.md` (the validator; read-only).
+Source: `validation/backtests/pead_long_pit/data_issues.json` and `results.md` (review; read-only).
 - **Affected, now marked PROVISIONAL – data defects pending the data owner's fixes:**
   - the Addendum 3 k re-estimate: `research/ls_volcap_wf.py`, `research/out/ls_volcap_sip_N100_w.json`, `ls_volcap_sip_N100_all5_w.json` and their `_daily.csv`;
   - the v2 re-runs below.
@@ -442,10 +442,10 @@ Source: `validation/backtests/pead_long_pit/data_issues.json` and `results.md` (
   - today's shadow and tradable books, and their betas, vols, LW Σ and sleeve m / σ_target;
   - the statarb/data.json walk-forwards (§2, Addendum 2, `research/out/volcap_*`, `riskmodels_*`).
   - Reason: they use data.json (Alpaca IEX) or the derivatives researcher's statarb bars. The data.json universe has 120 symbols (117 for statarb). Intersected with the 220 former members, or with SNDK, it is empty. The intersection with the validator's 59 no-bar symbols is {LIN} only, and LIN's defect is in the data owner's store (Praxair history before 2018-10-31), not in data.json.
-- The new earnings gate reads the data owner's `data/earnings/` calendar. That is a separate dataset. It uses forward Nasdaq dates for current names and avoids `first_tradable_session` (the validator's DURING_MKT defect). It is listed in `data_provenance`, not marked provisional.
+- The new earnings gate reads the data owner's `data/earnings/` calendar. That is a separate dataset. It uses forward Nasdaq dates for current names and avoids `first_tradable_session` (the review's DURING_MKT defect). It is listed in `data_provenance`, not marked provisional.
 
 ### B. Exposure of the k backtest to the defects, and a sensitivity check (PROVISIONAL)
-`research/ls_volcap_wf.py` v2 (the v1 copy is in `archive/`) adds exposure tracking and `--exclude_defects`, which drops the validator's 59 symbols plus SNDK. Re-running without exclusion reproduces Addendum 3 exactly. Logs: `research/out/log_ls_{base,base_x,all5,all5_x}_v2.txt`; JSON: `ls_volcap_sip_N100_*_v2.json`.
+`research/ls_volcap_wf.py` v2 (the v1 copy is in `archive/`) adds exposure tracking and `--exclude_defects`, which drops the review's 59 symbols plus SNDK. Re-running without exclusion reproduces Addendum 3 exactly. Logs: `research/out/log_ls_{base,base_x,all5,all5_x}_v2.txt`; JSON: `ls_volcap_sip_N100_*_v2.json`.
 
 | Weights | k | Defects | Realised vol [CI] | Bias [CI] | Mean former / defect names in top-100 | Gross share former / defect | Defect names held |
 |---|---|---|---|---|---|---|---|
@@ -490,7 +490,7 @@ Source: `validation/backtests/pead_long_pit/data_issues.json` and `results.md` (
 | event | 14.06% / 9.49% / 0.675 | 11.11% / 5.98% / 0.539 |
 
 - Proxy days: 2,521–2,715 (from 2016) vs 1,370–1,564 before.
-- The validator's 59 defect symbols (SNDK among them) are excluded, leaving ≈482 PIT members per day on average.
+- The review's 59 defect symbols (SNDK among them) are excluded, leaving ≈482 PIT members per day on average.
 - Source: the `risk_overlays.vol_scaling` fields of `shadow/targets_20261030T020824SGT.json` and `shadow/targets_20261030T022224SGT.json`.
 
 **Signal study on SIP history (same 420-day window as before)**

@@ -1,6 +1,6 @@
 # News data audit: timestamps and coverage (no returns examined)
 
-2026-10-30 (SGT), the sentiment researcher.
+2026-10-30, the sentiment researcher.
 - This audit uses metadata only: ids, timestamps, symbols and counts. **No prices, returns or signal statistics were computed.**
 - Hold-out months (before 2025-06) were read only for timestamp and coverage counts.
 - Scripts are in `audit/`: `ts_internal.py`, `sample_urls.py`, `coverage.py`. Rerun `ts_internal.py` and `coverage.py` once the fetch completes, because the coverage tables below are partial.
@@ -92,7 +92,7 @@ The full table is in `audit/coverage_by_sector_year.csv`.
 - No cron job or routine exists.
 - I verified that the lock currently skips the hold-out months already present in `raw/`.
 
-## 5. Edited-after-cutoff drop share (validator decision 5 / final X6 i, iv). Metadata only
+## 5. Edited-after-cutoff drop share (validation decision 5 / final X6 i, iv). Metadata only
 - Script: `audit/edited_share.py` (reads id, created_at, updated_at, symbols; no text, tone, prices or returns). Outputs: `audit/edited_share_by_year.csv`, `audit/edited_share_by_sector_year.csv`, `audit/edited_share_by_membertype_year.csv`, `audit/coverage_floor_by_month.csv`, `audit/edited_share.json`.
 - Rule measured exactly as PREREG §4.3: session d = first session whose 09:25 ET cutoff is after created_at; **dropped if updated_at ≥ 09:25 ET of d.** Scope: every fetched file in `raw/` and `raw_alias/`, deduplicated by id; year = year of session d. Universe: ≤ 3-symbol articles tagging a PIT S&P 500 member (the PREREG input).
 - **Status: provisional.** At run time (2026-10-30 ~02:20 SGT) `raw/` held 2024-06..2026-10 only; the 2016-01..2024-05 months are still being fetched.
@@ -111,12 +111,12 @@ The full table is in `audit/coverage_by_sector_year.csv`.
 - **Years above 5%: none among the years that can be measured today (2024-26).** Pending: 2016-2023.
 - **Selection statement (required).** Dropping later-edited articles is a selection on newsworthiness and on future information: whether a story is edited after the decision cutoff is not known at 09:25 ET, and edited stories are plausibly developing or high-attention ones. Keeping them instead scores text that did not exist at decision time. Neither is clean. The pre-registration therefore runs the no-filter version as a bound (PREREG G10): if the two disagree on G1 or G4, the verdict is capped at CONDITIONAL.
 
-## 6. Coverage floor by month and former vs current members (validator X7). Metadata only
+## 6. Coverage floor by month and former vs current members (validation X7). Metadata only
 - `audit/coverage_floor_by_month.csv`: share of PIT members with ≥ 1 member-tagged article per month (any symbol count), split current vs former members. Floor for the first OOS month: **≥ 90%**.
 - Measured (complete months only): 2025: monthly min 93.5%, mean 97.0% (former members 96.9%). 2026: min 91.9%, mean 96.5% (former 93.1%). Every 2025-26 month meets the floor.
 - 2016-2024-05: **pending fetch** (current partial values are not meaningful). The possible Feb 2015 to Oct 2016 Benzinga gap (Alpaca forum report, not verified) will show up here; if 2016 months fail the floor the PREREG OOS start moves and lengths are restated.
 
-## 7. Benzinga coverage by size (spillover card disclosure, validator decision 6 / M11). Metadata + dollar volume only
+## 7. Benzinga coverage by size (spillover card disclosure, validation decision 6 / M11). Metadata + dollar volume only
 - `audit/coverage_by_size.py` → `audit/coverage_by_size_year.csv`, `audit/coverage_by_membertype_sessions_year.csv`. Size proxy = within-index tercile of 63-session median dollar volume (close × volume) at the prior month end; market caps for 41 members are pending from the data owner. "Story" = ≥ 1 Benzinga article tagging the stock with ≤ 3 symbols, session-assigned at the 09:25 ET cutoff. Only fully fetched months (2024-06..2026-10).
 
 | year | tercile | member-sessions | share of sessions with own story | articles per member-session | members with no story all year |

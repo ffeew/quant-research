@@ -1,6 +1,6 @@
 # RESULTS v2: unlevered, lower-cost ETF trend sleeve (pre-registered)
 
-**Owner:** the macro strategist · **Run:** Fri 30 Oct 2026, 01:37 SGT · **Spec:** `PREREG-v2.md` §1–§8 plus Amendments A1 (the validator) and A2 (STANDARD.md items). Both amendments were logged before the run.
+**Owner:** the macro strategist · **Run:** Fri 30 Oct 2026 · **Spec:** `PREREG-v2.md` §1–§8 plus Amendments A1 (the review) and A2 (STANDARD.md items). Both amendments were logged before the run.
 **One command:** `.venv/bin/python run_v2.py` (unit checks: `.venv/bin/python -m tests.test_v2_engine`, 23/23 PASS) · **Outputs:** `outputs_v2/` (v1 `outputs/` untouched)
 **Hashes:**
 - outputs_v2 directory. This is the sha256 of `outputs_v2.MANIFEST.sha256`, the per-file sha256 list with sorted paths.
@@ -88,7 +88,7 @@ V[SR] always comes from the 24 logged trials; only N varies (A1.2).
 | **gross** (Stage A gate) | 0.149 | 0.295 / **0.62** | 0.309 / 0.61 | 0.339 / 0.57 |
 | all-net | 0.734 | 1.453 / 0.0005 | 1.521 / 0.0002 | 1.670 / 0.0000 |
 
-- At the validator's N = 30, DSR is 0.61 in the gross version and about 0 in the all-net version. Both are far below 0.95.
+- At the review's N = 30, DSR is 0.61 in the gross version and about 0 in the all-net version. Both are far below 0.95.
 - The all-net version is degenerate: the v1 fast and levered trials lost up to −2.4 Sharpe net, which inflates the dispersion. It is reported as A1.2 requires.
 
 ## PBO via CSCV (A1.4)
@@ -167,10 +167,10 @@ The band saved about 0.6× turnover and added about 0.04 to net Sharpe.
 ## Caveats / limitations
 1. **Not out-of-sample.** 2017–2026 was fully seen in v1, and the v2 design was informed by v1's attribution (PREREG §1). Stage B on the 2005+ backfill is the real test. `bars/daily/extended/etf_total_return_spliced.parquet` exists but was **not read**.
 2. **Shortability look-ahead (A1.5).** Today's (2026-10-29) Alpaca shortable/ETB flags are applied to the whole history. USO is long/flat for this reason. Historical borrow availability is unknown.
-3. **Data build moved between pre-registration and run.** The TR file's sha256 was at pre-registration (01:29 build) and at run time (rebuilt 01:32:38 SGT). Per PREREG §2, all 19 v1 trials were re-run on the new build. They reproduce the v1-logged Sharpes to 3 decimals (e.g. baseline net 0.203, gross 0.607), so the rebuild did not move these ETFs materially.
+3. **Data build moved between pre-registration and run.** The TR file's sha256 was at pre-registration (01:29 build) and at run time (rebuilt). Per PREREG §2, all 19 v1 trials were re-run on the new build. They reproduce the v1-logged Sharpes to 3 decimals (e.g. baseline net 0.203, gross 0.607), so the rebuild did not move these ETFs materially.
 4. **Fills** are at the next session's close (lag 1), not STANDARD §2's "next-bar open or worse" open fill.
 5. **Borrow** base is the TCA owner's 25 bps. At STANDARD's 1%/yr floor, net Sharpe falls to 0.36.
-6. **No VIX series in the desk store**, so STANDARD §7's VIX regime split is not reported (gap; the data owner).
+6. **No VIX series in the data store**, so STANDARD §7's VIX regime split is not reported (gap; the data owner).
 7. **Universe** is today's surviving ETFs (no delisted ETFs). STANDARD's 20% survivorship haircut would cut net Sharpe to about 0.32.
 8. **Short sample.** 9.7 years gives a Sharpe SE of 0.32. The 0.395 vs 0.40 miss is far inside noise in both directions. The verdict is applied strictly as pre-registered, not because 0.005 is meaningful.
 9. **Partial parameter neighbourhood.** Only lookback ±25% and vol target ±20% were perturbed, as A1.3 specified. Band width, cap and EWMA centre of mass were not perturbed, and no joint perturbation was run.

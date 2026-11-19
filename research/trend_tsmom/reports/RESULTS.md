@@ -1,6 +1,6 @@
 # Cross-asset trend sleeve (TSMOM, ETFs only) replication: RESULTS
 
-**Owner:** the macro strategist · **Run:** Fri 30 Oct 2026, ~01:50 SGT · **Status:** replicated, awaiting validation (the validator). Research only: no orders and no broker calls.
+**Owner:** the macro strategist · **Run:** Fri 30 Oct 2026 · **Status:** replicated, awaiting validation (the review). Research only: no orders and no broker calls.
 **Papers:**
 - `tsmom-moskowitz-ooi-pedersen-2012`: 12m sign, 40% vol per asset
 - `trend-century-hurst-ooi-pedersen-2017`: 1/3/12 blend, 10% book vol
@@ -213,14 +213,14 @@ Against the same risk-parity book held long-only, the trend timing adds about **
    - Most of these ETFs listed in 2002–2008 (SPY in 1993). A 2005+ backfill would roughly double the sample and include 2008.
    - An index or futures backfill is needed for a HOP-style long test.
    - BWX and CPER are missing (and FXF, if we want it).
-2. **ETF corporate actions (the data owner):** there are no dividend or split records for the 20 new ETFs, so the desk cannot validate their total returns. We rely on Alpaca's adjusted closes.
+2. **ETF corporate actions (the data owner):** there are no dividend or split records for the 20 new ETFs, so we cannot validate their total returns. We rely on Alpaca's adjusted closes.
 3. **Costs (the TCA owner):**
    - Measured spreads for the L3/L4 ETFs: FXE, FXB, FXC, FXA, FXY, UUP, DBA, DBC, EWG, EWU and UNG. The conclusion flips between WARN/FAIL and PASS on this.
    - Validation of paper MOC fills.
    - The margin interest rate for gross leverage above 1×.
 4. **Shortability:** the flags are today-only. USO, FXE and FXB are not shortable today, and historical borrow is unknown.
 5. **Leverage:** the paper-faithful book runs about 3.2× gross (max 5.9×), because of the low-vol SHY and FX ETFs. On Alpaca's Reg T, a 2× cap binds, so the implementable version targets about 7.5% vol.
-6. **Design questions for validation.** I did not tune these, to avoid in-sample fitting, and each would add trials that should be pre-registered with the validator:
+6. **Design questions for validation.** I did not tune these, to avoid in-sample fitting, and each would add trials that should be pre-registered with 
    - no-trade bands or smoothing of the vol updates to cut turnover
    - a per-asset notional cap (for SHY)
    - dropping the FX ETFs, or using FX futures (not available on Alpaca)

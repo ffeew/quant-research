@@ -1,10 +1,10 @@
-# $QR_DATA_DIR: desk research data store (owner: the data owner, Data Engineer)
+# $QR_DATA_DIR: research data store (owner: the data owner, Data Engineer)
 
 Point-in-time (PIT), source-traceable research data. **No number here is invented.** Every value comes from the named API or page and carries a fetch time. Gaps are listed below instead of being filled in.
 Status snapshot for the CIO: `STATUS.md`. Machine-readable run summary (counts, coverage, failures): `manifest.json`. Logs: `logs/`.
 
 - Python env: `$QR_DATA_DIR/.venv` (pandas, pyarrow, exchange_calendars, requests, lxml, tabulate). Lock file: `pipelines/requirements.lock.txt`.
-  Desk members should keep their own venvs (e.g. The derivatives researcher: $QR_SCRATCH_DIR/dave_venv) and only *read* these files.
+  Users should keep their own venvs (e.g. under $QR_SCRATCH_DIR) and only *read* these files.
 - All writes are atomic: `<file>.tmp.parquet` is written first, then `os.replace` swaps it in. A reader never sees a half-written file.
 - Credentials come only from env vars `ALPACA_API_KEY_ID` / `ALPACA_API_SECRET_KEY`. They are never logged or stored.
   SEC requests send `SEC_USER_AGENT`. Set it to "<org> <real contact email>" per SEC fair-access policy. The default placeholder works but is not compliant long-term.
@@ -279,7 +279,7 @@ Sample of 22 liquid stocks/ETFs, 2016-2026:
 | `crypto_bars.py` | DEPRECATED | - | - |
 | `alfred_store.py` | macro/treasury, macro/carry/g10_3m, sentiment/credit (frozen dated ALFRED vintages; `python alfred_store.py treasury g10_3m credit treasury_extra`) | weekly (daily for treasury/credit if needed); each run writes new dated files | ~1-2 min |
 
-Suggested daily order: corporate_actions, then daily_bars, total_return, assets_snapshot, earnings, qa. Run it at **07:30 SGT Tue-Sat** (US close + about 3.5 h; robust to the 1 Nov 2026 DST change). No schedules are configured.
+Suggested daily order: corporate_actions, then daily_bars, total_return, assets_snapshot, earnings, qa. Run it **Tue-Sat** (US close + about 3.5 h; robust to the 1 Nov 2026 DST change). No schedules are configured.
 
 ## Blockers / not freely obtainable
 - **Macro release calendar (CPI/NFP/GDP/PCE/ISM), vintage-aware.**
@@ -325,7 +325,7 @@ Legend: COVERED = in store now; PARTIAL = usable with caveats; NO = not in store
 | garleanu-pedersen-2013 (PC) | per-name costs/borrow | PARTIAL: SIP volume/vwap/trade_count; no borrow fees |
 | kaminski-lo-2014 stop-loss (the risk manager) | daily returns | COVERED for ETFs/stocks; the paper's futures data NO |
 | frazzini-israel-moskowitz-2018, almgren-chriss, perold, ATHL (the TCA owner) | SIP volume/ADV, intraday for impact | PARTIAL: SIP daily volume/vwap COVERED; intraday/quotes NO |
-| The validator's references (HLZ, DSR, PBO, McLean-Pontiff) | none (methodology) | n/a |
+| The review's references (HLZ, DSR, PBO, McLean-Pontiff) | none (methodology) | n/a |
 
 The derivatives researcher's numbered requests:
 1. SIP adjusted+raw incl. former members: COVERED.
@@ -462,7 +462,7 @@ Built by `pipelines/alfred_store.py`; observation start 2004-01-01. Every run wr
 The live store is mutable: fixes land in place (v1.0, v1.1, ...). A snapshot hash alone does not freeze content, because the live files can be replaced after hashing. A **release** is a read-only copy (`chmod -R a-w`) of every data file. Its manifest hashes the copies.
 | version | top_hash | files | notes |
 |---|---|---|---|
-| v1.2 | — | 1,939 | first frozen release. Includes bars/daily/raw, security master v1.2b, VIX, index, macro. Earnings captured mid validator fix #2 (final earnings fixes go to v1.3). See `releases/v1.2/RELEASE.md` |
+| v1.2 | — | 1,939 | first frozen release. Includes bars/daily/raw, security master v1.2b, VIX, index, macro. Earnings captured mid validation fix #2 (final earnings fixes go to v1.3). See `releases/v1.2/RELEASE.md` |
 | v1.3 | — | 1,939 | derivatives researcher freeze pin. v1.2 bars unchanged; Fix-2-final earnings (`edgar_8k_202`, `earnings_events`). SIP methodology doc. SUE not included (addendum). See `releases/v1.3/RELEASE.md` |
 - Releases v1.0/v1.1 were never frozen. By 02:10 SGT, `earnings_events`, `edgar_8k_202` and `ticker_cik_map` no longer matched the v1.1 manifest, so v1.1 content cannot be reproduced.
 - **Policy:** cut a new frozen release after each fix batch (`releases/v1.3/`, ...), never overwrite one, and append to `snapshots/CHANGELOG.md`. Researchers read from `releases/<version>/...` and cite **release version + top_hash**. Verify with the snippet in RELEASE.md.
@@ -479,14 +479,14 @@ tr = pd.read_parquet(f"{R}/bars/daily/total_return/daily_total_return.parquet")
 - Hooked after commit (it never changes a script exit code) into daily_bars.py, total_return.py, assets_snapshot.py, earnings_forward.py, update_sp500_index.py, and alfred_store.py (credit group).
 - Release pins (releases/, snapshots/) are not tracked; they are frozen by design.
 - **Schedule reality:** there is NO local scheduler (no cron or systemd timers). Only three Grok Bot routines exist (S&P 16:50 ET, next-earnings 06:30 ET, borrow 08:00 ET), and they failed from 10-30 to 11-05 because of missing usage. Nothing else refreshes unless someone runs it. Freshness is not guaranteed.
-- 06:14 SGT check: FRESH for index_sp500, bars_daily, total_return, credit_oas (2026-11-04), earnings_forward, and assets_borrow. STALE: vix_vix3m (2026-10-28), which has no build script. Not tracked/stale: earnings_events and corporate_actions (left alone during the validator fixes).
+- check: FRESH for index_sp500, bars_daily, total_return, credit_oas (2026-11-04), earnings_forward, and assets_borrow. STALE: vix_vix3m (2026-10-28), which has no build script. Not tracked/stale: earnings_events and corporate_actions (left alone during the review fixes).
 ## Immutable component reconciliation (2026-11-06, 06:49 SGT)
 
 ### Sentiment researcher 8-K Item 2.02 timestamp component — optional additive only
 - `/derived/earnings_events_8k202_v1.parquet` remains a **timestamps/event-spine additive component only**, not a replacement for v1.3 `edgar_8k_202` or multi-source `earnings_events`; not a SUE-ready input, v1.4, return-bearing authorization or a full complete press-release package.
 - Immutable addendum: `/derived/earnings_events_8k202_v1_reconciliation/DECISION.md`, `accession_union_diff.parquet`, `reconciliation_summary.json`, `build_reconciliation.py`. Local independent check verified every documented count and SHA256; all five addendum files are mode 0444.
 - Canonical parent remains v1.3. Its EDGAR table is event-symbol grain (29,519 rows/28,768 unique accessions); the sentiment researcher is accession grain (31,467). Reconciled union is 31,913: 28,322 shared with exactly equal UTC acceptance and first-open-session fields; 446 v1.3-only = 397 withheld as cluster member + 49 AA/EVHC identity mapping; 3,145 sentiment-researcher-only = 2,807 intentional 2015 extension + 338 requiring lineage review. 131 shared accessions retain CIK alias/display differences; 133 v1.3-only contain an 8-K/A in forms (NOT an assertion of amended public-content timing). These are bounded/known gaps, not silent superset or complete-identity coverage.
-- Validator disposition measured from file bytes, the internal review record. ACCEPT INPUT TIMESTAMP TABLE only, not main promotion/SUE. Do not mix cluster-first vs keep-all-actings enumeration policies in one trial; need explicit dual-pin/versioned trial pin when optional component used. v1 files and README remain byte-identical and read-only.
+- Review disposition measured from file bytes, the internal review record. ACCEPT INPUT TIMESTAMP TABLE only, not main promotion/SUE. Do not mix cluster-first vs keep-all-actings enumeration policies in one trial; need explicit dual-pin/versioned trial pin when optional component used. v1 files and README remain byte-identical and read-only.
 - Future v2 by the sentiment researcher (new immutable paths) must restore/support AA & EVHC lineage, preserve all component CIK aliases, reason-code the diffs and separately audit late/partial siblings/amendments and EX-99 timing/content. First SEC acceptance is not inferred as full release-public evidence. No source table was silently repaired.
 
 ### Gate primary-calendar candidate — DATA usable for replay but adoption WITHHELD

@@ -1,4 +1,4 @@
-"""Curve episode gate, validator follow-up decision (2026-10-30 ~02:06 SGT).
+"""Curve episode gate, validation follow-up decision (2026-10-30).
 SIGNAL INPUTS ONLY: DGS2/DGS10 (+ the USO session calendar from the store, used only for its NYSE session dates). No ETF prices or returns.
 Merge rule (decision (1)): an exit to neutral followed by a SAME-direction re-entry within 4 weeks (<= 28 calendar days between the last active
 weekly evaluation and the re-entry evaluation) counts as ONE episode. Opposite-direction flips are never merged.

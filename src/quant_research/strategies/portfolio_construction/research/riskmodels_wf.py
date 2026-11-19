@@ -30,7 +30,7 @@ NON_ALPHA = {"SPY", "QQQ", "IWM", "DIA", "EEM", "EFA", "TLT", "HYG", "GLD", "SLV
 SECTOR_ETF = {"XLB", "XLC", "XLE", "XLF", "XLI", "XLK", "XLP", "XLRE", "XLU", "XLV", "XLY", "SMH"}
 CRYPTO = {"BTC/USD", "ETH/USD", "SOL/USD"}
 CUTOFF = "2026-10-29"   # 2026-10-29 bar is partial at run time (market open)
-# Data-provenance rule (2026-10-30 02:12 SGT): history ONLY from the shared store, via $QR_DATA_DIR/lib/desk_data_client.py.
+# Data-provenance rule (2026-10-30): history ONLY from the shared store, via $QR_DATA_DIR/lib/desk_data_client.py.
 # src="store" (default) = desk universe (construct.DESK_UNIVERSE, alpha names only) from bars/daily/adjusted (SIP, adjustment=all),
 # allow_api=False (history only; no live calls in research). "datajson"/"statarb" are RETIRED sources kept only so earlier
 # outputs can be reproduced/audited: they raise unless allow_retired=True (CLI --allow_retired). statarb -> the derivatives researcher's audit copy.
@@ -184,7 +184,7 @@ def tca_costs(C: pd.DataFrame, V: pd.DataFrame, src: str, equity: float = 100_00
     sig = R.rolling(20).std().median()
     adv = ((C * V).rolling(20).mean().median() * 21.6) if V is not None else pd.Series(2e9, C.columns)
     bps = np.array([hs.get(s, hs_default) + k * sig[s] * math.sqrt(clip * equity / adv[s]) * 1e4 + haircut_bps for s in C.columns])
-    meta = dict(formula="HS + k*sigma*sqrt(Q/ADV) + H", k=k, Q=f"{clip:.0%} of ${equity:,.0f}", H_bps=haircut_bps,
+    meta = dict(formula="HS + k*sigma*sqrt(Q/ADV) + H", k=k, Q=f"{clip:.0%} of ${equity:.0f}", H_bps=haircut_bps,
                 hs_measured={s: round(hs[s], 2) for s in C.columns if s in hs}, hs_default=hs_default,
                 per_side_bps_min_med_max=[round(float(bps.min()), 2), round(float(np.median(bps)), 2), round(float(bps.max()), 2)])
     return bps / 1e4, meta

@@ -1,4 +1,4 @@
-"""Earnings gate for construct.py (LIMITS.md H7; current LIMITS header, v0.3.7 at 02:28 SGT; Risk decision 2026-10-30 02:27). Read-only use of the data owner's calendar + next_earnings sidecar.
+"""Earnings gate for construct.py (LIMITS.md H7; current LIMITS header, v0.3.7; Risk decision 2026-10-30 02:27). Read-only use of the data owner's calendar + next_earnings sidecar.
 
 DEFAULT POLICY = "risk_ruling_20261030_0227" (Risk, risk/decisions-log.md row 2026-10-30 02:27, "H7 earnings gate:
 estimated dates and recently reported names: RULING: ACCEPTED WITH CONDITIONS"):
@@ -29,7 +29,7 @@ Source (read-only, the data owner, $QR_DATA_DIR/README.md §6):
   $QR_DATA_DIR/earnings/earnings_events.parquet  - one row per event: symbol, announce_date_et, timing (BMO/AMC/
       INTRADAY/UNKNOWN), source (edgar_8k_2.02 | nasdaq_reported_or_past | nasdaq_scheduled), knowledge_time_utc
   $QR_DATA_DIR/earnings/nasdaq_calendar.parquet  - Nasdaq calendar pull; fetched_at_utc = calendar freshness
-We use announce_date_et + timing only (NOT first_tradable_session: the validator found the DURING_MKT alignment defect).
+We use announce_date_et + timing only (NOT first_tradable_session: the review found the DURING_MKT alignment defect).
 
 Rules (LIMITS H7 + CIO 2026-10-30 01:58):
   * SHORTS are never held through their own release: if the next release falls before the end of the holding horizon

@@ -1,5 +1,5 @@
 # Alpha Vantage news sentiment + earnings-call transcripts (for the sentiment researcher) - RAW layer
-Built 10-11 Nov 2026 SGT.
+Built 10-11 Nov 2026.
 Status: RAW, sealed, pending inspection. Not yet released for research use. A separate clean/ layer will follow the
 cleaning decisions, with every rule and dropped row in CLEANING.md; raw/ stays untouched.
 
@@ -50,4 +50,4 @@ Never read: sentiment scores, relevance scores, transcript text, prices. No retu
   Remaining runs restarted as fresh workers <= 35 min each. No calls lost or duplicated.
 - Low: R8 process was killed at 04:56:32Z 11 Nov after 490/804 items (last OK SBUX 2015Q1; no .done). Remainder fetched by a
   fresh split run R8b (fetch_av2_r8b.py, 314/314 OK, orphan files 0). R8 is not counted as resumed.
-- Low: news runs 2-4 split into R2a..R4b; R1b added for weekly re-splits of R1 halves (fund-manager-approved budget).
+- Low: news runs 2-4 split into R2a..R4b; R1b added for weekly re-splits of R1 halves (within the agreed call budget).

@@ -7,7 +7,7 @@ Rules (v0.4):
   - tag us-gaap:EarningsPerShareDiluted (else EarningsPerShareBasicAndDiluted), unit USD/shares, forms 10-Q / 10-K
     (amendments ignored -> values as originally filed).
   - 3-month duration values only (80-100 days). NO Q4 = FY - 9M (or FY - Q1..Q3) derivation: invalid for diluted EPS
-    (validator review §5). A Q4 with no reported 3-month value is missing here.
+    (validation review §5). A Q4 with no reported 3-month value is missing here.
   - Earliest accession: for each (cik, period_start, period_end) the value from the FIRST-accepted filing is kept
     (later filings' comparatives and restatements are ignored).
   - knowledge time: join accn = edgar_10q10k.accession -> acceptance_datetime_et; knowledge_session per the 09:30 ET rule.

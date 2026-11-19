@@ -1,4 +1,4 @@
-"""Statistics required by the validator's STANDARD.md v1.0 (the derivatives researcher, 2026-10-30). All on DAILY net returns unless noted.
+"""Statistics required by the review's STANDARD.md v1.0 (the derivatives researcher, 2026-10-30). All on DAILY net returns unless noted.
 DSR: Bailey & Lopez de Prado (2014) eq. 1-2. PBO: Bailey, Borwein, Lopez de Prado & Zhu (2017) CSCV.
 Newey-West HAC with Bartlett kernel, lag = floor(4 (T/100)^(2/9))."""
 

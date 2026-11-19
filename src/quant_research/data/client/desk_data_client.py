@@ -1,6 +1,6 @@
 """desk_data_client: shared, local-first access to desk market data + a cross-process throttled Alpaca client.
 
-Owner: the data owner (Data Engineer). Dependencies: stdlib + requests + pandas + pyarrow only (works from any desk venv).
+Owner: the data owner (Data Engineer). Dependencies: stdlib + requests + pandas + pyarrow only (works from any venv).
 
     import sys; sys.path.insert(0, "$QR_DATA_DIR/lib")
     import desk_data_client as ddc

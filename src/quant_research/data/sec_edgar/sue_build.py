@@ -444,8 +444,8 @@ def main() -> None:
         "coverage_complete_reason": "real gaps persist (see gap_classes + coverage mean_n_members - mean_n_sue): 8-K events "
         "without a usable GAAP diluted EPS (none/unlabeled/adjusted-only), events without a PIT "
         "fiscal period, PIT members with no SUE in the 130-session window, ticker-grain membership "
-        "join. AA/EVHC are NOT a gap (outside/before PIT membership; validator v2 review 2.3). "
-        "Not validator-reviewed / not data-owner-promoted.",
+        "join. AA/EVHC are NOT a gap (outside/before PIT membership; v2 review 2.3). "
+        "Not validation-reviewed / not data-owner-promoted.",
         "not_a_frozen_complete_sue_input": True,
         "event_spine": "v1.3 edgar_8k_202 (form 8-K) + earnings_events; sentiment researcher v1/v2 NOT used for values",
         "input_hashes": {

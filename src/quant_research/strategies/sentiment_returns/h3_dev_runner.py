@@ -10,8 +10,8 @@ if TYPE_CHECKING:
 
     import numpy.typing as npt
 
-# h3_dev_runner.py v3 (re-freeze 2026-11-13; v2, v1; v3 adds DV-25 stale terminal bar, the validator) - H3 DEV runner for sealed PREREG_H3_DRAFT_v2 + seal S1-S6.
-# DEV ONLY (closes/events <= 2024-12-31). ONE run, guarded by an atomic LOCK. Raw output goes to validator first (S6).
+# h3_dev_runner.py v3 (re-freeze 2026-11-13; v2, v1; v3 adds DV-25 stale terminal bar, the review) - H3 DEV runner for sealed PREREG_H3_DRAFT_v2 + seal S1-S6.
+# DEV ONLY (closes/events <= 2024-12-31). ONE run, guarded by an atomic LOCK. Raw output goes to validation first (S6).
 # Helper conventions COPIED (not imported) from dev_run.py: XNYS sessions, adjusted_close ratios,
 # 252-return OLS beta ending t-1, (ws, we] 15:30 ET cutoffs, UTC/ET readings of naive time_published, relevance-weighted
 # mean, Bartlett NW t, one-sided Student-t p (df = T-1), +/-1 day month padding; H1b-style entry from flat (h2_dev.py
@@ -256,7 +256,7 @@ EXPECT = dict(
     returns_before_first=276,
 )
 TICK = re.compile(r"^[A-Z][A-Z0-9.\-]{0,9}$")
-STALE_EXPECT_N = 2  # DV-25 (the validator): expected drops on real data (TWTR 2022-10-28, ATVI 2023-10-13); a different count is REPORTED, not a STOP
+STALE_EXPECT_N = 2  # DV-25 (the review): expected drops on real data (TWTR 2022-10-28, ATVI 2023-10-13); a different count is REPORTED, not a STOP
 
 
 # ---------------- path guard ----------------
@@ -649,7 +649,7 @@ def av_daily(b: bytes) -> dict[str, float]:
 
 
 def drop_stale_terminal(df: pd.DataFrame) -> tuple[pd.DataFrame, list[list[object]]]:
-    """DV-25 (the validator): for EVERY symbol, look at its single FINAL bar only (once, not iterated). If volume <= 1 AND adjusted_close ==
+    """DV-25 (the review): for EVERY symbol, look at its single FINAL bar only (once, not iterated). If volume <= 1 AND adjusted_close ==
     the previous bar's adjusted_close, drop that final bar; the previous bar becomes the symbol's effective last bar. Returns (df, [[sym, date], ...])."""
     vol = pd.to_numeric(df["volume"], errors="coerce")
     d = df.assign(_v=vol).sort_values(["symbol", "date"])
@@ -933,7 +933,7 @@ def main() -> None:
     res["path_guard_denials"] = G.denials
     with open(f"{C['out']}/H3_DEV_RAW.json", "x") as f:
         json.dump(res, f, indent=1, default=float)
-    log("done; raw output to validator first (S6)")
+    log("done; raw output to validation first (S6)")
     LOG.close()
 
 

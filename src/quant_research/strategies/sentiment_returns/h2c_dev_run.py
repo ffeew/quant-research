@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 # Exit codes: 0 ok | 2 sha mismatch | 3 mapping cross-check | 4 schema | 5 LOCK slots unfilled | 6 allowlist/forbidden path
 #             7 purge mismatch | 8 partition (row outside DEV) | 9 interpreter/flags/version/import | 10 argv/config | 11 calendar
 #             12 uncaught exception BEFORE any output (coded STOP, FD-6) | 13 any STOP/exception AFTER RUN_DIR/STATS exist (FD-6, final)
-# FREEZE r2 (FD-1..FD-8, FI-4/FI-7 AMEND per validator): real input shapes from schema walks.
+# FREEZE r2 (FD-1..FD-8, FI-4/FI-7 AMEND per review): real input shapes from schema walks.
 import sys
 
 from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DATA_DIR, ...)
@@ -74,7 +74,7 @@ PINS = {
     "COST_EARNINGS_CLEAN": (
         f"{_QR.DESK_DIR}/validation/dmitri/h2c_cost_clean_20261114_r4_inc70/COST_EARNINGS_DEV_CLEAN.json",
         desk_pin("strategies.sentiment_returns.h2c_dev_run", "PINS.COST_EARNINGS_CLEAN[1]"),
-    ),  # The data owner's DEV-only H4 clean output for COST (after validator readback)
+    ),  # The data owner's DEV-only H4 clean output for COST (after validation readback)
     "COST_TX_SUMS": (
         f"{_QR.DESK_DIR}/validation/dmitri/h2c_cost_delta_route_20261114_r2_inc70/TRANSCRIPTS_DEV/SHA256SUMS",
         desk_pin("strategies.sentiment_returns.h2c_dev_run", "PINS.COST_TX_SUMS[1]"),
@@ -125,8 +125,8 @@ EXPECTED_TX_ENTRY_KEYS = {"content", "sentiment", "speaker", "title"}  # FI-4 (w
 FYE_REQUIRED_COLS = {"symbol", "fye_month", "status"}  # h2_dev.py
 VERSIONS = {"python": "3.13.5", "numpy": "2.5.4", "scipy": "1.18.1", "exchange_calendars": "4.13.2"}
 VENV_PY = f"{_QR.DATA_DIR}/.venv/bin/python"  # LOCK runtime (unchanged)
-ACCEPT_PY = f"{_QR.SCRATCH_DIR}/scratch/v_fd8_stage_20261114/venv/bin/python"  # FD-8 (validator note L12): accept interpreter, SYNTHETIC only
-ACCEPT_IN_ROOT = f"{_QR.SCRATCH_DIR}/scratch/v_fd8_stage_20261114/in/"  # FD-8 (note L11, L22): the validator's stage in/ copies, SYNTHETIC only
+ACCEPT_PY = f"{_QR.SCRATCH_DIR}/scratch/v_fd8_stage_20261114/venv/bin/python"  # FD-8 (validation note L12): accept interpreter, SYNTHETIC only
+ACCEPT_IN_ROOT = f"{_QR.SCRATCH_DIR}/scratch/v_fd8_stage_20261114/in/"  # FD-8 (note L11, L22): the review's stage in/ copies, SYNTHETIC only
 # =====================================================================================================================
 UNIVERSE = sorted(
     [
@@ -440,7 +440,7 @@ def main(argv: list[str]) -> int:
         sys.flags.dont_write_bytecode,
         vers,
     )
-    # FD-8: real mode = LOCK runtime VENV_PY only; synthetic mode also accepts the validator's stage ACCEPT_PY (read-only bind of the
+    # FD-8: real mode = LOCK runtime VENV_PY only; synthetic mode also accepts the review's stage ACCEPT_PY (read-only bind of the
     # same venv; under the tmpfs mask VENV_PY does not exist, so it is matched by its literal path, never resolved via cio/data).
     py_ok = os.path.realpath(sys.executable) == os.path.realpath(VENV_PY) or (
         S["synthetic"] and os.path.abspath(sys.executable) == ACCEPT_PY
@@ -464,7 +464,7 @@ def main(argv: list[str]) -> int:
         raise Stop(5, "LOCK slots unfilled: " + ",".join(unfilled))
     if os.path.exists(S["RUN_DIR"]):
         raise Stop(10, "RUN_DIR exists")
-    # FD-8: never write next to the runner's own file or into the venv (read-only venv mount at the validator's real call)
+    # FD-8: never write next to the runner's own file or into the venv (read-only venv mount at the review's real call)
     rdp = os.path.realpath(S["RUN_DIR"])
     own = os.path.dirname(os.path.realpath(__file__))
     bad_roots = [
@@ -1089,7 +1089,7 @@ def _one_line(x: object) -> str:
 
 
 def run(argv: list[str]) -> int:
-    """FD-6/FD-8 entry point: callable after import (the validator's stage accept call) or as __main__. Returns the exit code."""
+    """FD-6/FD-8 entry point: callable after import (the review's stage accept call) or as __main__. Returns the exit code."""
     try:
         install_guard()
         rc = main(argv)

@@ -27,7 +27,7 @@ DESK_OUT=out_current DESK_UNIVERSE_MODE=current ../.venv/bin/python news_signal.
 4. **Sector level.** Each component is averaged over member stocks with a score that day, by GICS sector, and mapped to the SPDR ETFs (XLK XLF XLE XLV XLY XLP XLI XLU XLB XLRE XLC). The test goes long the top-3 and short the bottom-3 ETFs at the open; the rating component uses top-1 minus bottom-1.
    GICS is today's classification from `universe.parquet`, not point-in-time. Former members have no GICS and drop out.
 
-Panels for the validator: `out_*/stock_day_scores.parquet` (symbol, d, text_lm, text_vader, n_text, rating_chg, n_rating, pt_chg, n_pt) and `out_*/sector_day_scores.parquet` (sector, etf, d, text_lm, rating_chg, pt_chg, counts). Session d is the first trading session whose open may use the score.
+Panels for review: `out_*/stock_day_scores.parquet` (symbol, d, text_lm, text_vader, n_text, rating_chg, n_rating, pt_chg, n_pt) and `out_*/sector_day_scores.parquet` (sector, etf, d, text_lm, rating_chg, pt_chg, counts). Session d is the first trading session whose open may use the score.
 
 **X posts are excluded.** X has no historical archive available to us, so it is archive-forward only and cannot be backtested.
 
@@ -69,7 +69,7 @@ Panels for the validator: `out_*/stock_day_scores.parquet` (symbol, d, text_lm, 
 - `RESULTS.md`: summary.
 
 ## OOS lock, pre-registration and audits (added 2026-10-30)
-- Validator logged the exploratory results (RESULTS.md, 2025-06 to 2026-10) as **FAIL**. Those 72 statistics count toward N.
+- Review logged the exploratory results (RESULTS.md, 2025-06 to 2026-10) as **FAIL**. Those 72 statistics count toward N.
 - **The 2016-01 to 2025-05 history is a locked hold-out.** `news_signal.py` skips those months unless `PREREG_sector_lm_5d.md` is frozen: its sha256 must be in `PREREG_sector_lm_5d.sha256` and passed as `NEWS_OOS_UNLOCK`. `fetch_news.py` only fetches; nothing runs analysis automatically.
 - The pre-registered single test is in `PREREG_sector_lm_5d.md` (currently DRAFT).
 - The timestamp and coverage audit is in `DATA_AUDIT.md`. Rerun `audit/ts_internal.py` and `audit/coverage.py` after the fetch; they read metadata only.
@@ -81,23 +81,23 @@ Panels for the validator: `out_*/stock_day_scores.parquet` (symbol, d, text_lm, 
 - **Pre-registration artefacts:** `prereg_run.py` (draft, not executed; `--check` only), `make_manifest.py` → `PREREG_manifest.txt` (PROVISIONAL until fetch completes). `PREREG_sector_lm_5d.sha256` is intentionally absent until freeze.
 - **Audits (metadata only):** `audit/edited_share.py` (drop share under the updated_at rule, coverage floor by month), `audit/coverage_by_size.py` (Benzinga coverage by size tercile). See `DATA_AUDIT.md` §5-§7.
 
-### 2026-10-30 ~02:30 SGT: the validator's decisions (02:24) applied
+### 2026-10-30: the review's decisions (02:24) applied
 - N = 153 (sector-LM, breadth, spillover); hype-fade gates at 345 (153 + 192 PEAD) and reports both. +4 VADER-twin trials; +1 R151 (breadth NB7, included: it is in the ±20% grid of R126).
 - VADER finance-domain handling: `lexicon/vader_finance_neutral_v1.txt` (LM 2011 cited words + plurals; removes liability, liabilities, cancer, crude from VADER 3.3.2) applied by `vader_fin.py`; pinned in `prereg_run.py`.
 - All four documents: pre-2024 years count as OOS only after the ≥90% coverage floor is shown from the fetch; verdict capped at CONDITIONAL until the 2-9 Nov opening-auction cost pilot is in; G9 (2019+) kept.
 - Nothing frozen; no returns computed; no hold-out text read.
 
-### 2026-10-30 ~02:35 SGT: TCA owner cost inputs wired in
+### 2026-10-30: TCA owner cost inputs wired in
 - Pinned: `tca/ethan_cost_inputs.md` + all 11 files in `tca/ethan_inputs/` (hashes in `prereg_run.py` COSTS_FILE_SHA).
 - prereg_run.py: per side = max(model, floor 2 bp + full half-spread, TCA owner per-ETF Base); stop exits at continuous cost; whole shares; borrow 1%/yr calendar/360 (2× = 2%), HTB sensitivity 10%/yr; 25 bp reference only; today's ETB flags not used historically.
 - All four documents: per-side costs, card cost expectations (labelled expectations, not results), the TCA owner's §4 caveats; uplift as primary entry cost for spillover and hype-fade (normal and 2× reported). N unchanged (153 / 345).
 
-### 2026-11-06 ~06:10 SGT: the validator's 6 Nov decisions applied
+### 2026-11-06: the review's 6 Nov decisions applied
 - Uplift is the primary entry cost for spillover/hype-fade (normal base = diagnostic); 2× = 2× primary (101 / 105 bps per event, unchanged numbers, relabelled).
 - 10%/yr HTB run is a REQUIRED gate (net Sharpe > 0 else FAIL on costs) for spillover and hype-fade single-name shorts; not applicable to sector-LM/breadth (ETF shorts only).
 - No trials added: N 153 / 345. CONDITIONAL cap kept. Decision log in each document (A11 / PREREG "Decision log").
 
-### 2026-11-06 ~06:25 SGT: validator 06:09 SGT decision, unknown-borrow gate extended to ETF shorts
+### 2026-11-06: validation decision, unknown-borrow gate extended to ETF shorts
 - Sector-LM (new gate G11) and revision-breadth (gate 1, A12): 10%/yr borrow on every ETF short must leave net Sharpe > 0, else FAIL on costs. 1% base / 2% sensitivity stay as diagnostics. `prereg_run.py`: HTB_GATE_APPLIES = True. N unchanged (153 / 345). Historical quoted rates, if ever supplied, must be pinned and pre-registered before results.
 
 ### 2026-11-06 ~22:30 SGT: §5 control wiring (cost mode; nothing run)

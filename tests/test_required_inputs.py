@@ -1,4 +1,4 @@
-"""Desk input locations that used to be hard-coded are required inputs with no default (fail closed)."""
+"""External input locations that used to be hard-coded are required inputs with no default (fail closed)."""
 
 from __future__ import annotations
 

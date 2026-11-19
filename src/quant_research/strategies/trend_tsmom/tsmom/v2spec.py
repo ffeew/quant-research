@@ -46,7 +46,7 @@ SENSITIVITIES = [  # non-trial, V1 only (§3 + A2)
     ("borrow_100bps(STANDARD floor)", replace(V1, borrow_rate=0.01)),
     ("band_off", replace(V1, band_rel=None, band_abs=0.0)),
 ]
-STABILITY = [  # Validator A1.3, V1 only, not trials
+STABILITY = [  # Review A1.3, V1 only, not trials
     ("lookback_9m", replace(V1, lookbacks=(9,))),
     ("lookback_15m", replace(V1, lookbacks=(15,))),
     ("voltarget_8pct", replace(V1, port_vol_target=0.08)),

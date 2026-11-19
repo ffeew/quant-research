@@ -77,7 +77,7 @@ v2["canonical_cik_rule"] = np.where(
     "single_cik",
 )
 
-# ---------- cluster availability (the validator: first acceptance ≠ full info public) ----------
+# ---------- cluster availability (first acceptance ≠ full info public) ----------
 # Pin: keep cluster-first ACCESSION (v1 stable; Item 2.02 event identity).
 # Add conservative EX-99 availability time when a sibling first supplies EX-99.1.
 multi = core[core.cluster_n_filings > 1].merge(ex_audit, on="accession", how="left")
@@ -146,7 +146,7 @@ v2.loc[single_mask & ~v2.in_sp500, "cluster_availability_flag"] = "outside_index
 v2.loc[single_mask, "cluster_rule_pin"] = "cluster_first_accession_retained; availability may lag to sibling EX-99"
 
 # For deferred cases, point ex99_* display fields at the sibling exhibit while keeping event accession
-# (do not rewrite acceptance_utc — the validator accepted v1 timestamps; availability is separate)
+# (do not rewrite acceptance_utc — the review accepted v1 timestamps; availability is separate)
 defer_map = cluster_concern.set_index("first_acc")
 for first_acc, row in defer_map.iterrows():
     sib_acc = str(row.sib_ex99_acc).split(";")[0]
@@ -171,7 +171,7 @@ print("deferred EX99 clusters applied:", n_deferred)
 
 # ---------- lineage decisions AA / EVHC (NOT restored as in_sp500) ----------
 # AA: membership ends 2016-11-01 (removed on Arconic spin). Alcoa Corp CIK1675149 post-split
-# never in sp500_membership as AA. The validator accepted v1 membership PIT.
+# never in sp500_membership as AA. The review accepted v1 membership PIT.
 # EVHC: CIK1578318 Holdings filings are before membership start 2016-12-02; segment correctly
 # uses CIK1678531 Envision Healthcare Corp for the membership window.
 lineage_decisions = [

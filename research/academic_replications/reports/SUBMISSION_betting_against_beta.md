@@ -1,15 +1,15 @@
 # Validation submission: Betting against beta / low volatility (Frazzini & Pedersen 2014)
 
-> **Status: FAILED** (the validator, 2026-10-30). Corrections applied 2026-10-30 02:26 SGT after his check.
+> **Status: FAILED** (the review, 2026-10-30). Corrections applied 2026-10-30 after that check.
 
-Submitted for validation, 2026-10-30 01:47 SGT. Built against validation/STANDARD.md v1.0. Self-assessment only; the verdict is recorded separately.
+Submitted for validation, 2026-10-30. Built against validation/STANDARD.md v1.0. Self-assessment only; the verdict is recorded separately.
 
 ## Reproduce (one command)
 ```
 $QR_DESK_DIR/research/replication/.venv/bin/python $QR_DESK_DIR/research/replication/run_all.py --only bab
 ```
 Code: `research/replication/frazzini-pedersen-2014-betting-against-beta/pipeline.py`, `_common/engine.py` (fills, costs, borrow), `_common/validation.py` (DSR, PBO, NW, walk-forward), `run_all.py`. Env: `research/replication/.venv` (`requirements.lock.txt`).
-Data snapshot: data owner SIP total_return ret_total_best (clean), fingerprint; file mtimes {"daily_total_return.parquet": "2026-10-30 01:32:38 SGT", "sp500_membership.parquet": "2026-10-30 01:31:38 SGT", "ff3_daily.parquet": "2026-10-30 01:10:57 SGT"}. Trial log: `research/replication/TRIAL_LOG.csv`; T x N daily net matrix: `research/replication/results/trials_daily_net_*.parquet`.
+Data snapshot: data owner SIP total_return ret_total_best (clean), fingerprint; file mtimes {"daily_total_return.parquet": "2026-10-30", "sp500_membership.parquet": "2026-10-30", "ff3_daily.parquet": "2026-10-30"}. Trial log: `research/replication/TRIAL_LOG.csv`; T x N daily net matrix: `research/replication/results/trials_daily_net_*.parquet`.
 
 ## Codified rules
 See the docstring of `pipeline.py` (copied below). No discretion, no overrides.
@@ -27,7 +27,7 @@ Codified rules (base params; perturbed +/-20% in the sensitivity grid):
          lowvol_long = EW lowest-q 1y total volatility (vol_days), long-only, excess of rf.
   Rebalance monthly; fill next session's open (engine). Ex-ante book beta and leg leverage are recorded per rebalance.
 ```
-Execution: signal at the close of the last session of each month; market-on-open fill at the next session's open; costs TCA owner v1.1 max validator floor; borrow 1.00%/yr; book $100,000; 2x stress doubles costs and borrow. Primary (pre-specified, paper-faithful) book: **bab_fp**; secondary books: lowvol_long, bab_q.
+Execution: signal at the close of the last session of each month; market-on-open fill at the next session's open; costs TCA owner v1.1 max validation floor; borrow 1.00%/yr; book $100,000; 2x stress doubles costs and borrow. Primary (pre-specified, paper-faithful) book: **bab_fp**; secondary books: lowvol_long, bab_q.
 
 ## Headline (base parameters, next-open fills, full desk sample)
 
@@ -55,12 +55,12 @@ Execution: signal at the close of the last session of each month; market-on-open
 | §4 DSR >= 0.95 | NOT MET | family N=59: DSR 0.000, SR0 0.99 ann; all-derivatives-researcher N=184: DSR 0.000, SR0 1.06; T=1946, skew -0.30, kurt 7.75 |
 | §4 t-stat >= 2.8 (replication of published anomaly; NW) | NOT MET | t_NW -0.88 (iid -0.84) |
 | §4 PBO < 0.20 (<= 0.05 for PASS) | NOT MET | book grid PBO 0.30 (N=11); whole family PBO 0.00 (N=33). N~11 per grid -> weakly informative |
-| §5 costs >= validator minimums; borrow >= 1%/yr; exclude unborrowable | MET (borrow caveat) | avg 15.6 bps/side (TCA-owner-only 12.5); borrow 1%/yr; no PIT borrow history exists, so unborrowable names cannot be excluded at signal time |
+| §5 costs >= validation minimums; borrow >= 1%/yr; exclude unborrowable | MET (borrow caveat) | avg 15.6 bps/side (TCA-owner-only 12.5); borrow 1%/yr; no PIT borrow history exists, so unborrowable names cannot be excluded at signal time |
 | §6 post-publication haircut | computed | expected SR for sizing = min(WF-OOS -0.19, 0.40 x 0.70) = -0.19 (AQR BAB USA 1930-12..2012-03 (post_pub_checks.csv), proxy for the paper's US BAB) |
 | §7 no year > 40% of PnL | NOT MET | max year share n/a (n/a if total PnL <= 0) |
 | §7 no regime Sharpe < -0.5 | NOT MET | worst regime SR -0.96 |
 | §7 +/-20% neighbourhood: SR > 0 and >= 50% of base | NOT MET | 0/11 configs pass on full-sample net SR; 0/11 on 2022+ net SR |
-| §7 legs reported; correlation to book | MET (book history 1 day) | long leg gross SR 0.47, short leg gross SR -0.60; desk book has 1 day of history, so correlations are vs SPY/FF factors and the validator's validation backtests |
+| §7 legs reported; correlation to book | MET (book history 1 day) | long leg gross SR 0.47, short leg gross SR -0.60; the live book has 1 day of history, so correlations are vs SPY/FF factors and the review's validation backtests |
 | §8 trade size <= 1% of 20d ADV | MET | max 0.0043% at $100,000; at 10x book max 0.043% |
 | §8 break-even cost >= 2x assumed | NOT MET | break-even -119.9 bps/side vs assumed 15.6 |
 
@@ -260,7 +260,7 @@ bab_fp is ex-ante beta-neutral by construction: each leg is scaled to beta 1 (h 
 
 The data owner's `data/universe/delisting_returns.parquet` has terminal returns only for deals matched in Alpaca's corporate-action feed (which starts 2020-04). Of the 120 stocks whose bars end before the sample end, 47 have a terminal return and 73 do not (they cannot be told apart as merger vs performance delisting from the data available, so they are treated as performance-related in the stress). Base runs treat a held position whose bars stop as cash at the last close (0%). Sensitivity (base params, next-open fills, each logged as a data_alt trial):
 - **table**: matched terminal return where known, else 0%;
-- **conservative**: matched terminal return where known, else **-30% on both legs** (the validator's suggested assumption; shorts gain);
+- **conservative**: matched terminal return where known, else **-30% on both legs** (the review's suggested assumption; shorts gain);
 - **adverse**: matched where known, else -30% on longs and **+30% on shorts** (takeover-premium case; worst for every book).
 
 | book | delisting events while held (long / short) | net SR base | table | conservative | adverse | net ann base | ann conservative | ann adverse |
@@ -269,7 +269,7 @@ The data owner's `data/universe/delisting_returns.parquet` has terminal returns 
 | lowvol_long | 15 (15 / 0) | 0.50 | 0.50 | 0.49 | 0.49 | 7.34% | 7.16% | 7.16% |
 | bab_q | 23 (12 / 11) | -0.46 | -0.46 | -0.46 | -0.47 | -13.27% | -13.13% | -13.52% |
 
-Per-event detail (symbol, weight held, last bar, return applied in the base run = 0): `delisting_exits_<book>.csv`. The validator's file lists 120 delisting rows (47 matched, 70 no deal, 3 acquirer price missing); pre-2020 delistings have no terminal return at all, so the 2016-2019 part of every book is the most exposed.
+Per-event detail (symbol, weight held, last bar, return applied in the base run = 0): `delisting_exits_<book>.csv`. The review's file lists 120 delisting rows (47 matched, 70 no deal, 3 acquirer price missing); pre-2020 delistings have no terminal return at all, so the 2016-2019 part of every book is the most exposed.
 
 ### 2. Ticker reuse (SNDK and others)
 

@@ -1,11 +1,11 @@
 # RESULTS v3: limits-compliant ETF trend sleeve (single pre-registered run)
 
-**Owner:** the macro strategist · **Run:** Fri 6 Nov 2026, 06:21:23 → 06:21:59 SGT · **Spec:** `PREREG-v3.md` (§1–§12; validator A1–A6, §9.B/§9.C, option-(b) data rules).
+**Owner:** the macro strategist · **Run:** Fri 6 Nov 2026 · **Spec:** `PREREG-v3.md` (§1–§12; validation A1–A6, §9.B/§9.C, option-(b) data rules).
 **One command:** `.venv/bin/python run_v3.py run` (after one authorised `pin` and a clean `preflight`). Unit checks at run: 106/106 PASS. **Outputs:** `outputs_v3/` (v1/v2 outputs untouched).
 **Single-run statement:** this is the one pre-registered v3 execution. No retry, no alternate data, no parameter change. Research only; not a trade.
 
 **Hashes (from `outputs_v3/meta.json` and `outputs_v3.HASH.txt`):**
-- outputs_v3 directory: = sha256 of `outputs_v3.MANIFEST.sha256` (23 files; stamped 2026-11-06 06:21:59 SGT).
+- outputs_v3 directory: = sha256 of `outputs_v3.MANIFEST.sha256` (23 files; stamped 2026-11-06).
 - PREREG-v3.md at run: (pinned state; candidate freeze was before the §2 pin wrote the build/CA/diff hashes).
 - Data build (v2): (`…/signoff/trend_v3_v2_etf_daily_20261030.parquet`; 2005-01-03 → 2026-10-28).
 - Corporate-action table.
@@ -17,11 +17,11 @@
 - VIX series.
 - Full values: `outputs_v3/meta.json`.
 
-**Harness fix (non-trial, pre-run; validator decision):** the internal review record. Only `tests/test_v3_engine.py` changed. → new. Log: `NOTES-v3-preflight-fix-2026-11-06.md`. No strategy, data, threshold or N change.
+**Harness fix (non-trial, pre-run; validation decision):** the internal review record. Only `tests/test_v3_engine.py` changed. → new. Log: `NOTES-v3-preflight-fix-2026-11-06.md`. No strategy, data, threshold or N change.
 
 ## Mechanical verdict: **FAIL** (trend shelved for this sprint)
 
-This is the pipeline's mechanical verdict from `outputs_v3/criteria.csv` / `meta.json` (`mechanical_verdict`). **The formal validation verdict is FAIL** (06:29 SGT); trend v3 is shelved for this sprint.
+This is the pipeline's mechanical verdict from `outputs_v3/criteria.csv` / `meta.json` (`mechanical_verdict`). **The formal validation verdict is FAIL**; trend v3 is shelved for this sprint.
 
 ## Criteria (exactly `outputs_v3/criteria.csv`)
 
@@ -36,7 +36,7 @@ This is the pipeline's mechanical verdict from `outputs_v3/criteria.csv` / `meta
 | 5 | PBO < 0.20 | 0.380186 | False |
 | 6 | quasi-OOS trades ≥ 100 | 1520 | True |
 | 7a | no year > 40% of net PnL | 6.187624 | False |
-| 7b | no calendar-year Sharpe < −0.5 (§7.7; confirmed hard by the validator) | −2.108033 | False |
+| 7b | no calendar-year Sharpe < −0.5 (§7.7; confirmed hard in review) | −2.108033 | False |
 | 7c | no SPY/VIX regime Sharpe < −0.5 (VIX required) | −0.426921 | True |
 | 8 | stability: all 10 > 0 and ≥ 50% of primary | 2 | False |
 | 9 | LIMITS compliance (decision 9B-4: orders ok, breaches cured next open, hard-breach sessions ≤ 1%) | sessions 5218; hard_breach_sessions 1 (2020-04-06); share 0.000192; uncured []; orders_ok true; pass true | True |
@@ -64,7 +64,7 @@ Blind note (meta): "2005-2007 is too short to judge on its own (A2); passing it 
 
 - **NW t (full):** 0.106445 (criterion 4).
 - **DSR** (`outputs_v3/dsr.csv`), gate row gross-dispersion, N=57, T=2749: DSR **0.087202** (sr_ann −0.064564; sr0 0.3464). N=47 companion: 0.093089. All-net-dispersion rows are reported alongside and are ~0.
-- **PBO** (`outputs_v3/pbo.json`): S=16, 12870 combinations, **40 of 57** trials with daily series, T=2448, **PBO 0.380186**, median logit 0.446. Gap 17 = the validator's diagnostics. Decision N remains 57 (`meta.n_trials`).
+- **PBO** (`outputs_v3/pbo.json`): S=16, 12870 combinations, **40 of 57** trials with daily series, T=2448, **PBO 0.380186**, median logit 0.446. Gap 17 = the review's diagnostics. Decision N remains 57 (`meta.n_trials`).
 - Trial log append: trial 47 `V3_PRIMARY`, data, quasi-OOS net SR −0.064564.
 
 ## Stability (`outputs_v3/stability.csv`) and sensitivities
@@ -110,4 +110,4 @@ From the full segment: one-way turnover 116.9 (5.65×/yr), average cost 9.17 bps
 
 ## Disposition
 
-Mechanical FAIL, independently confirmed by the validator: trend v3 shelved for this sprint. No further v3 run or same-trial tweak. Any future variant needs a new PREREG, trial budget and validator decision. Preserve `outputs_v3/` and directory hash unchanged. Formal decision: the internal review record.
+Mechanical FAIL, independently confirmed in review: trend v3 shelved for this sprint. No further v3 run or same-trial tweak. Any future variant needs a new PREREG, trial budget and validation decision. Preserve `outputs_v3/` and directory hash unchanged. Formal decision: the internal review record.

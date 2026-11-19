@@ -14,12 +14,12 @@ UNIVERSE = ["SPY", "QQQ", "IWM", "EFA", "EEM", "EWJ", "IEF", "TLT", "GLD", "SLV"
 COST_MODEL_SHA = desk_pin("strategies.trend_tsmom.tsmom.v3spec", "COST_MODEL_SHA")  # TCA owner v1.1 (§2)
 PRIMARY = V3Config()  # split_source="table" (data owner CA table), trim_venue="continuous", max_open_fallback=0.5%
 LIMITS_FROZEN_SHA_ABBR = "af513e3a…1cf6"  # LIMITS.md as read at drafting; breaker frozen to §5/§9.A/§9.B
-# The validator's 5 v1 cost settings: columns 20-24 of his u23 net matrix, same 2017-02-01..2026-10-28 window
+# The review's 5 v1 cost settings: columns 20-24 of his u23 net matrix, same 2017-02-01..2026-10-28 window
 U23_PATH = f"{_QR.DESK_DIR}/validation/backtests/trend_sleeve/u23/trial_matrix_net_TxN24.csv"
 U23_SHA = desk_pin("strategies.trend_tsmom.tsmom.v3spec", "U23_SHA")
 U23_COLS = ["costs_2x", "venue_close(MOC)", "impact_k0.5", "nav_10m", "borrow_50bps"]
 PBO_COLUMNS_EXPECTED = 40  # 24 logged + 5 v1 cost settings + v3 primary + 10 stability
-PBO_MISSING = "the validator's 17 diagnostics (no daily series; not regenerated before the run)"
+PBO_MISSING = "the review's 17 diagnostics (no daily series; not regenerated before the run)"
 SEGMENTS = [  # (label, start, end, status)  (§6, A2, quasi-OOS label)
     ("2005-2007 blind", "2005-01-01", "2007-12-31", "blind"),
     ("2008-2016 partly seen", "2008-01-01", "2016-12-31", "partly seen"),
@@ -66,9 +66,9 @@ N_REPORT = 47  # 46 + v3 primary
 N_DECISION = 57  # A1: + 10 stability runs
 
 
-# ---- data v2 (option (b), PREREG-v3 §2; validator 02:26 SGT). Frozen constants.
+# ---- data v2 (option (b), PREREG-v3 §2; validation). Frozen constants.
 CA_TABLE_START = "2016-01-05"  # corporate-action table is the split source on/after this date
-ALPACA_START = "2016-01-04"  # build source switches from Yahoo to Alpaca SIP (data owner sign-off)
+ALPACA_START = "2016-01-04"  # build source switches from Yahoo to Alpaca SIP (data owner acceptance)
 NASDAQ_START = "2016-10-28"  # Nasdaq.com official close coverage starts
 # Yahoo split events before CA_TABLE_START: source $QR_SCRATCH_DIR/trend_v3_build/work_splitlog.parquet
 # column yahoo_ratio = new shares per old.

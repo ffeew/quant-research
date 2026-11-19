@@ -20,7 +20,7 @@ RESEARCH_EVENTS_DIR = Path(f"{_QR.DESK_DIR}/equity/earnings_events")  # read-onl
 RESEARCH_ADDITIVE = LIVE_STORE / "derived" / "earnings_events_8k202_v1.parquet"  # optional ex99/timestamps only
 OUT = HERE / "out"
 OUT.mkdir(exist_ok=True)
-DATA_RELEASE_ID = "v1.3"  # top; SIP methodology settled (validator 2026-11-06). Sentiment researcher v1/v2 not used for any EPS/SUE value (SPEC.md).
+DATA_RELEASE_ID = "v1.3"  # top; SIP methodology settled (validation 2026-11-06). Sentiment researcher v1/v2 not used for any EPS/SUE value (SPEC.md).
 
 
 def sessions() -> pd.DatetimeIndex:

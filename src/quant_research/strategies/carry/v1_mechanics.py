@@ -1,7 +1,7 @@
 """Pure synthetic V1 VIX overlay mechanics engine (isolated reference).
 
 Deterministic fixture-only implementation of parent addendum §5 + binding
-erratum E1–E4, amended per validator preflight
+erratum E1–E4, amended per review preflight
 the internal review record.
 
 No market data, no production construct/risk_state imports as mutable engines,

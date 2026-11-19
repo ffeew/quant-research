@@ -1,6 +1,6 @@
 """V1 synthetic mechanics suite — parent §5 + erratum E1–E4.
 
-Amended per validator preflight
+Amended per review preflight
 the internal review record
 
 (RETURN FOR AMENDMENT — NOT authorised to run).
@@ -8,7 +8,7 @@ the internal review record
 Deterministic fixture tests only. No market returns, no R1–R7 synthetic P&L,
 no production construct/risk_state imports as engines.
 
-Run (ONLY after a future validator AUTHORISE ONE RUN decision — not now):
+Run (ONLY after a future validation AUTHORISE ONE RUN decision — not now):
   python3 --version
   python3 -m unittest discover -s . -p 'test_*.py' -v \
     2>&1 | tee intended-output/pytest-output.txt
@@ -504,6 +504,6 @@ class TestV1Mechanics(unittest.TestCase):
 
 if __name__ == "__main__":
     raise SystemExit(
-        "Execution not authorised. Validator preflight RETURN FOR AMENDMENT "
+        "Execution not authorised. Review preflight RETURN FOR AMENDMENT "
         "(3bed621e…). No run until AUTHORISE ONE RUN decision after re-pin."
     )

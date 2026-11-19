@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""H3 Stage 1b: TIME_SERIES_DAILY_ADJUSTED full JSON for FETCH_LIST_1b.txt[START:END] (ELIGIBLE_SCAN minus 4 symbols with chars unusable as filenames, pending validator decision). One fresh process per chunk.
+"""H3 Stage 1b: TIME_SERIES_DAILY_ADJUSTED full JSON for FETCH_LIST_1b.txt[START:END] (ELIGIBLE_SCAN minus 4 symbols with chars unusable as filenames, pending validation decision). One fresh process per chunk.
 Key from env only. <=60/min (>=1.05s between call starts). 1 retry on network exception only.
 Body classes: ok (has 'Time Series (Daily)'), error_message, empty -> logged, continue (no_series candidates);
 Note/Information/throttle text -> STOP exit 3. Exits: 0 ok, 2 no key, 3 throttle, 4 >5 network failures, 5 target exists, 6 bad args, 7 exception (type only)."""

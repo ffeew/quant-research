@@ -67,7 +67,7 @@ VADER_FIN_OVERRIDE_SHA = (
 )
 VADER_FIN_PY_SHA = "0b8506ea47193fac39b93b3022bdb7d7dfff827d99a19ded0b219360e279a6ca"  # vader_fin.py
 N_FAMILY = 153
-N_HYPEFADE = 153 + 192  # Validator decisions 2026-10-30 ~02:24 SGT
+N_HYPEFADE = 153 + 192  # Review decisions 2026-10-30
 SUE_PATH = f"{_QR.DATA_DIR}/derived/sue_xbrl.parquet"  # The derivatives researcher; stamped at 10-Q/10-K acceptance
 EVENTS_DIR = f"{_QR.DESK_DIR}/equity/earnings_events"  # see EVENTS_PATH/EVENTS_SHA (§5 block); never globbed
 OOS = (
@@ -93,16 +93,16 @@ PRIMARY = dict(hold=5, k=3, min_stocks=3, min_sectors=6, scorer="lm", filt=True,
 NEIGH = dict(hold=(4, 6), k=(2, 4), min_stocks=(2, 4), min_sectors=(5, 7))
 # LIMITS v0.3.5 sizing: 5 sleeves x 6 ETFs; per-sleeve gross g with 5g/6 <= 9.5% (H1 buffer) -> g = 11.4%; total 57% <= 58% (H3 buffer)
 SLEEVE_GROSS, EQUITY_USD = 0.114, 100_000.0
-# Borrow (TCA owner ethan_cost_inputs.md §3, validator look-ahead decision): primary 1%/yr (STANDARD GC floor), 2x stress = 2%/yr
+# Borrow (TCA owner ethan_cost_inputs.md §3, validation look-ahead decision): primary 1%/yr (STANDARD GC floor), 2x stress = 2%/yr
 # via cost_mult=2; 10%/yr unknown-borrow GATE (G11) because historical ETB flags are unknown (flags exist only from 2026-10-30, and
 # today's flags are NOT applied to history). 25 bp/yr is a reference only and is not used. Calendar-day / 360 basis.
 BORROW_BASE, BORROW_HTB_SENS = 0.01, 0.10
-# Validator 2026-11-06: (2) the 2x run = 2x the PRIMARY cost (here: no uplift, so primary = Base); cost_mult multiplies the
-# primary per-side cost and borrow. (5) + 06:09 SGT decision: the 10%/yr unknown-borrow run is a REQUIRED gate (G11) for the
+# Review 2026-11-06: (2) the 2x run = 2x the PRIMARY cost (here: no uplift, so primary = Base); cost_mult multiplies the
+# primary per-side cost and borrow. (5) + decision: the 10%/yr unknown-borrow run is a REQUIRED gate (G11) for the
 # ETF shorts too: net Sharpe > 0 with borrow=BORROW_HTB_SENS, else FAIL on costs. Today's ETB flags / ETF liquidity are
 # not historical evidence. 1% base and 2% sensitivity remain diagnostics. (3) none of these add trials.
 COST_MULT_PRIMARY, COST_MULT_STRESS = 1.0, 2.0
-HTB_GATE_APPLIES = True  # Validator 2026-11-06 06:09 SGT: applies to SPDR ETF shorts (G11)
+HTB_GATE_APPLIES = True  # Review 2026-11-06: applies to SPDR ETF shorts (G11)
 HTB_GATE_RULE = "sharpe(simulate(..., borrow=BORROW_HTB_SENS)) > 0 else FAIL_ON_COSTS"
 COSTS_INPUTS = f"{_QR.DESK_DIR}/tca/ethan_cost_inputs.md"
 COSTS_INPUTS_SHA = desk_pin("strategies.news_sentiment.prereg_run", "COSTS_INPUTS_SHA")
@@ -439,15 +439,15 @@ def pbo_cscv(M: pd.DataFrame, S: int = 16) -> float:
 # SYNTHETIC data only (tests/test_controls_asof.py). No prices, calendars, event rows or SUE rows are read by --check.
 #
 # Event table choice: v1 (pinned below), not v2. Reason: ANNSHARE needs only accession, cik, acceptance_utc,
-# session_date_0925, in_sp500 and index_symbols. The validator ACCEPTED v1 for timestamps + PIT membership
+# session_date_0925, in_sp500 and index_symbols. The review ACCEPTED v1 for timestamps + PIT membership
 # (the internal review record); v2 is a CONDITIONAL accept with promotion blockers open
-# and, by the validator's own check, has identical acceptance/session timing for all 31,467 accessions, so v2 adds nothing ANNSHARE
+# and, by the review's own check, has identical acceptance/session timing for all 31,467 accessions, so v2 adds nothing ANNSHARE
 # uses. v1 also carries none of v2's later-availability fields (ex99_available_*, cluster lags), so they cannot leak in.
 # Only the explicit v1 path is read (never a glob over versioned tables, which would duplicate accessions), and only
 # EVENT_COLS; ex99_*, exhibit, cluster, lag and other retrospective columns are never loaded or used as predictors.
 EVENTS_PATH = f"{_QR.DESK_DIR}/equity/earnings_events/earnings_events_8k202.parquet"
 EVENTS_SHA = (
-    desk_pin("strategies.news_sentiment.prereg_run", "EVENTS_SHA")  # v1, validator PIT decision (timestamps/PIT only)
+    desk_pin("strategies.news_sentiment.prereg_run", "EVENTS_SHA")  # v1, validation PIT decision (timestamps/PIT only)
 )
 EVENT_COLS = ["accession", "cik", "acceptance_utc", "session_date_0925", "in_sp500", "index_symbols"]
 SUE_SHA: str | None = (
@@ -467,7 +467,7 @@ CONTROL_LONG_HIGH = {
 CONTROL_MISSING_POLICY: str | None = (
     None  # §5 "same eligible sectors": if a control is undefined for a sector that is eligible in L,
 )
-# the run RAISES (no invented fill / drop). Needs a validator decision before freeze (README).
+# the run RAISES (no invented fill / drop). Needs a validation decision before freeze (README).
 _STRICT_OK = False
 
 
@@ -640,7 +640,7 @@ def annshare_panel(
     return out
 
 
-# SUE input contract (PROPOSED by the sentiment researcher from SUE_NOTE.md §6; NOT derivatives-researcher-approved). Grain: one row per 8-K 2.02 event.
+# SUE input contract (PROPOSED by the sentiment researcher from SUE_NOTE.md §6; not yet accepted by the SUE owner). Grain: one row per 8-K 2.02 event.
 SUE_REQUIRED = {
     "accession": "8-K Item 2.02 accession in the pinned event table (join key; unique)",
     "sue": "float; NaN = not computable (row ignored); +/-inf rejected",

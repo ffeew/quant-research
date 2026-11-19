@@ -1,4 +1,4 @@
-"""Append-only trial log (validator STANDARD §1.3). One row per variant ever run by the derivatives researcher. The derivatives researcher, 2026-10-30."""
+"""Append-only trial log (validation STANDARD §1.3). One row per variant ever run by the derivatives researcher. The derivatives researcher, 2026-10-30."""
 
 from __future__ import annotations
 
@@ -194,7 +194,7 @@ def historical_rows() -> list[dict[str, Any]]:
                     "universe": "PIT S&P 500 (before SNDK/AA/Q interval exclusion)",
                     "data": "data owner store, v2 run killed mid-way",
                     "fill": fill,
-                    "costs": "max(the TCA owner, validator floor) + 1% borrow",
+                    "costs": "max(the TCA owner, validation floor) + 1% borrow",
                     "role": "superseded_rerun",
                     "has_daily_series": False,
                     "sr_net_full": float(n),

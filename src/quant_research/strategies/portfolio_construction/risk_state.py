@@ -5,7 +5,7 @@ Files (paths confirmed by Risk 2026-10-30; overridable via construct.py --panic_
   $QR_DESK_DIR/risk/state/breaker_state.json  -> fields used: as_of_sgt, state (NORMAL|HALVED|HALTED|RESUMED_DISARMED),
                                                     gross_cap_pct, new_trades_allowed, backstop_equity, halt_armed, current_equity
 LIMITS.md (current header read at run time by limits_version(); v0.3.7 at 2026-10-30 02:28 SGT):
-  * Panic flag (§3) is FINAL since ~02:27 SGT (panic_v2 validation: T6 PASS, T7 PASS, T8 CONDITIONAL; signed off; file
+  * Panic flag (§3) is FINAL (panic_v2 validation: T6 PASS, T7 PASS, T8 CONDITIONAL; accepted; file
     computed on the data owner's S&P 500 official-close history). A flag file WITHOUT a provisional marker is BINDING.
     A file that still says provisional (provisional: true, or 'PROVISIONAL' in status) is returned with provisional=True
     and construct.py reports it for context only (--panic_provisional context, default; 'apply' forces it).

@@ -19,7 +19,7 @@ Per-period tables: periods_<H>_<reading>.tsv (date, n, k, IC, L/S raw & beta-adj
   scored UTC 299 / ET 304; scored obs UTC 7,282 / ET 7,362; below-min UTC 22,611 / ET 22,590; obs in dropped periods UTC 5,681 / ET 5,622; coverage=0 26; capped 0.
   Missing target 0 (beta warm-up never binds). News: 1,700 DEV files (50 stocks × 2022-03..2024-12) sha-OK; 53,685 items;
   kept 52,441; relevance < 0.50 1,234; unparseable 0; after DEV cutoff 10 dropped; 6 items with duplicate ticker entries (first used).
-- Fiscal diagnostic: INCONCLUSIVE — see FISCAL_DIAGNOSTIC.md (needs the validator).
+- Fiscal diagnostic: INCONCLUSIVE — see FISCAL_DIAGNOSTIC.md (needs review).
 
 ## Implementation notes / deviations (prereg silent → conservative choice)
 1. H1a "week" = ISO calendar week; decision = last XNYS session of the week, using the XNYS calendar (no data) to 2025-01-10 so

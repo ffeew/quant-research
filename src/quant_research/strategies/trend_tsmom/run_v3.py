@@ -87,7 +87,9 @@ def load_spec() -> dict[str, Any]:
         die(f"{SPEC} missing")
     spec = cast(dict[str, Any], json.load(open(SPEC)))
     if not spec_filled(spec):
-        die(f"{SPEC} not filled in (path/layout/column map and corporate_actions from the data owner's sign-off note)")
+        die(
+            f"{SPEC} not filled in (path/layout/column map and corporate_actions from the data owner's acceptance note)"
+        )
     return spec
 
 
@@ -146,11 +148,11 @@ def cmd_pin(h: str, ca: str, diff: str) -> None:
         )
     txt = open(D.PREREG, encoding="utf-8").read()
     if D.PLACEHOLDER not in txt or D.CA_PLACEHOLDER not in txt or D.DIFF_PLACEHOLDER not in txt:
-        die("PREREG-v3 already (partly) pinned; a second pin is a protocol change (log it by hand with the validator)")
+        die("PREREG-v3 already (partly) pinned; a second pin is a protocol change (log it by hand with the review)")
     txt = txt.replace(
-        f"**`{D.PLACEHOLDER}`**", f"**`{h}`** (data owner sign-off; pinned {now()}; path `{spec['path']}`)"
+        f"**`{D.PLACEHOLDER}`**", f"**`{h}`** (data owner acceptance; pinned {now()}; path `{spec['path']}`)"
     )
-    txt = txt.replace(f"**`{D.CA_PLACEHOLDER}`**", f"**`{ca}`** (data owner sign-off; pinned {now()}; path `{cap}`)")
+    txt = txt.replace(f"**`{D.CA_PLACEHOLDER}`**", f"**`{ca}`** (data owner acceptance; pinned {now()}; path `{cap}`)")
     txt = txt.replace(f"**`{D.DIFF_PLACEHOLDER}`**", f"**`{diff}`** (data owner v2 diff; pinned {now()}; path `{dfp}`)")
     txt = (
         txt.rstrip("\n")
@@ -163,7 +165,7 @@ def cmd_pin(h: str, ca: str, diff: str) -> None:
 
 # ------------------------------------------------------------------ evaluation helpers
 def pbo_add_u23(M: pd.DataFrame) -> pd.DataFrame:
-    """Decision 9B-9: append the validator's 5 v1 cost settings (u23 columns 20-24) on the same window."""
+    """Decision 9B-9: append the review's 5 v1 cost settings (u23 columns 20-24) on the same window."""
     U = pd.read_csv(S.U23_PATH, index_col=0, parse_dates=True)
     cols = list(U.columns)[19:24]
     if cols != S.U23_COLS:
@@ -232,7 +234,7 @@ def cmd_run() -> None:
         die("unit checks failed; see tests/unit_checks_v3_output.txt")
     t0 = now()
     if D.sha_file(S.U23_PATH) != S.U23_SHA:
-        die("the validator's u23 net matrix (PBO columns) differs from the pinned sha256")
+        die("the review's u23 net matrix (PBO columns) differs from the pinned sha256")
     if D.sha_file(spec["substitution_diff"]["path"]) != diff_pinned:
         die("v2 substitution diff differs from the §2 pin (option (b), rule S6)")
     if src_pinned != S.REF_SOURCE_TABLE_SHA:
@@ -386,7 +388,7 @@ def cmd_run() -> None:
         ("6 quasi-OOS trades >= 100", q.n_trades, q.n_trades >= 100),
         ("7a no year > 40% of net PnL", years.share_of_total.max(), years.share_of_total.max() <= 0.40),
         (
-            "7b no calendar-year Sharpe < -0.5 (§7.7; confirmed hard by the validator)",
+            "7b no calendar-year Sharpe < -0.5 (§7.7; confirmed hard in review)",
             years.sharpe.min(),
             years.sharpe.min() >= -0.5,
         ),
@@ -412,7 +414,7 @@ def cmd_run() -> None:
     verdict = (
         "FAIL (trend shelved for this sprint)"
         if not hard["pass"].all()
-        else "CONDITIONAL PASS (for the validator's review)"
+        else "CONDITIONAL PASS (for the review's review)"
     )
     # artefacts
     prim["daily"].to_csv(f"{OUT}/v3_daily.csv")

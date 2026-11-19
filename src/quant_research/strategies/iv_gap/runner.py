@@ -1,7 +1,7 @@
-"""IV-gap v2 runner (FROZEN CANDIDATE; sentiment researcher desk; built 2026-11-13 SGT).
+"""IV-gap v2 runner (FROZEN CANDIDATE; built 2026-11-13).
 
 Spec: PREREG_IV_GAP_v2_DRAFT_r3.md.
-Stdlib only. Run (ONE run, after validator confirmation + LOCK only):
+Stdlib only. Run (ONE run, after validation confirmation + LOCK only):
   env -u ALPHAVANTAGE_API_KEY $QR_DATA_DIR/.venv/bin/python -I -B runner.py <NEW_RUN_DIR>
 Reads ONLY through the data owner's sealed reader ivgap_av_reader_v2.api (W1d). No mapping, no direct file reads of
 chains/underlyings, no greeks, no IV levels or per-date rows in outputs (reader_calls.tsv date list excepted).
@@ -105,7 +105,7 @@ KILL_T = 0.10  # s7 A2: usable iff drop_rate <= 0.10; kill iff > 0.10
 N_MIN = 20  # s3 / s7 OQ-6
 MNY_EDGES = (-0.30, -0.15, -0.075, -0.025, 0.025, 0.075, 0.15, 0.30)  # s3
 MNY_MAX = 0.30
-DTE_EDGES = (3, 8, 22, 46, 91, 181, 366)  # s3 [3,..,366)
+DTE_EDGES = (3, 8, 22, 46, 91, 181, 366)  # s3 [3..,366)
 DTE_MIN, DTE_MAX = 3, 365
 MARK_TOL = 0.005  # s4a (iv)
 PARITY_TOL = 0.01  # s4b
@@ -137,7 +137,7 @@ SGT = timezone(timedelta(hours=8))
 
 
 class RunStop(Exception):
-    """In-run STOP (prereg s6): end the run, no retry, report to the validator."""
+    """In-run STOP (prereg s6): end the run, no retry, report for review."""
 
 
 class _OptionReader(Protocol):

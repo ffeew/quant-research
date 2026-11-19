@@ -1,6 +1,6 @@
-"""Desk data loader (read-only on the data owner's store). The derivatives researcher, 2026-10-30 (v2).
+"""Shared-store data loader (read-only on the data owner's store). The derivatives researcher, 2026-10-30 (v2).
 
-Primary source (the data owner, SIP, landed 2026-10-30 ~01:15 SGT):
+Primary source (the data owner, SIP, landed 2026-10-30):
   data/bars/daily/total_return/daily_total_return.parquet  -> ret_total_best (recommended research return),
                                                               close_raw / volume_raw (for cost buckets)
   data/universe/sp500_membership.parquet                    -> point-in-time S&P 500 intervals [start, end)

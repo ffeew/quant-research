@@ -83,7 +83,7 @@ def main() -> Any:
     ap.add_argument("--cap", type=float, default=0.06)
     ap.add_argument("--tc", type=float, default=10e-4)
     ap.add_argument("--all5", action="store_true")
-    ap.add_argument("--exclude_defects", action="store_true", help="drop every symbol in validator data_issues.json members_without_bars_symbols (+SNDK) - sensitivity")
+    ap.add_argument("--exclude_defects", action="store_true", help="drop every symbol in validation data_issues.json members_without_bars_symbols (+SNDK) - sensitivity")
     ap.add_argument("--boot", type=int, default=2000)
     ap.add_argument("--out", required=True)
     a = ap.parse_args()
@@ -96,7 +96,7 @@ def main() -> Any:
     gics = uni.set_index("symbol")["gics_sector"]
     stocks = [s for s in C.columns if roles.get(s) in ("sp500_current", "sp500_former_since_2016")]
     issues = json.load(open(f"{_QR.DESK_DIR}/validation/backtests/pead_long_pit/data_issues.json"))
-    DEFECT = set(issues["members_without_bars_symbols"]) | {"SNDK"}          # Validator 2026-10-30 (read-only)
+    DEFECT = set(issues["members_without_bars_symbols"]) | {"SNDK"}          # Review 2026-10-30 (read-only)
     FORMER = {s for s in stocks if roles.get(s) == "sp500_former_since_2016"}
     if a.exclude_defects:
         stocks = [s for s in stocks if s not in DEFECT]
@@ -269,7 +269,7 @@ def main() -> Any:
                                            defect_names_held=sorted({x for e in expo for x in cast(Iterable[Any], e["defect_names"])}),
                                            sndk_ever_in_book=bool(any(abs(cast(float, e["sndk"])) > 1e-6 for e in expo))))
     dg = pd.DataFrame(diag_rows)
-    meta = dict(status="PROVISIONAL - data defects pending the data owner's fixes (validator validation/backtests/pead_long_pit/data_issues.json)", exclude_defects=a.exclude_defects, data_span=[str(idx[0].date()), str(idx[-1].date())], data_years=round((idx[-1] - idx[0]).days / 365.25, 2),
+    meta = dict(status="PROVISIONAL - data defects pending the data owner's fixes (validation/backtests/pead_long_pit/data_issues.json)", exclude_defects=a.exclude_defects, data_span=[str(idx[0].date()), str(idx[-1].date())], data_years=round((idx[-1] - idx[0]).days / 365.25, 2),
                 oos_start=str(Rm.index[0].date()), oos_end=str(Rm.index[-1].date()), oos_days=nobs, oos_years=round(nobs / 252, 2),
                 n_rebal=len(rebal), universe_rule=f"PIT S&P 500 members, 120 complete returns, top {a.n} by 63d median $ volume, + SPY hedge",
                 signal_weights=sw, lw_delta_mean=float(dg.delta.mean()), lw_delta_range=[float(dg.delta.min()), float(dg.delta.max())],

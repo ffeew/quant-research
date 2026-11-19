@@ -1,7 +1,7 @@
-# RESULTS: IV-gap v2, DEV gate readout (the sentiment researcher, the desk)
-Written 2026-11-13 ~23:50 SGT. Governed by PREREG r3 `PREREG_IV_GAP_v2_DRAFT_r3.md` (sealed, the validator).
-Run: `iv_gap_v2_run_r2_20261113/` checksums verified (6/6 OK), console (rc=0), FREEZE_NOTE,
-RUNCHECK (the validator, RUN ACCEPTED). Derived only from the sealed outputs by `derive.py`. No reader, AV or chain call; no rerun,
+# RESULTS: IV-gap v2, DEV gate readout
+Written 2026-11-13. Governed by PREREG r3 `PREREG_IV_GAP_v2_DRAFT_r3.md` (sealed, the review).
+Run: hash check 6/6 OK, console (rc=0), FREEZE_NOTE,
+RUNCHECK (the review, RUN ACCEPTED). Derived only from the sealed outputs by `derive.py`. No reader, AV or chain call; no rerun,
 no variant and no new cuts. The holdout (2016-06-01 onward) stayed unopened. v1 outputs were not opened.
 **Status: to be checked against the raw output before any decision.**
 
@@ -64,7 +64,7 @@ Usable pooled cells per non-killed symbol-year are 18-31 (see usable_by_symbol_y
 - **Handling.** Flagged and dropped legs are **not removed** from the kept set. They stay in each cell's and each symbol-year's denominator, and
   "drop" works as a *rate* (A-7: usable and kill booleans are not written; the rule is applied to the rates). Only the **drop** rate carries a decision (§7).
   The **flag** rate is reported and carries none. So a flag rate of 1.0 by itself would not kill a symbol-year. A symbol-year is killed only by its drop rate.
-- **Validator INFO-2 tie-in.** QQQ 2009 and 2010 have flag rate 1.000 and SPY 2009 has 0.896, all before the 2011-03-23 changeover (the validator's label). In those same
+- **Review INFO-2 tie-in.** QQQ 2009 and 2010 have flag rate 1.000 and SPY 2009 has 0.896, all before the 2011-03-23 changeover (the review's label). In those same
   symbol-years the drop rates are 0.993, 0.997 and 0.839, so nearly every flagged leg also exceeds 0.10. The kill comes from the drop rate, as the prereg requires.
   SPY 2010 (flag 0.372, drop 0.271) is also killed. §7: a 2009 failure does not widen to other years, and 2011-2016 pass on their own rates.
   The prereg (§9 D3) labels 2009 findings as not blind discovery.
@@ -87,10 +87,10 @@ Usable pooled cells per non-killed symbol-year are 18-31 (see usable_by_symbol_y
 | SPY rate | 0.254 | 0.243 | 0.144 | 0.304 | 0.134 | 0.135 | 0.165 | 0.102 |
 This is a quote-consistency diagnostic with circularity (F and DF are fitted from the same quotes), not an arbitrage claim (§4b). No decision is attached.
 
-## 7. Validator INFO items
+## 7. Review INFO items
 - **INFO-1 "SPY 2012 has no_date 1": not reproduced from coverage.csv.** SPY 2012 has no_date = **0** and sampled_days = 12.
   The 1 in that row is **excl_crossed = 1**, and sanity_bidask also shows ask<bid = 1 for SPY 2012. Every symbol-year has no_date = 0. This is stated factually
-  and is for the validator to confirm. It may be a column reading in the RUNCHECK, but I have not resolved it.
+  and is for review to confirm. It may be a column reading in the RUNCHECK, but I have not resolved it.
 - **INFO-2**: see §4.
 
 ## 8. Disclosures (restated)
@@ -107,7 +107,7 @@ F1 +1, F1b +1, F1c +1, F2 0, **F3 +1** (cross-check usability selection, counted
 Per §7, the only permitted use is AV IV as a cross-check on the desk's Black-76 IV in the usable cells. It is never alpha, a signal, a gate or a filter.
 "the derivatives researcher's Black-76 IV is primary; AV IV is not used for gating" stands. This study tests no trade and makes no recommendation. Any later trade test that cites
 it must be defined-risk only (verticals, iron condors, or flies with long wings), with no naked short vol and no leverage. Such a test needs its own prereg and
-risk, cost and owner sign-off, and is paper only.
+risk, cost and owner checks, and is paper only.
 
 ## 11. Ambiguities (listed, not resolved)
 1. **Type granularity.** §7 names "symbol x year x moneyness x DTE cells", while §3 defines the cells with type (C/P separately and pooled). I report pooled as the
@@ -115,6 +115,6 @@ risk, cost and owner sign-off, and is paper only.
 2. **Usable share denominator.** The prereg names none. Three are shown: of reported cells, of all cells, and of reported cells in non-killed symbol-years.
 3. **No overall PASS/FAIL or net-after-cost metric** is defined. The verdict is the set of per-cell and per-symbol-year readings.
 4. **INFO-1 discrepancy** (§7).
-5. **Changeover date 2011-03-23** is the validator's label and does not appear in the prereg. Year cells are calendar years, so QQQ 2011 mixes pre- and post-changeover days.
+5. **Changeover date 2011-03-23** is the review's label and does not appear in the prereg. Year cells are calendar years, so QQQ 2011 mixes pre- and post-changeover days.
    It is not split, because that would be a new cut.
 6. Flagged and dropped counts are derived as rate × kept and rounded, since the outputs carry rates, not counts.
