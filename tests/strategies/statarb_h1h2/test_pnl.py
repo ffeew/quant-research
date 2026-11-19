@@ -568,3 +568,35 @@ def test_h1_short_bound_charges_tau_to_tau1_borrow_once():
     total = float(base.loc[d[20] :].sum()) - float(ov.sum()) - liability
     assert np.isclose(total, per_day * (d[27] - d[19]).days)  # every day from tau to h, once
     assert rec[0]["borrow_rate"] == 0.10
+
+
+def test_terminal_short_first_session_borrow_uses_the_higher_source_rate():
+    b = _bars(30)
+    d = b["PX"].index
+    b["PX"].iloc[20:, 0] = np.nan
+    b["VOL"].iloc[20:, 0] = 0
+    b["R"].iloc[20:, 0] = np.nan
+    w = pd.DataFrame(0.0, index=d, columns=["A"])
+    w.iloc[10:25, 0] = -0.05
+    cfg = pnl.build_cost_config("unknown_borrow_required")
+    for source_rate in (0.05, 0.30):
+        row = {
+            "symbol": "A",
+            "identity_ok": True,
+            "short_terms": {
+                "h": str(d[27].date()),
+                "borrow_rate_source": source_rate,
+                "alternatives": [
+                    {"cash": 25.0, "ratio": 1.0, "acquirer_id": "ACQ", "acquirer_identity_accepted": True}
+                ],
+            },
+        }
+        wa, ov, rec = pnl.h1_terminal_bound(b, w, [row], cfg, client=Closes())
+        base = pnl.apply_costs_and_returns(b, wa, cfg, idea="H1")["daily"]["borrow"]
+        liability = 0.05 * (55.0 / 50.0 - 1.0)
+        rate = max(cfg.borrow_rate, source_rate)
+        first = float(base.loc[d[20]]) - float(ov.iloc[20]) - liability
+        assert np.isclose(first, 0.05 * rate * (d[20] - d[19]).days / 360)
+        total = float(base.loc[d[20] :].sum()) - float(ov.sum()) - liability
+        assert np.isclose(total, 0.05 * rate * (d[27] - d[19]).days / 360)
+        assert rec[0]["borrow_rate"] == rate

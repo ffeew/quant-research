@@ -106,7 +106,8 @@ ratio (DSR) and purged cross-validation land in a later PR. No DEV run yet; no r
     they also have zero or NaN volume or no positive close.
   - Synthetic checks only; no DEV run or real returns.
 - **Borrow and session alignment.** The H1 short bound's tau -> tau+1 session is charged borrow
-  once, in base borrow on the held short; the borrow overlay starts at tau+2. The weight index
+  once, at max(base, source-rate bound): the overlay adds only the excess above base on tau+1,
+  then the full bound from tau+2. The weight index
   must equal the price index (same sessions, same order), not just be a subset.
 - Not done yet: DSR and purged CV. Until they land there is no Stage A verdict, whatever a DEV
   Sharpe shows.

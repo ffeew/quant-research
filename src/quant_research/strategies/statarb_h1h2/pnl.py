@@ -402,8 +402,8 @@ def h1_terminal_bound(
 ) -> tuple[pd.DataFrame, pd.Series, list[dict[str, Any]]]:
     """Positions stranded in unresolved terminal rows: zero the leg from tau+1 (no print there, so
     it can't fill: no exit-cost credit) and book an equity overlay at tau+1:
-    long -100% of marked value; short max(P_tau, V_max) liability plus borrow from tau+2 to
-    max(frozen exit, h) (tau -> tau+1 is the base borrow on the held short, never charged twice). The bound applies to the position actually held into tau+1 (after the
+    long -100% of marked value; short max(P_tau, V_max) liability plus borrow through
+    max(frozen exit, h). On tau -> tau+1 charge max(base, overlay), never both. The bound applies to the position actually held into tau+1 (after the
     ADV cap), not the target: a capped exit still holding at delisting is bound on what is left.
     Fails closed (Blocked). Paths A and B coincide in this harness."""
     if path not in H1_TERMINAL_PATHS:
@@ -477,10 +477,14 @@ def h1_terminal_bound(
             rate = max(cfg.borrow_rate, float(terms.get("borrow_rate_source", 0.0)))
             per_day = costs.borrow_usd(abs(w) * AUM, 1.0, cfg) / AUM
             per_day *= rate / cfg.borrow_rate if cfg.borrow_rate > 0 else 1.0
-            # tau -> tau+1 is already charged by the base borrow on the held short (it is held over
-            # row tau+1), so the overlay starts at tau+2: each session is charged borrow once.
-            for j in range(book_i + 1, end_i + 1):
-                overlay.iloc[j] -= per_day * (dates[j] - dates[j - 1]).days  # calendar days, weekends accrue
+            # The base charges the held short on tau -> tau+1. Add only the excess needed for
+            # the source-rate bound on that session: total borrow is max(base, overlay).
+            # Thereafter the settled leg has no base borrow, so charge the full bound.
+            for j in range(book_i, end_i + 1):
+                days = (dates[j] - dates[j - 1]).days
+                bound = per_day * days
+                base = costs.borrow_usd(abs(w) * AUM, float(days), cfg) / AUM if j == book_i else 0.0
+                overlay.iloc[j] -= max(0.0, bound - base)  # calendar days, weekends accrue
             rec.update({"h": str(h_d.date()), "V_max": vmax, "liability": liab, "borrow_rate": rate})
         # flat from tau+1: the stranded amount is never traded at tau (no exit-cost credit)
         W_adj.iloc[t + 1 :, iloc_int(W_adj.columns, s)] = 0.0
