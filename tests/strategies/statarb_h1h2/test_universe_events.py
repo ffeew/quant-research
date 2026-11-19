@@ -13,20 +13,32 @@ T = pd.Timestamp
 
 def test_subtract_intervals():
     assert u.subtract_intervals((T("2016-01-01"), T("2017-01-01")), [(T("2016-03-01"), T("2016-04-01"))]) == [
-        (T("2016-01-01"), T("2016-03-01")), (T("2016-04-01"), T("2017-01-01"))]
+        (T("2016-01-01"), T("2016-03-01")),
+        (T("2016-04-01"), T("2017-01-01")),
+    ]
     out = u.subtract_intervals((T("2016-01-01"), pd.NaT), [(T("2016-06-01"), pd.NaT)])
     assert out == [(T("2016-01-01"), T("2016-06-01"))]
     assert u.subtract_intervals((T("2016-01-01"), T("2016-02-01")), [(T("2017-01-01"), pd.NaT)]) == [
-        (T("2016-01-01"), T("2016-02-01"))]
+        (T("2016-01-01"), T("2016-02-01"))
+    ]
 
 
 def test_membership_rules():
-    pm = pd.DataFrame({"symbol": ["AAA", "BBB", "CCC", "XLK", "DDD", "EEE"],
-                       "start_date_filled": T("2015-01-02"), "end_date": [None] * 6})
-    ls = pd.DataFrame({"symbol": ["AAA", "BBB", "CCC", "XLK", "EEE"],
-                       "ipoDate": ["2000-01-03", "2000-01-03", "2016-06-01", "2000-01-03", "2000-01-03"],
-                       "delistingDate": ["null", "null", "2017-01-31", "null", "null"],
-                       "listing_source": "active"})
+    pm = pd.DataFrame(
+        {
+            "symbol": ["AAA", "BBB", "CCC", "XLK", "DDD", "EEE"],
+            "start_date_filled": T("2015-01-02"),
+            "end_date": [None] * 6,
+        }
+    )
+    ls = pd.DataFrame(
+        {
+            "symbol": ["AAA", "BBB", "CCC", "XLK", "EEE"],
+            "ipoDate": ["2000-01-03", "2000-01-03", "2016-06-01", "2000-01-03", "2000-01-03"],
+            "delistingDate": ["null", "null", "2017-01-31", "null", "null"],
+            "listing_source": "active",
+        }
+    )
     reused = {"tickers": [{"ticker": "BBB", "original_member_periods": [["2015-01-02", "2016-01-04"]]}]}
     missing = {"tickers": [{"ticker": "EEE"}]}
     fl = {"sha256": "x", "excluded": {"AAA": "identity"}, "kept": set()}
@@ -46,8 +58,9 @@ def test_listing_overlap_fails_closed():
     ls = pd.concat([S.listing(), S.listing().iloc[:1].assign(listing_source="delisted", delistingDate="2010-01-04")])
     with pytest.raises(Blocked, match="AAA"):
         u.build_membership(pm, ls, {"tickers": []}, {"tickers": []})
-    mem, rec = u.build_membership(pm, ls, {"tickers": []}, {"tickers": []},
-                                  final_list={"kept": {"AAA"}, "excluded": {}})
+    _mem, rec = u.build_membership(
+        pm, ls, {"tickers": []}, {"tickers": []}, final_list={"kept": {"AAA"}, "excluded": {}}
+    )
     assert rec["final_list_kept_covered_overlap"] == ["AAA"]
     u.build_membership(pm, ls, {"tickers": []}, {"tickers": []}, listing_overlap_treatment={"AAA": "x"})
 
@@ -56,15 +69,15 @@ def test_elig_filters():
     bars = S.make_bars()
     mem, _ = u.build_membership(S.membership(), S.listing(), {"tickers": []}, {"tickers": []})
     E = u.build_elig(bars, mem)
-    assert not E.iloc[:252].any().any()                    # 252-session history
-    assert E["AAA"].iloc[300] and not E["XLK"].any()        # ETFs are not members
+    assert not E.iloc[:252].any().any()  # 252-session history
+    assert E["AAA"].iloc[300] and not E["XLK"].any()  # ETFs are not members
     bars["PX"].iloc[300:, bars["PX"].columns.get_loc("CCC")] = 4.0
     bars["VOL"].iloc[305, bars["VOL"].columns.get_loc("DDD")] = 0
     bars["R"].iloc[310, bars["R"].columns.get_loc("EEE")] = 0.5
     E2 = u.build_elig(bars, mem)
-    assert not E2["CCC"].iloc[300:].any()                   # price < $5
-    assert not E2["DDD"].iloc[305]                          # zero volume
-    assert not E2["EEE"].iloc[310:330].any() and E2["EEE"].iloc[331]   # 20-session jump filter
+    assert not E2["CCC"].iloc[300:].any()  # price < $5
+    assert not E2["DDD"].iloc[305]  # zero volume
+    assert not E2["EEE"].iloc[310:330].any() and E2["EEE"].iloc[331]  # 20-session jump filter
 
 
 def test_event_windows():
@@ -87,11 +100,15 @@ def test_boundary_ambiguous():
 
 def test_earliest_possible_index():
     dates = pd.bdate_range("2018-01-01", periods=30)
-    e = pd.DataFrame({"symbol": ["A", "B", "C", "D"],
-                      "source": ["sec_8k", "nasdaq_scheduled", "x_fallback", "sec_8k"],
-                      "timing_quality": ["exact_acceptance_time", "exact_acceptance_time", "exact", "unknown_x"],
-                      "reaction_session": [dates[10], dates[10], dates[10], dates[12]],
-                      "first_tradable_session": [None] * 4,
-                      "announce_date_et": [dates[9], dates[9], dates[9], dates[8]]})
+    e = pd.DataFrame(
+        {
+            "symbol": ["A", "B", "C", "D"],
+            "source": ["sec_8k", "nasdaq_scheduled", "x_fallback", "sec_8k"],
+            "timing_quality": ["exact_acceptance_time", "exact_acceptance_time", "exact", "unknown_x"],
+            "reaction_session": [dates[10], dates[10], dates[10], dates[12]],
+            "first_tradable_session": [None] * 4,
+            "announce_date_et": [dates[9], dates[9], dates[9], dates[8]],
+        }
+    )
     out = ev.earliest_possible_index(e, dates).set_index("symbol")._ix.to_dict()
     assert out == {"A": 10, "C": 5, "D": 8}

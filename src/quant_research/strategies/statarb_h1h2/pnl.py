@@ -1,4 +1,5 @@
 """Execution lag, costs, borrow, terminal / delisting treatments and Sharpe. Gated by the runner."""
+
 from __future__ import annotations
 
 import math
@@ -31,14 +32,23 @@ def _any(v: Any) -> Any:
 @dataclass(frozen=True)
 class CostConfig:
     label: str = "unknown_borrow_required"
-    borrow_rate: float = BORROW_UNKNOWN_REQUIRED   # on every historically unknown short, ETF hedges included
+    borrow_rate: float = BORROW_UNKNOWN_REQUIRED  # on every historically unknown short, ETF hedges included
     is_pass_bar: bool = True
     k_impact: float = cm.K_IMPACT_DEFAULT
 
 
 class CostModel(Protocol):
-    def one_way_bps(self, side: str, px: float, shares: float, adv_shares: float | None, *,
-                    symbol: str, is_etf: bool, cfg: CostConfig) -> float: ...
+    def one_way_bps(
+        self,
+        side: str,
+        px: float,
+        shares: float,
+        adv_shares: float | None,
+        *,
+        symbol: str,
+        is_etf: bool,
+        cfg: CostConfig,
+    ) -> float: ...
 
     def borrow_usd(self, short_mv_usd: float, days: float, cfg: CostConfig) -> float: ...
 
@@ -48,8 +58,17 @@ class SharedCostModel:
 
     The desk's frozen pre-registered cost path can be injected instead (same protocol)."""
 
-    def one_way_bps(self, side: str, px: float, shares: float, adv_shares: float | None, *,
-                    symbol: str, is_etf: bool, cfg: CostConfig) -> float:
+    def one_way_bps(
+        self,
+        side: str,
+        px: float,
+        shares: float,
+        adv_shares: float | None,
+        *,
+        symbol: str,
+        is_etf: bool,
+        cfg: CostConfig,
+    ) -> float:
         if not (shares > 0):
             return 0.0
         return float(cm.trade_cost(side, px, shares, adv_shares, k=cfg.k_impact, venue="close")["total_bps"])
@@ -61,7 +80,7 @@ class SharedCostModel:
 def build_cost_config(path: str) -> CostConfig:
     paths = {
         "unknown_borrow_required": CostConfig("unknown_borrow_required", BORROW_UNKNOWN_REQUIRED, True),
-        "gc_counterfactual": CostConfig("gc_counterfactual", 0.01, False),   # labelled counterfactual only
+        "gc_counterfactual": CostConfig("gc_counterfactual", 0.01, False),  # labelled counterfactual only
         "k_lighter_sensitivity": CostConfig("k_lighter_sensitivity", BORROW_UNKNOWN_REQUIRED, False, 0.75),
     }
     if path not in paths:
@@ -69,14 +88,15 @@ def build_cost_config(path: str) -> CostConfig:
     return paths[path]
 
 
-def apply_costs_and_returns(bars: dict[str, pd.DataFrame], W: pd.DataFrame, cfg: CostConfig, *, idea: str,
-                            costs: CostModel | None = None) -> dict[str, Any]:
+def apply_costs_and_returns(
+    bars: dict[str, pd.DataFrame], W: pd.DataFrame, cfg: CostConfig, *, idea: str, costs: CostModel | None = None
+) -> dict[str, Any]:
     """One-session execution lag, 1% ADV participation cap, trading cost, borrow, daily net."""
     if cfg.is_pass_bar and cfg.borrow_rate < BORROW_UNKNOWN_REQUIRED:
         raise RuntimeError("pass-bar config must have borrow_rate >= 10%/yr")
     costs = costs or SharedCostModel()
     R, PX, VOL = bars["R"], bars["PX"], bars["VOL"]
-    W_exec = W.shift(1).fillna(0.0)               # signal at t, fill at t+1
+    W_exec = W.shift(1).fillna(0.0)  # signal at t, fill at t+1
     DV = PX * VOL
     ADV20 = DV.rolling(20, min_periods=10).mean().shift(1)
     dW = W_exec.diff().fillna(W_exec)
@@ -107,8 +127,15 @@ def apply_costs_and_returns(bars: dict[str, pd.DataFrame], W: pd.DataFrame, cfg:
         b = costs.borrow_usd(short_mv, 1.0, cfg) / AUM
         rets.append((d, gross - trade_cost_frac - b, gross, trade_cost_frac, b))
     df = pd.DataFrame(rets, columns=["session_date", "net", "gross", "tc", "borrow"]).set_index("session_date")
-    return {"idea": idea, "cost_path": cfg.label, "borrow_rate_used": cfg.borrow_rate,
-            "is_pass_bar": cfg.is_pass_bar, "k_impact": cfg.k_impact, "n_sessions": int(len(df)), "daily": df}
+    return {
+        "idea": idea,
+        "cost_path": cfg.label,
+        "borrow_rate_used": cfg.borrow_rate,
+        "is_pass_bar": cfg.is_pass_bar,
+        "k_impact": cfg.k_impact,
+        "n_sessions": int(len(df)),
+        "daily": df,
+    }
 
 
 def sharpe_ann(daily_net: pd.Series) -> float:
@@ -120,6 +147,7 @@ def sharpe_ann(daily_net: pd.Series) -> float:
 
 
 # ---- H1 adverse terminal bound (unresolved terminal rows) ----
+
 
 class AcquirerCloses(Protocol):
     def sessions(self, start: pd.Timestamp, end: pd.Timestamp) -> pd.DatetimeIndex: ...
@@ -161,9 +189,16 @@ def short_vmax(terms: dict[str, Any], tau_d: pd.Timestamp, h_d: pd.Timestamp, cl
     return float(max(vals))
 
 
-def h1_terminal_bound(bars: dict[str, pd.DataFrame], W: pd.DataFrame, roster: list[dict[str, Any]], cfg: CostConfig, *,
-                      client: AcquirerCloses | None = None, path: str = "A",
-                      costs: CostModel | None = None) -> tuple[pd.DataFrame, pd.Series, list[dict[str, Any]]]:
+def h1_terminal_bound(
+    bars: dict[str, pd.DataFrame],
+    W: pd.DataFrame,
+    roster: list[dict[str, Any]],
+    cfg: CostConfig,
+    *,
+    client: AcquirerCloses | None = None,
+    path: str = "A",
+    costs: CostModel | None = None,
+) -> tuple[pd.DataFrame, pd.Series, list[dict[str, Any]]]:
     """Positions stranded in unresolved terminal rows: zero the leg from tau (the execution lag
     closes it at tau+1 with no exit-cost credit) and book an equity overlay at tau+1:
     long -100% of marked value; short max(P_tau, V_max) liability plus borrow from tau+1 to
@@ -185,8 +220,10 @@ def h1_terminal_bound(bars: dict[str, pd.DataFrame], W: pd.DataFrame, roster: li
         if t is None:
             raise Blocked(f"BLOCK H1: no trusted print for held roster row {s}.")
         tau_d = dates[t]
-        if (row.get("ledger_last_session_status") == "observed_last_trading_session"
-                and pd.Timestamp(_any(row.get("ledger_last_session"))) != tau_d):
+        if (
+            row.get("ledger_last_session_status") == "observed_last_trading_session"
+            and pd.Timestamp(_any(row.get("ledger_last_session"))) != tau_d
+        ):
             raise Blocked(f"BLOCK H1: tau != ledger last_session for {s}.")
         if row.get("economic_event_date") and pd.Timestamp(row["economic_event_date"]) < tau_d:
             raise Blocked(f"BLOCK H1: source-bound economic date < tau for {s}.")
@@ -202,12 +239,19 @@ def h1_terminal_bound(bars: dict[str, pd.DataFrame], W: pd.DataFrame, roster: li
         book_i = t + 1
         p_tau = float(bars["PX"][s].iloc[t])
         rec: dict[str, Any] = {
-            "symbol": s, "sid": row.get("sid"), "instrument_id": row.get("instrument_id"),
-            "side": "long" if w > 0 else "short", "weight": w,
+            "symbol": s,
+            "sid": row.get("sid"),
+            "instrument_id": row.get("instrument_id"),
+            "side": "long" if w > 0 else "short",
+            "weight": w,
             "entry_session": str(dates[int(np.flatnonzero((W[s].abs() > 0).values)[0])].date()),
-            "tau": str(tau_d.date()), "booking_session": str(dates[book_i].date()), "P_tau": p_tau, "path": path}
+            "tau": str(tau_d.date()),
+            "booking_session": str(dates[book_i].date()),
+            "P_tau": p_tau,
+            "path": path,
+        }
         if w > 0:
-            overlay.iloc[book_i] -= w                      # terminal value 0: -100%
+            overlay.iloc[book_i] -= w  # terminal value 0: -100%
         else:
             terms = row.get("short_terms")
             if not terms or not terms.get("h"):
@@ -218,7 +262,7 @@ def h1_terminal_bound(bars: dict[str, pd.DataFrame], W: pd.DataFrame, roster: li
             vmax = short_vmax(terms, tau_d, h_d, client)
             liab = max(p_tau, vmax)
             overlay.iloc[book_i] -= abs(w) * (liab / p_tau - 1.0)
-            post = W[s].iloc[t + 1:]
+            post = W[s].iloc[t + 1 :]
             ex_rel = np.flatnonzero((post == 0).values)
             frozen_exit_i = t + 1 + int(ex_rel[0]) if len(ex_rel) else len(dates) - 1
             h_i = int(np.searchsorted(dates.values, h_d.to_datetime64(), side="right")) - 1
@@ -236,6 +280,7 @@ def h1_terminal_bound(bars: dict[str, pd.DataFrame], W: pd.DataFrame, roster: li
 
 # ---- H2 delisting base and counted stress ----
 
+
 def h2_delisting_receipts(bars: dict[str, pd.DataFrame], positions: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Base: a name that stops printing before its planned exit is closed at its last close
     (R is NaN afterwards, so it adds 0); the hedge leg and borrow run to the planned exit.
@@ -252,19 +297,28 @@ def h2_delisting_receipts(bars: dict[str, pd.DataFrame], positions: list[dict[st
             continue
         last_i = int(idx[-1])
         if p["entry_i"] <= last_i < p["exit_i"] - 1:
-            out.append({"symbol": s, "side": "long" if p["w_sym"] > 0 else "short",
-                        "entry_session": str(dates[p["entry_i"]].date()),
-                        "last_close_session": str(dates[last_i].date()),
-                        "last_close": float(PX[s].iloc[last_i]),
-                        "planned_exit_session": str(dates[min(p["exit_i"], len(dates) - 1)].date()),
-                        "treatment": "base: closed at last close (null delisting return)",
-                        "hedge_leg": p["etf"], "hedge_held_to_planned_exit": True})
+            out.append(
+                {
+                    "symbol": s,
+                    "side": "long" if p["w_sym"] > 0 else "short",
+                    "entry_session": str(dates[p["entry_i"]].date()),
+                    "last_close_session": str(dates[last_i].date()),
+                    "last_close": float(PX[s].iloc[last_i]),
+                    "planned_exit_session": str(dates[min(p["exit_i"], len(dates) - 1)].date()),
+                    "treatment": "base: closed at last close (null delisting return)",
+                    "hedge_leg": p["etf"],
+                    "hedge_held_to_planned_exit": True,
+                }
+            )
     return out
 
 
-def h2_delisting_stress(bars: dict[str, pd.DataFrame], W: pd.DataFrame, positions: list[dict[str, Any]],
-                        supplied_delist_returns: dict[str, Any] | None = None
-                        ) -> tuple[pd.Series, list[dict[str, Any]]]:
+def h2_delisting_stress(
+    bars: dict[str, pd.DataFrame],
+    W: pd.DataFrame,
+    positions: list[dict[str, Any]],
+    supplied_delist_returns: dict[str, Any] | None = None,
+) -> tuple[pd.Series, list[dict[str, Any]]]:
     """Counted stress: on a null delisting return, -30% for longs and 0% for shorts, booked at
     last+1 on the weight held over that session. A supplied delisting return gets no stress."""
     sup = supplied_delist_returns or {}
@@ -283,6 +337,14 @@ def h2_delisting_stress(bars: dict[str, pd.DataFrame], W: pd.DataFrame, position
         shock = H2_DELISTING_STRESS_LONG if w > 0 else H2_DELISTING_STRESS_SHORT
         charge = w * shock if w > 0 else 0.0
         overlay.iloc[li + 1] += charge
-        out.append(dict(r, stress="counted: null delisting return", stress_weight=w, stress_shock=shock,
-                        stress_charge=charge, stress_booking_session=str(dates[li + 1].date())))
+        out.append(
+            dict(
+                r,
+                stress="counted: null delisting return",
+                stress_weight=w,
+                stress_shock=shock,
+                stress_charge=charge,
+                stress_booking_session=str(dates[li + 1].date()),
+            )
+        )
     return overlay, out

@@ -1,7 +1,9 @@
 """Point-in-time universe and eligibility (pre-registered rules)."""
+
 from __future__ import annotations
 
-from typing import Any, Iterable
+from collections.abc import Iterable
+from typing import Any
 
 import pandas as pd
 
@@ -30,12 +32,17 @@ def subtract_intervals(iv: Interval, cuts: list[Interval]) -> list[Interval]:
     return out
 
 
-def build_membership(pm: pd.DataFrame, listing: pd.DataFrame, reused_tickers: dict[str, Any],
-                     missing_names: dict[str, Any], *,
-                     lineage_excl: Iterable[str] = (), dev_universe: Iterable[str] | None = None,
-                     final_list: dict[str, Any] | None = None,
-                     listing_overlap_treatment: dict[str, str] | None = None
-                     ) -> tuple[pd.DataFrame, dict[str, Any]]:
+def build_membership(
+    pm: pd.DataFrame,
+    listing: pd.DataFrame,
+    reused_tickers: dict[str, Any],
+    missing_names: dict[str, Any],
+    *,
+    lineage_excl: Iterable[str] = (),
+    dev_universe: Iterable[str] | None = None,
+    final_list: dict[str, Any] | None = None,
+    listing_overlap_treatment: dict[str, str] | None = None,
+) -> tuple[pd.DataFrame, dict[str, Any]]:
     """PIT membership clipped to listing windows, minus reused-ticker original-member periods,
     minus missing names, minus ETFs, minus identity exclusions. Returns (mem, receipt).
 
@@ -43,13 +50,16 @@ def build_membership(pm: pd.DataFrame, listing: pd.DataFrame, reused_tickers: di
     listing: symbol, ipoDate, delistingDate ('null' / NaN = still listed), listing_source (active|delisted)
     """
     treatment = dict(listing_overlap_treatment or {})
-    r18_cuts = {t["ticker"]: [(pd.Timestamp(a), pd.Timestamp(b) if b else pd.NaT)
-                              for a, b in t["original_member_periods"]] for t in reused_tickers["tickers"]}
+    r18_cuts = {
+        t["ticker"]: [(pd.Timestamp(a), pd.Timestamp(b) if b else pd.NaT) for a, b in t["original_member_periods"]]
+        for t in reused_tickers["tickers"]
+    }
     m14_set = {t["ticker"] for t in missing_names["tickers"]}
     ls = listing.copy()
     lineage = set(lineage_excl)
-    both = (set(ls.loc[ls["listing_source"] == "active", "symbol"])
-            & set(ls.loc[ls["listing_source"] == "delisted", "symbol"]))
+    both = set(ls.loc[ls["listing_source"] == "active", "symbol"]) & set(
+        ls.loc[ls["listing_source"] == "delisted", "symbol"]
+    )
     in_uni = both & set(pm["symbol"]) & (set(dev_universe) if dev_universe is not None else set(pm["symbol"]))
     fl = final_list or {}
     fl_excl: dict[str, str] = dict(fl.get("excluded", {}))
@@ -57,8 +67,9 @@ def build_membership(pm: pd.DataFrame, listing: pd.DataFrame, reused_tickers: di
     in_uni -= set(r18_cuts) | m14_set | lineage | set(ETFS) | set(fl_excl)
     uncovered = sorted(in_uni - set(treatment) - fl_kept)
     if uncovered:
-        raise Blocked(f"REFUSING: {len(uncovered)} in-universe symbols in both listing sources with no "
-                      f"treatment: {uncovered}")
+        raise Blocked(
+            f"REFUSING: {len(uncovered)} in-universe symbols in both listing sources with no treatment: {uncovered}"
+        )
     ls["ipo"] = pd.to_datetime(ls["ipoDate"].replace({"null": None}), errors="coerce")
     ls["dl"] = pd.to_datetime(ls["delistingDate"].replace({"null": None}), errors="coerce")
     windows: dict[str, list[tuple[Any, Any]]] = {}
@@ -69,12 +80,19 @@ def build_membership(pm: pd.DataFrame, listing: pd.DataFrame, reused_tickers: di
         windows[str(sym)] = wl
     rows: list[dict[str, Any]] = []
     rec: dict[str, Any] = {
-        "reused_removed": [], "missing_gap": [], "no_listing_record": [], "etf_rows_dropped": [],
-        "listing_clipped": [], "lineage_excl_dropped": [], "final_list_sha256": fl.get("sha256"),
-        "final_list_excluded": [], "final_list_kept": sorted(fl_kept),
+        "reused_removed": [],
+        "missing_gap": [],
+        "no_listing_record": [],
+        "etf_rows_dropped": [],
+        "listing_clipped": [],
+        "lineage_excl_dropped": [],
+        "final_list_sha256": fl.get("sha256"),
+        "final_list_excluded": [],
+        "final_list_kept": sorted(fl_kept),
         "final_list_kept_covered_overlap": sorted(in_uni & fl_kept),
-        "after_boundary_member_rows": (sorted(pm.loc[pm["after_boundary"].astype(bool), "symbol"])
-                                       if "after_boundary" in pm.columns else []),
+        "after_boundary_member_rows": (
+            sorted(pm.loc[pm["after_boundary"].astype(bool), "symbol"]) if "after_boundary" in pm.columns else []
+        ),
     }
     for sym, start_raw, end_raw in zip(pm["symbol"], pm["start_date_filled"], pm["end_date"]):
         s = str(sym)
@@ -89,8 +107,9 @@ def build_membership(pm: pd.DataFrame, listing: pd.DataFrame, reused_tickers: di
             rec["etf_rows_dropped"].append(s)
             continue
         if s in m14_set:
-            rec["missing_gap"].append({"symbol": s, "start": str(iv[0].date()),
-                                       "end": None if pd.isna(iv[1]) else str(iv[1].date())})
+            rec["missing_gap"].append(
+                {"symbol": s, "start": str(iv[0].date()), "end": None if pd.isna(iv[1]) else str(iv[1].date())}
+            )
             continue
         parts = [iv]
         if s in r18_cuts:
@@ -135,5 +154,4 @@ def build_elig(bars: dict[str, pd.DataFrame], mem: pd.DataFrame) -> pd.DataFrame
         e = pd.Timestamp(r.end_date) if pd.notna(r.end_date) else dates[-1] + pd.Timedelta(days=1)
         M.loc[(dates >= s) & (dates < e), r.symbol] = True
     ELIG = M & (PX >= 5) & (ADV20 >= 2e7) & ~ZV & ~JUMP20 & R.notna()
-    ELIG = ELIG & (R.rolling(252, min_periods=252).count() >= 252)
-    return ELIG
+    return ELIG & (R.rolling(252, min_periods=252).count() >= 252)

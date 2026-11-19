@@ -8,6 +8,7 @@ Refuses (exit 1, or 18 for an identity-list mismatch) unless every DEV input is 
 matches, the acceptance hash equals sha256(pre-registration) and its pin, and no row after the
 DEV read-time end survives. Holdout is not bound in this harness version and always refuses.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -74,7 +75,7 @@ def _write_out(cfg: HarnessConfig, name: str, results: dict[str, Any]) -> Path:
         raise Blocked("REFUSING: --out must be a plain *.json file name (written under out_dir).")
     outp = Path(cfg.out_dir) / name
     outp.parent.mkdir(parents=True, exist_ok=True)
-    with open(outp, "x") as f:   # no clobber
+    with open(outp, "x") as f:  # no clobber
         json.dump(results, f, indent=2, default=str)
     return outp
 
@@ -111,10 +112,15 @@ def _main(args: argparse.Namespace) -> int:
     if cfg.expected_lineage_exclusions is not None and len(lineage) != cfg.expected_lineage_exclusions:
         raise Blocked(f"REFUSING: expected {cfg.expected_lineage_exclusions} lineage exclusions, got {len(lineage)}.")
     mem, universe_receipt = build_membership(
-        loaders.load_parquet_pinned(cfg, "membership"), loaders.load_parquet_pinned(cfg, "listing_status"),
-        loaders.load_json_pinned(cfg, "reused_tickers"), loaders.load_json_pinned(cfg, "missing_names"),
-        lineage_excl=lineage, dev_universe=loaders.load_symbol_set(cfg, "dev_universe", ","),
-        final_list=final_list, listing_overlap_treatment=cfg.listing_overlap_treatment)
+        loaders.load_parquet_pinned(cfg, "membership"),
+        loaders.load_parquet_pinned(cfg, "listing_status"),
+        loaders.load_json_pinned(cfg, "reused_tickers"),
+        loaders.load_json_pinned(cfg, "missing_names"),
+        lineage_excl=lineage,
+        dev_universe=loaders.load_symbol_set(cfg, "dev_universe", ","),
+        final_list=final_list,
+        listing_overlap_treatment=cfg.listing_overlap_treatment,
+    )
     ELIG = build_elig(bars, mem)
     ev_raw = loaders.load_earnings(cfg, filter_end)
     ev = earliest_possible_index(ev_raw, pd.DatetimeIndex(bars["R"].index))
@@ -126,33 +132,59 @@ def _main(args: argparse.Namespace) -> int:
     last_exit_i = iloc_int(dates, eval_dates[-1]) - MARGIN
 
     results: dict[str, Any] = {
-        "stage": args.stage, "prereg_sha256": prereg_sha, "runner_version": RUNNER_VERSION,
-        "cost_path": cost_cfg.label, "borrow_rate_used": cost_cfg.borrow_rate, "is_pass_bar": cost_cfg.is_pass_bar,
-        "k_impact": cost_cfg.k_impact, "filter_end": str(filter_end), "eval": [str(eval_start), str(eval_end)],
-        "generated": datetime.now().isoformat(timespec="seconds"), "returns_computed": False,
-        "input_pins": {k: v.sha256 for k, v in cfg.inputs.items()}, "universe_receipt": universe_receipt,
-        "delisting_stress": bool(args.delisting_stress)}
+        "stage": args.stage,
+        "prereg_sha256": prereg_sha,
+        "runner_version": RUNNER_VERSION,
+        "cost_path": cost_cfg.label,
+        "borrow_rate_used": cost_cfg.borrow_rate,
+        "is_pass_bar": cost_cfg.is_pass_bar,
+        "k_impact": cost_cfg.k_impact,
+        "filter_end": str(filter_end),
+        "eval": [str(eval_start), str(eval_end)],
+        "generated": datetime.now().isoformat(timespec="seconds"),
+        "returns_computed": False,
+        "input_pins": {k: v.sha256 for k, v in cfg.inputs.items()},
+        "universe_receipt": universe_receipt,
+        "delisting_stress": bool(args.delisting_stress),
+    }
 
-    for idea in (["H1", "H2"] if args.idea == "both" else [args.idea]):
+    for idea in ["H1", "H2"] if args.idea == "both" else [args.idea]:
         stress_overlay = None
         if idea == "H1":
-            W, _ = signal_h1(bars, ELIG, subind, evidx, eval_start=eval_start, eval_end=eval_end,
-                             last_exit_i=last_exit_i)
+            W, _ = signal_h1(
+                bars, ELIG, subind, evidx, eval_start=eval_start, eval_end=eval_end, last_exit_i=last_exit_i
+            )
         else:
-            W, pos = signal_h2(bars, ELIG, subind, sector, ev_raw, evidx, unit=args.unit, eval_start=eval_start,
-                               eval_end=eval_end, last_exit_i=last_exit_i)
+            W, pos = signal_h2(
+                bars,
+                ELIG,
+                subind,
+                sector,
+                ev_raw,
+                evidx,
+                unit=args.unit,
+                eval_start=eval_start,
+                eval_end=eval_end,
+                last_exit_i=last_exit_i,
+            )
             results["H2_delisting_receipts"] = h2_delisting_receipts(bars, pos)
             if args.delisting_stress:
                 stress_overlay, results["H2_delisting_stress_receipts"] = h2_delisting_stress(bars, W, pos)
         if args.dry_run_signals:
-            results[idea] = {"signal_only": True, "n_days_nonzero": int((W.abs().sum(axis=1) > 0).sum()),
-                             "avg_gross": float(W.abs().sum(axis=1).mean())}
+            results[idea] = {
+                "signal_only": True,
+                "n_days_nonzero": int((W.abs().sum(axis=1) > 0).sum()),
+                "avg_gross": float(W.abs().sum(axis=1).mean()),
+            }
             continue
         runs: list[tuple[str, pd.DataFrame, pd.Series | None, list[dict[str, Any]] | None]] = [(idea, W, None, None)]
         if idea == "H1":
             roster = loaders.load_json_pinned(cfg, "h1_terminal_roster")
-            client = loaders.FileAcquirerCloses(cfg) if "acquirer_closes" in cfg.inputs and \
-                not cfg.inputs["acquirer_closes"].pending else None
+            client = (
+                loaders.FileAcquirerCloses(cfg)
+                if "acquirer_closes" in cfg.inputs and not cfg.inputs["acquirer_closes"].pending
+                else None
+            )
             runs = []
             for pth in H1_TERMINAL_PATHS:
                 W_adj, overlay, receipts = h1_terminal_bound(bars, W, roster, cost_cfg, client=client, path=pth)

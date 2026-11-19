@@ -9,9 +9,9 @@ from quant_research.strategies.statarb_h1h2 import splits as sp
 
 
 def test_preregistered_boundaries():
-    assert (sp.DEV0, sp.DEV1) == (date(2017, 1, 3), date(2021, 12, 31))
-    assert sp.EMBARGO1 == date(2022, 3, 29)
-    assert sp.HOLDOUT0 == date(2022, 3, 30)
+    assert (date(2017, 1, 3), date(2021, 12, 31)) == (sp.DEV0, sp.DEV1)
+    assert date(2022, 3, 29) == sp.EMBARGO1
+    assert date(2022, 3, 30) == sp.HOLDOUT0
     sp.check_split_invariants()
 
 
@@ -76,14 +76,17 @@ def test_final_list_ok(tmp_path):
     assert g.load_final_list(p, g.sha256_file(p))["sha256"] == g.sha256_file(p)
 
 
-@pytest.mark.parametrize("raw", [
-    HDR.replace(b"\n", b"\r\n") + b"AAA\tKEPT\t\tA\n",      # CR in header
-    HDR + b"AAA\tKEPT\t\tA\nAAA\tKEPT\t\tA\n",               # duplicate
-    HDR + b"AAA\tMAYBE\t\tA\n",                              # unknown decision
-    HDR + b"AAA\tEXCLUDED\t \tA\n",                          # excluded without reason
-    HDR + b"AAA\tKEPT\tA\n",                                 # 3 fields
-    HDR + b"\xff\xfe\n",                                     # not UTF-8
-])
+@pytest.mark.parametrize(
+    "raw",
+    [
+        HDR.replace(b"\n", b"\r\n") + b"AAA\tKEPT\t\tA\n",  # CR in header
+        HDR + b"AAA\tKEPT\t\tA\nAAA\tKEPT\t\tA\n",  # duplicate
+        HDR + b"AAA\tMAYBE\t\tA\n",  # unknown decision
+        HDR + b"AAA\tEXCLUDED\t \tA\n",  # excluded without reason
+        HDR + b"AAA\tKEPT\tA\n",  # 3 fields
+        HDR + b"\xff\xfe\n",  # not UTF-8
+    ],
+)
 def test_final_list_mismatch_rc18(raw):
     with pytest.raises(g.FinalListMismatch) as e:
         g.parse_final_list(raw)

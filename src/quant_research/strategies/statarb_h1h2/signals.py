@@ -1,4 +1,5 @@
 """H1 (bellwether lag) and H2 (earnings peer read-through) target weights. Frozen primary rules."""
+
 from __future__ import annotations
 
 import math
@@ -16,9 +17,21 @@ from .splits import LOAD0, NAME_CAP, SECTOR_ETF
 EvIdx = dict[str, np.ndarray]
 
 
-def signal_h1(bars: dict[str, pd.DataFrame], ELIG: pd.DataFrame, subind: pd.Series, evidx: EvIdx, *,
-              L: int = 60, z_thr: float = 1.0, n_lead: int = 2, min_grp: int = 4, hold_weeks: int = 4,
-              eval_start: date, eval_end: date, last_exit_i: int) -> tuple[pd.DataFrame, list[pd.Timestamp]]:
+def signal_h1(
+    bars: dict[str, pd.DataFrame],
+    ELIG: pd.DataFrame,
+    subind: pd.Series,
+    evidx: EvIdx,
+    *,
+    L: int = 60,
+    z_thr: float = 1.0,
+    n_lead: int = 2,
+    min_grp: int = 4,
+    hold_weeks: int = 4,
+    eval_start: date,
+    eval_end: date,
+    last_exit_i: int,
+) -> tuple[pd.DataFrame, list[pd.Timestamp]]:
     """H1 primary: L=60, |z|>=1, 4 weekly tranches, 2 leaders, min group 4.
 
     Weekly (last session of each W-FRI week): within each GICS sub-industry, the n_lead names
@@ -53,7 +66,7 @@ def signal_h1(bars: dict[str, pd.DataFrame], ELIG: pd.DataFrame, subind: pd.Seri
                 continue
             ms = sorted(ms, key=lambda s: -_at(MEDDV60, t, s))
             Ld, F = ms[:n_lead], ms[n_lead:]
-            win = R.iloc[i - 252 + 1:i + 1]
+            win = R.iloc[i - 252 + 1 : i + 1]
             d = win[Ld].mean(axis=1) - win[F].mean(axis=1)
             G = d.iloc[-L:].sum()
             sd = d.iloc[:-L].std() * math.sqrt(L)
@@ -95,14 +108,27 @@ def signal_h1(bars: dict[str, pd.DataFrame], ELIG: pd.DataFrame, subind: pd.Seri
         rows[t] = book
     Wk = pd.DataFrame(rows).T.fillna(0.0)
     W = Wk.reindex(dates).ffill().fillna(0.0)
-    W = W.clip(-NAME_CAP, NAME_CAP)   # name cap: trim, do not reallocate
+    W = W.clip(-NAME_CAP, NAME_CAP)  # name cap: trim, do not reallocate
     return W, list(Wk.index)
 
 
-def signal_h2(bars: dict[str, pd.DataFrame], ELIG: pd.DataFrame, subind: pd.Series, sector: pd.Series,
-              ev_all: pd.DataFrame, evidx: EvIdx, *, H: int = 40, thr: float = 1.5, unit: float = 0.005,
-              gap_sessions: int = 50, NMAX: int = 100, eval_start: date, eval_end: date,
-              last_exit_i: int) -> tuple[pd.DataFrame, list[dict[str, Any]]]:
+def signal_h2(
+    bars: dict[str, pd.DataFrame],
+    ELIG: pd.DataFrame,
+    subind: pd.Series,
+    sector: pd.Series,
+    ev_all: pd.DataFrame,
+    evidx: EvIdx,
+    *,
+    H: int = 40,
+    thr: float = 1.5,
+    unit: float = 0.005,
+    gap_sessions: int = 50,
+    NMAX: int = 100,
+    eval_start: date,
+    eval_end: date,
+    last_exit_i: int,
+) -> tuple[pd.DataFrame, list[dict[str, Any]]]:
     """H2 primary: H=40, |N|>=1.5, report window 50, unit 0.5%, max 100 live positions.
 
     On each exact-acceptance-time earnings session d0, reporters' residual reactions (vs the
@@ -126,7 +152,7 @@ def signal_h2(bars: dict[str, pd.DataFrame], ELIG: pd.DataFrame, subind: pd.Seri
 
     def hedge_etf(s: str, i: int) -> str:
         e = etf_of0.get(s)
-        if e is None or e not in R.columns or R[e].iloc[max(0, i - 252):i].notna().sum() < 252:
+        if e is None or e not in R.columns or R[e].iloc[max(0, i - 252) : i].notna().sum() < 252:
             return "SPY"
         return e
 
@@ -155,7 +181,7 @@ def signal_h2(bars: dict[str, pd.DataFrame], ELIG: pd.DataFrame, subind: pd.Seri
             reactions: list[tuple[str, float]] = []
             for s in reporters:
                 e = hedge_etf(s, i)
-                win = R[[s, e]].iloc[i - 252:i]
+                win = R[[s, e]].iloc[i - 252 : i]
                 if win.dropna().shape[0] < 200:
                     continue
                 y = win[s].to_numpy(dtype=float)
@@ -175,8 +201,11 @@ def signal_h2(bars: dict[str, pd.DataFrame], ELIG: pd.DataFrame, subind: pd.Seri
             N = float(np.mean([r for _, r in reactions]))
             if abs(N) < thr:
                 continue
-            members = [s for s in subind.index[(subind == gname).to_numpy(dtype=bool)]
-                       if s in ELIG.columns and bool(ELIG.iloc[i - 1].get(s, False))]
+            members = [
+                s
+                for s in subind.index[(subind == gname).to_numpy(dtype=bool)]
+                if s in ELIG.columns and bool(ELIG.iloc[i - 1].get(s, False))
+            ]
             cands: list[tuple[float, str, str, float]] = []
             for s in members:
                 if s in reporters:
@@ -185,17 +214,17 @@ def signal_h2(bars: dict[str, pd.DataFrame], ELIG: pd.DataFrame, subind: pd.Seri
                 if xs is None:
                     continue
                 lo, hi = i - gap_sessions, i - 2
-                if not np.any((xs >= lo) & (xs <= hi)):   # must have reported in [d0-50, d0-2]
+                if not np.any((xs >= lo) & (xs <= hi)):  # must have reported in [d0-50, d0-2]
                     continue
                 ent = i + 1
                 ex_i = ent + H
                 if ex_i > last_exit_i:
                     continue
                 if ev_in(evidx, s, i - 1, ex_i, margin=0):
-                    if np.any((xs >= i - 1) & (xs <= ex_i + 2)):   # no own row in [d0-1, exit+2]
+                    if np.any((xs >= i - 1) & (xs <= ex_i + 2)):  # no own row in [d0-1, exit+2]
                         continue
                 e = hedge_etf(s, i)
-                win = R[[s, e]].iloc[i - 252:i]   # follower beta excludes d0
+                win = R[[s, e]].iloc[i - 252 : i]  # follower beta excludes d0
                 y = win[s].to_numpy(dtype=float)
                 x_ = win[e].to_numpy(dtype=float)
                 mask = np.isfinite(y) & np.isfinite(x_)
@@ -212,8 +241,17 @@ def signal_h2(bars: dict[str, pd.DataFrame], ELIG: pd.DataFrame, subind: pd.Seri
                 if n_live >= NMAX:
                     break
                 sgn = np.sign(N)
-                positions.append({"sym": s, "etf": e, "w_sym": sgn * unit, "w_etf": -sgn * beta_f * unit,
-                                  "entry_i": i + 1, "exit_i": i + 1 + H, "N": N})
+                positions.append(
+                    {
+                        "sym": s,
+                        "etf": e,
+                        "w_sym": sgn * unit,
+                        "w_etf": -sgn * beta_f * unit,
+                        "entry_i": i + 1,
+                        "exit_i": i + 1 + H,
+                        "N": N,
+                    }
+                )
                 live.add(s)
                 n_live += 1
 

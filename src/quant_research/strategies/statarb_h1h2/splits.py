@@ -1,4 +1,5 @@
 """Pre-registered date boundaries and frozen strategy constants (do not edit; add a new version)."""
+
 from __future__ import annotations
 
 from datetime import date
@@ -10,20 +11,27 @@ HOLDOUT0, HOLDOUT1 = date(2022, 3, 30), date(2026, 10, 28)
 LOAD0 = date(2015, 12, 31)  # warm-up only; still filtered by the stage end
 
 SECTOR_ETF = {
-    "Information Technology": "XLK", "Financials": "XLF", "Energy": "XLE",
-    "Health Care": "XLV", "Consumer Discretionary": "XLY", "Consumer Staples": "XLP",
-    "Industrials": "XLI", "Utilities": "XLU", "Materials": "XLB",
-    "Real Estate": "XLRE", "Communication Services": "XLC",
+    "Information Technology": "XLK",
+    "Financials": "XLF",
+    "Energy": "XLE",
+    "Health Care": "XLV",
+    "Consumer Discretionary": "XLY",
+    "Consumer Staples": "XLP",
+    "Industrials": "XLI",
+    "Utilities": "XLU",
+    "Materials": "XLB",
+    "Real Estate": "XLRE",
+    "Communication Services": "XLC",
 }
 ETFS = frozenset(SECTOR_ETF.values()) | {"SPY", "AGG", "BND"}
 
 AUM = 10e6
-NAME_CAP = 0.095 / 0.58          # 9.5% of equity at 58% gross
-ATR_STOP_MULT = 3.0              # fixed ex ante
-BASKET_STOP_EQUITY = 0.01        # 1% of equity
-PARTICIPATION_CAP = 0.01         # 1% ADV; remainder carries
-MARGIN = 2                       # 2-session earnings margin
-BORROW_UNKNOWN_REQUIRED = 0.10   # required-path borrow on every historically unknown short (ETF hedges too)
+NAME_CAP = 0.095 / 0.58  # 9.5% of equity at 58% gross
+ATR_STOP_MULT = 3.0  # fixed ex ante
+BASKET_STOP_EQUITY = 0.01  # 1% of equity
+PARTICIPATION_CAP = 0.01  # 1% ADV; remainder carries
+MARGIN = 2  # 2-session earnings margin
+BORROW_UNKNOWN_REQUIRED = 0.10  # required-path borrow on every historically unknown short (ETF hedges too)
 H2_DELISTING_STRESS_LONG = -0.30
 H2_DELISTING_STRESS_SHORT = 0.0
 H1_TERMINAL_PATHS = ("A", "B")

@@ -1,4 +1,5 @@
 """Small synthetic fixtures for the H1/H2 harness tests. All values are fabricated."""
+
 from __future__ import annotations
 
 import hashlib
@@ -9,7 +10,7 @@ import numpy as np
 import pandas as pd
 
 STOCKS = ["AAA", "BBB", "CCC", "DDD", "EEE", "FFF"]
-LEADERS = ["AAA", "BBB"]           # highest dollar volume
+LEADERS = ["AAA", "BBB"]  # highest dollar volume
 ETF = "XLK"
 SUBIND = "Synthetic Semis"
 SECTOR = "Information Technology"
@@ -19,8 +20,13 @@ def sessions(start: str = "2016-01-04", end: str = "2017-12-29") -> pd.DatetimeI
     return pd.bdate_range(start, end)
 
 
-def make_bars(seed: int = 7, h1_gap: float = 0.004, h1_window: tuple[int, int] = (300, 360),
-              h2_shock_i: int | None = 330, h2_shock: float = 0.08) -> dict[str, pd.DataFrame]:
+def make_bars(
+    seed: int = 7,
+    h1_gap: float = 0.004,
+    h1_window: tuple[int, int] = (300, 360),
+    h2_shock_i: int | None = 330,
+    h2_shock: float = 0.08,
+) -> dict[str, pd.DataFrame]:
     """Wide bars: R / PX / VOL / TRI. Leaders outperform followers by h1_gap per day over h1_window;
     AAA and BBB jump by h2_shock on session h2_shock_i (an earnings reaction)."""
     rng = np.random.default_rng(seed)
@@ -32,10 +38,10 @@ def make_bars(seed: int = 7, h1_gap: float = 0.004, h1_window: tuple[int, int] =
     R["SPY"] = mkt
     a, b = h1_window
     for s in LEADERS:
-        R.iloc[a:b, R.columns.get_loc(s)] += h1_gap
+        R.iloc[a:b, list(R.columns).index(s)] += h1_gap
     if h2_shock_i is not None:
         for s in LEADERS:
-            R.iloc[h2_shock_i, R.columns.get_loc(s)] += h2_shock
+            R.iloc[[h2_shock_i], list(R.columns).index(s)] += h2_shock  # one-row slice: Series arithmetic
     R.iloc[0] = np.nan
     TRI = (1 + R.fillna(0)).cumprod() * 50.0
     PX = TRI.copy()
@@ -50,27 +56,38 @@ def membership() -> pd.DataFrame:
 
 
 def listing() -> pd.DataFrame:
-    return pd.DataFrame({"symbol": STOCKS, "ipoDate": "2000-01-03", "delistingDate": "null",
-                         "listing_source": "active"})
+    return pd.DataFrame(
+        {"symbol": STOCKS, "ipoDate": "2000-01-03", "delistingDate": "null", "listing_source": "active"}
+    )
 
 
 def gics() -> tuple[pd.Series, pd.Series]:
-    return (pd.Series(SUBIND, index=STOCKS, name="gics_sub_industry"),
-            pd.Series(SECTOR, index=STOCKS, name="gics_sector"))
+    return (
+        pd.Series(SUBIND, index=STOCKS, name="gics_sub_industry"),
+        pd.Series(SECTOR, index=STOCKS, name="gics_sector"),
+    )
 
 
-def earnings(dates: pd.DatetimeIndex, leader_idx: tuple[int, ...] = (204, 267, 330, 393, 456),
-             follower_offset: int = -10) -> pd.DataFrame:
+def earnings(
+    dates: pd.DatetimeIndex, leader_idx: tuple[int, ...] = (204, 267, 330, 393, 456), follower_offset: int = -10
+) -> pd.DataFrame:
     """Quarterly exact-time events: leaders on leader_idx, followers follower_offset sessions earlier."""
     rows = []
     for s in STOCKS:
         off = 0 if s in LEADERS else follower_offset
         for k in leader_idx:
             d = dates[k + off]
-            rows.append({"symbol": s, "source": "sec_8k", "timing_quality": "exact_acceptance_time",
-                         "announce_date_et": (d - pd.Timedelta(days=1)).date(),
-                         "reaction_session": d.date(), "first_tradable_session": d.date(),
-                         "knowledge_time_utc": pd.Timestamp(d.date()) - pd.Timedelta(hours=2)})
+            rows.append(
+                {
+                    "symbol": s,
+                    "source": "sec_8k",
+                    "timing_quality": "exact_acceptance_time",
+                    "announce_date_et": (d - pd.Timedelta(days=1)).date(),
+                    "reaction_session": d.date(),
+                    "first_tradable_session": d.date(),
+                    "knowledge_time_utc": pd.Timestamp(d.date()) - pd.Timedelta(hours=2),
+                }
+            )
     ev = pd.DataFrame(rows)
     ev["knowledge_time_utc"] = pd.to_datetime(ev["knowledge_time_utc"]).dt.tz_localize("UTC")
     return ev
@@ -80,6 +97,13 @@ def sha(p: Path) -> str:
     return hashlib.sha256(p.read_bytes()).hexdigest()
 
 
+def _stacked(wide: pd.DataFrame, name: str) -> pd.Series:
+    """Wide (date x symbol) frame to a long Series named `name`; columns are single-level, so stack gives a Series."""
+    s = wide.stack(future_stack=True)
+    assert isinstance(s, pd.Series)
+    return s.rename(name)
+
+
 def write_inputs(root: Path, *, tr_extra_rows: pd.DataFrame | None = None) -> dict[str, Path]:
     """Write every DEV input under root as small synthetic files; return name -> path."""
     import pyarrow as pa
@@ -87,11 +111,15 @@ def write_inputs(root: Path, *, tr_extra_rows: pd.DataFrame | None = None) -> di
 
     root.mkdir(parents=True, exist_ok=True)
     bars = make_bars()
-    long = (bars["R"].stack(future_stack=True).rename("ret_total_best").to_frame()
-            .join(bars["TRI"].stack(future_stack=True).rename("tr_index_best"))
-            .join(bars["PX"].stack(future_stack=True).rename("close_raw"))
-            .join(bars["VOL"].stack(future_stack=True).rename("volume_raw"))
-            .reset_index().rename(columns={"level_0": "session_date", "level_1": "symbol"}))
+    long = (
+        _stacked(bars["R"], "ret_total_best")
+        .to_frame()
+        .join(_stacked(bars["TRI"], "tr_index_best"))
+        .join(_stacked(bars["PX"], "close_raw"))
+        .join(_stacked(bars["VOL"], "volume_raw"))
+        .reset_index()
+        .rename(columns={"level_0": "session_date", "level_1": "symbol"})
+    )
     long.columns = ["session_date", "symbol", *long.columns[2:]]
     if tr_extra_rows is not None:
         long = pd.concat([long, tr_extra_rows], ignore_index=True)
@@ -105,15 +133,18 @@ def write_inputs(root: Path, *, tr_extra_rows: pd.DataFrame | None = None) -> di
     wpq("tr_dev_cut", long[["symbol", "session_date", "close_raw", "volume_raw", "ret_total_best", "tr_index_best"]])
     p["tr_dev_cut_sums"] = root / "SHA256SUMS"
     p["tr_dev_cut_sums"].write_text(f"{sha(p['tr_dev_cut'])}  {p['tr_dev_cut']}\n")
-    wpq("earnings_dev_cut", earnings(bars["R"].index))
+    wpq("earnings_dev_cut", earnings(pd.DatetimeIndex(bars["R"].index)))
     sub, sec = gics()
     wpq("universe_gics", pd.DataFrame({"symbol": STOCKS, "gics_sub_industry": sub.values, "gics_sector": sec.values}))
     m = membership()
     m["end_date"] = pd.Series([None] * len(m), dtype="datetime64[ns]")
     wpq("membership", m)
     wpq("listing_status", listing())
-    for name, obj in (("reused_tickers", {"tickers": []}), ("missing_names", {"tickers": []}),
-                      ("h1_terminal_roster", [])):
+    for name, obj in (
+        ("reused_tickers", {"tickers": []}),
+        ("missing_names", {"tickers": []}),
+        ("h1_terminal_roster", []),
+    ):
         p[name] = root / f"{name}.json"
         p[name].write_text(json.dumps(obj))
     p["identity_list"] = root / "identity.tsv"

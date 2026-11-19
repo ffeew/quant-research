@@ -22,11 +22,11 @@ def test_h1_followers_long_when_leaders_led():
     bars, E, sub, _, _, evidx, last = _setup()
     W, tr = signals.signal_h1(bars, E, sub, evidx, eval_start=DEV0, eval_end=DEV1, last_exit_i=last)
     assert tr
-    row = W.iloc[350]                                      # inside the injected leader-gap window
+    row = W.iloc[350]  # inside the injected leader-gap window
     assert (row[S.LEADERS] < 0).all() and (row[["CCC", "DDD", "EEE", "FFF"]] > 0).all()
-    assert np.isclose(row["AAA"], -NAME_CAP)               # name cap trims, does not reallocate
+    assert np.isclose(row["AAA"], -NAME_CAP)  # name cap trims, does not reallocate
     assert W.abs().max().max() <= NAME_CAP + 1e-12
-    assert (W.loc[: pd.Timestamp("2016-11-01")] == 0).all().all()   # nothing before the eval warm-up
+    assert (W.loc[: pd.Timestamp("2016-11-01")] == 0).all().all()  # nothing before the eval warm-up
 
 
 def test_h1_flips_sign_and_respects_threshold():
@@ -56,7 +56,7 @@ def test_h2_peer_readthrough():
     d = W.index
     assert (W["CCC"].iloc[331:371] == 0.005).all() and W["CCC"].iloc[330] == 0 and W["CCC"].iloc[371] == 0
     assert np.isclose(W["XLK"].iloc[340], sum(q["w_etf"] for q in pos))
-    assert d[p["entry_i"]] > d[330]                        # fill after the reaction session
+    assert d[p["entry_i"]] > d[330]  # fill after the reaction session
 
 
 def test_h2_no_trigger_without_shock_or_with_boundary_time():
@@ -65,15 +65,17 @@ def test_h2_no_trigger_without_shock_or_with_boundary_time():
     assert pos == [] or all(abs(p["N"]) >= 1.5 for p in pos)
     bars, E, sub, sec, ev, evidx, last = _setup()
     ev2 = ev.copy()
-    ev2["knowledge_time_utc"] = pd.to_datetime(ev2["reaction_session"]).dt.tz_localize("America/New_York") \
-        + pd.Timedelta(hours=16)
+    ev2["knowledge_time_utc"] = pd.to_datetime(ev2["reaction_session"]).dt.tz_localize(
+        "America/New_York"
+    ) + pd.Timedelta(hours=16)
     _, pos2 = signals.signal_h2(bars, E, sub, sec, ev2, evidx, eval_start=DEV0, eval_end=DEV1, last_exit_i=last)
     assert pos2 == []
 
 
 def test_h2_unit_and_max_positions():
     bars, E, sub, sec, ev, evidx, last = _setup()
-    _, pos = signals.signal_h2(bars, E, sub, sec, ev, evidx, unit=0.004, NMAX=2, eval_start=DEV0, eval_end=DEV1,
-                               last_exit_i=last)
+    _, pos = signals.signal_h2(
+        bars, E, sub, sec, ev, evidx, unit=0.004, NMAX=2, eval_start=DEV0, eval_end=DEV1, last_exit_i=last
+    )
     assert len(pos) == 2 and all(p["w_sym"] == 0.004 for p in pos)
-    assert [p["sym"] for p in pos] == ["CCC", "DDD"]       # ties broken by symbol
+    assert [p["sym"] for p in pos] == ["CCC", "DDD"]  # ties broken by symbol

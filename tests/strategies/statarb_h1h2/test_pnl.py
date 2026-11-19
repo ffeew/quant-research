@@ -32,10 +32,11 @@ def test_one_session_lag_zero_cost():
     b = _bars()
     W = pd.DataFrame(0.0, index=b["R"].index, columns=["A", "B"])
     W.iloc[5:10, 0] = 0.1
-    out = pnl.apply_costs_and_returns(b, W, pnl.build_cost_config("unknown_borrow_required"), idea="H1",
-                                      costs=ZeroCost())
+    out = pnl.apply_costs_and_returns(
+        b, W, pnl.build_cost_config("unknown_borrow_required"), idea="H1", costs=ZeroCost()
+    )
     g = out["daily"]["gross"]
-    assert g.iloc[4] == 0 and np.isclose(g.iloc[5], 0.1 * 0.01)   # weight at t=5 earns from t=6 (row 5 = date 6)
+    assert g.iloc[4] == 0 and np.isclose(g.iloc[5], 0.1 * 0.01)  # weight at t=5 earns from t=6 (row 5 = date 6)
     assert np.isclose(g.sum(), 5 * 0.1 * 0.01) and (out["daily"]["net"] == g).all()
 
 
@@ -101,8 +102,10 @@ def test_h1_terminal_short_vmax():
     W = pd.DataFrame(0.0, index=b["R"].index, columns=["A"])
     W.iloc[10:25, 0] = -0.05
     h = str(b["R"].index[27].date())
-    terms = {"h": h, "alternatives": [{"cash": 25.0, "ratio": 1.0, "acquirer_id": "ACQ",
-                                       "acquirer_identity_accepted": True}]}
+    terms = {
+        "h": h,
+        "alternatives": [{"cash": 25.0, "ratio": 1.0, "acquirer_id": "ACQ", "acquirer_identity_accepted": True}],
+    }
     roster = [{"symbol": "A", "identity_ok": True, "short_terms": terms}]
     cfg = pnl.build_cost_config("unknown_borrow_required")
     _, ov, rec = pnl.h1_terminal_bound(b, W, roster, cfg, client=Closes(), costs=ZeroCost())
@@ -121,10 +124,10 @@ def test_h2_delisting_base_and_stress():
     pos = [{"sym": "A", "etf": "XLK", "w_sym": 0.005, "w_etf": -0.004, "entry_i": 10, "exit_i": 28, "N": 2.0}]
     rec = pnl.h2_delisting_receipts(b, pos)
     assert len(rec) == 1 and rec[0]["last_close_session"] == str(b["R"].index[19].date())
-    ov, srec = pnl.h2_delisting_stress(b, W, pos)
+    ov, _srec = pnl.h2_delisting_stress(b, W, pos)
     assert np.isclose(ov.iloc[20], 0.005 * -0.30) and ov.sum() == ov.iloc[20]
     ov2, srec2 = pnl.h2_delisting_stress(b, W, pos, supplied_delist_returns={"A": -0.1})
     assert ov2.sum() == 0 and srec2[0]["stress"].startswith("not applied")
     short = [dict(pos[0], w_sym=-0.005)]
     ov3, _ = pnl.h2_delisting_stress(b, -W, short)
-    assert ov3.sum() == 0                                   # 0% for shorts
+    assert ov3.sum() == 0  # 0% for shorts

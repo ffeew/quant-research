@@ -1,4 +1,5 @@
 """Pinned loaders. Each verifies its pin before opening; parquet reads use read-time date filters."""
+
 from __future__ import annotations
 
 import csv
@@ -22,7 +23,8 @@ from .splits import EMBARGO1, LOAD0
 
 
 def _pq() -> Any:
-    import pyarrow.parquet as pq  # type: ignore[import-untyped]  # local import; pyarrow ships no stubs
+    import pyarrow.parquet as pq  # local import
+
     return pq
 
 
@@ -37,9 +39,11 @@ def load_bars_tr(cfg: HarnessConfig, filter_end: date, load_start: date = LOAD0)
     pq = _pq()
     if pq.read_table(p, columns=["session_date"], filters=[("session_date", ">", EMBARGO1)]).num_rows:
         raise Blocked("REFUSING: TR DEV cut holds rows after the embargo end (not a DEV-only cut).")
-    tr = pq.read_table(p, columns=["symbol", "session_date", "close_raw", "volume_raw", "ret_total_best",
-                                   "tr_index_best"],
-                       filters=[("session_date", "<=", filter_end)]).to_pandas()
+    tr = pq.read_table(
+        p,
+        columns=["symbol", "session_date", "close_raw", "volume_raw", "ret_total_best", "tr_index_best"],
+        filters=[("session_date", "<=", filter_end)],
+    ).to_pandas()
     tr["session_date"] = pd.to_datetime(tr["session_date"])
     tr = tr[(tr.session_date >= pd.Timestamp(load_start)) & (tr.session_date <= pd.Timestamp(filter_end))]
     assert_no_rows_after(tr.session_date, filter_end, "TR bars")
@@ -50,8 +54,7 @@ def bars_from_long(tr: pd.DataFrame) -> dict[str, pd.DataFrame]:
     def piv(col: str) -> pd.DataFrame:
         return tr.pivot(index="session_date", columns="symbol", values=col)
 
-    return {"R": piv("ret_total_best"), "TRI": piv("tr_index_best"), "PX": piv("close_raw"),
-            "VOL": piv("volume_raw")}
+    return {"R": piv("ret_total_best"), "TRI": piv("tr_index_best"), "PX": piv("close_raw"), "VOL": piv("volume_raw")}
 
 
 def load_earnings(cfg: HarnessConfig, filter_end: date) -> pd.DataFrame:
@@ -116,12 +119,14 @@ class FileAcquirerCloses:
 
     def sessions(self, start: pd.Timestamp, end: pd.Timestamp) -> pd.DatetimeIndex:
         self._guard(end)
-        import exchange_calendars as xcals  # type: ignore[import-untyped]  # ships no stubs
+        import exchange_calendars as xcals
+
         s = xcals.get_calendar("XNYS").sessions_in_range(pd.Timestamp(start).normalize(), pd.Timestamp(end).normalize())
         return pd.DatetimeIndex(s.tz_localize(None) if s.tz is not None else s)
 
     def accepted_acquirer_closes(self, acquirer_id: str, start: pd.Timestamp, end: pd.Timestamp) -> pd.Series:
         self._guard(end)
-        d = self._df[(self._df["symbol"] == acquirer_id) & (self._df.session_date >= start)
-                     & (self._df.session_date <= end)]
+        d = self._df[
+            (self._df["symbol"] == acquirer_id) & (self._df.session_date >= start) & (self._df.session_date <= end)
+        ]
         return pd.Series(d["close"].astype(float).values, index=d.session_date, name=acquirer_id).sort_index()

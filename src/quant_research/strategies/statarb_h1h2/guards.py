@@ -1,4 +1,5 @@
 """Fail-closed checks: sha256 pins, SUMS lines, acceptance hash, identity list, leakage guards."""
+
 from __future__ import annotations
 
 import hashlib
@@ -101,8 +102,9 @@ def verify_sums_dir(d: str | Path, sums_sha: str, sums_name: str = "SHA256SUMS")
     return listed
 
 
-def require_acceptance_hash(provided: str | None, prereg_path: str | Path | None, prereg_pin: str | None,
-                            stage: str) -> str:
+def require_acceptance_hash(
+    provided: str | None, prereg_path: str | Path | None, prereg_pin: str | None, stage: str
+) -> str:
     """Any return-computing stage needs --acceptance-hash == sha256(prereg) == configured pin."""
     if not provided:
         raise Blocked(f"REFUSING --stage {stage}: pass --acceptance-hash <sha256 of the pre-registration>.")
@@ -127,7 +129,7 @@ def parse_final_list(raw: bytes) -> dict[str, object]:
     if not raw.startswith(FINAL_LIST_HEADER):
         raise FinalListMismatch(f"REFUSING: identity list header bytes != {FINAL_LIST_HEADER!r}.")
     try:
-        body = raw[len(FINAL_LIST_HEADER):].decode("utf-8")
+        body = raw[len(FINAL_LIST_HEADER) :].decode("utf-8")
     except UnicodeDecodeError:
         raise FinalListMismatch("REFUSING: identity list body is not UTF-8.") from None
     rows = [line.split("\t") for line in body.split("\n") if line.strip()]

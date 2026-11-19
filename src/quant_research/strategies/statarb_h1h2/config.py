@@ -4,6 +4,7 @@ Lookup order for the config file: --config, then $QR_STATARB_H1H2_CONFIG, then t
 example ``configs/statarb_h1h2.toml`` (all pins PENDING, so the harness refuses to run).
 Path values may use ${QR_DATA_DIR} / ${QR_DESK_DIR}; relative paths resolve under QR_DATA_DIR.
 """
+
 from __future__ import annotations
 
 import os
@@ -22,22 +23,22 @@ DEFAULT_CONFIG = CONFIG_DIR / "statarb_h1h2.toml"
 
 # Every input the DEV run may open. Names are roles, not file names.
 DEV_INPUTS = (
-    "prereg",               # pre-registration document (acceptance hash = its sha256)
-    "tr_dev_cut",           # DEV-only cut of the primary total-return file (no rows after embargo end)
-    "tr_dev_cut_sums",      # SHA256SUMS that lists the cut as '<sha>  <path>'
-    "earnings_dev_cut",     # earnings events, DEV-only cut
-    "universe_gics",        # symbol, gics_sub_industry, gics_sector
-    "membership",           # PIT index membership: symbol, start_date_filled, end_date [, after_boundary]
-    "listing_status",       # symbol, ipoDate, delistingDate, listing_source (active|delisted)
-    "reused_tickers",       # JSON {"tickers": [{"ticker", "original_member_periods": [[start, end|null]]}]}
-    "missing_names",        # JSON {"tickers": [{"ticker"}]}
-    "identity_list",        # TSV identity list (symbol, decision, reasons, issuer_name)
+    "prereg",  # pre-registration document (acceptance hash = its sha256)
+    "tr_dev_cut",  # DEV-only cut of the primary total-return file (no rows after embargo end)
+    "tr_dev_cut_sums",  # SHA256SUMS that lists the cut as '<sha>  <path>'
+    "earnings_dev_cut",  # earnings events, DEV-only cut
+    "universe_gics",  # symbol, gics_sub_industry, gics_sector
+    "membership",  # PIT index membership: symbol, start_date_filled, end_date [, after_boundary]
+    "listing_status",  # symbol, ipoDate, delistingDate, listing_source (active|delisted)
+    "reused_tickers",  # JSON {"tickers": [{"ticker", "original_member_periods": [[start, end|null]]}]}
+    "missing_names",  # JSON {"tickers": [{"ticker"}]}
+    "identity_list",  # TSV identity list (symbol, decision, reasons, issuer_name)
     "identity_basis_sums",  # accepted identity-basis SUMS (hash-only gate)
-    "lineage_exclusions",   # TSV with a symbol column
-    "dev_universe",         # CSV with a symbol column
-    "h1_terminal_roster",   # JSON list of unresolved terminal rows (H1 adverse bound)
+    "lineage_exclusions",  # TSV with a symbol column
+    "dev_universe",  # CSV with a symbol column
+    "h1_terminal_roster",  # JSON list of unresolved terminal rows (H1 adverse bound)
 )
-OPTIONAL_INPUTS = ("acquirer_closes",)   # parquet: symbol, session_date, close (H1 short V_max)
+OPTIONAL_INPUTS = ("acquirer_closes",)  # parquet: symbol, session_date, close (H1 short V_max)
 
 
 @dataclass(frozen=True)
@@ -74,7 +75,7 @@ def _expand(v: str) -> str:
     s = string.Template(v).safe_substitute(QR_DATA_DIR=qr_paths.DATA_DIR, QR_DESK_DIR=qr_paths.DESK_DIR)
     if "$" in s:
         raise Blocked(f"REFUSING: unresolved variable in config path {v!r}.")
-    return s if os.path.isabs(s) else os.path.join(qr_paths.DATA_DIR, s)
+    return s if Path(s).is_absolute() else os.path.join(qr_paths.DATA_DIR, s)
 
 
 def load_config(path: str | os.PathLike[str] | None = None) -> HarnessConfig:
@@ -94,7 +95,10 @@ def load_config(path: str | os.PathLike[str] | None = None) -> HarnessConfig:
             raise Blocked(f"REFUSING: input {name!r} sha256 is not 64 hex chars.")
         inputs[name] = Pin(_expand(str(spec.get("path", PENDING))), PENDING if is_pending(sha) else sha)
     n_lin = h.get("expected_lineage_exclusions")
-    return HarnessConfig(inputs=inputs, out_dir=_expand(str(h.get("out_dir", "outputs/statarb_h1h2"))),
-                         expected_lineage_exclusions=int(n_lin) if n_lin is not None else None,
-                         listing_overlap_treatment=dict(h.get("listing_overlap_treatment") or {}),
-                         source=src.name)
+    return HarnessConfig(
+        inputs=inputs,
+        out_dir=_expand(str(h.get("out_dir", "outputs/statarb_h1h2"))),
+        expected_lineage_exclusions=int(n_lin) if n_lin is not None else None,
+        listing_overlap_treatment=dict(h.get("listing_overlap_treatment") or {}),
+        source=src.name,
+    )

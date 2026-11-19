@@ -36,8 +36,10 @@ def test_config_validation(tmp_path, monkeypatch):
         C.load_config(bad)
     monkeypatch.setattr(C.qr_paths, "DATA_DIR", str(tmp_path / "store"))
     ok = tmp_path / "ok.toml"
-    ok.write_text('[harness]\nout_dir = "${QR_DATA_DIR}/o"\n[harness.inputs.prereg]\npath = "p/PREREG.md"\n'
-                  f'sha256 = "{"A" * 64}"\n')
+    ok.write_text(
+        '[harness]\nout_dir = "${QR_DATA_DIR}/o"\n[harness.inputs.prereg]\npath = "p/PREREG.md"\n'
+        f'sha256 = "{"A" * 64}"\n'
+    )
     cfg = C.load_config(ok)
     assert cfg.inputs["prereg"] == C.Pin(str(tmp_path / "store" / "p" / "PREREG.md"), "a" * 64)
     assert cfg.out_dir == str(tmp_path / "store" / "o")
@@ -56,7 +58,7 @@ def _args(cfg, files, *extra):
 
 
 def test_end_to_end_dry_run_signals(synth_cfg, capsys):
-    root, files, cfg = synth_cfg
+    _root, files, cfg = synth_cfg
     assert run.main(_args(cfg, files, "--dry-run-signals")) == 0
     res = json.loads(capsys.readouterr().out)
     assert res["returns_computed"] is False and res["eval"] == ["2017-01-03", "2021-12-31"]
@@ -76,11 +78,14 @@ def test_end_to_end_returns_and_out_no_clobber(synth_cfg, capsys):
     assert run.main(_args(cfg, files, "--out", "../escape.json")) == 1
 
 
-@pytest.mark.parametrize("extra,code", [
-    (["--stage", "holdout"], 1),
-    (["--acceptance-hash", "0" * 64], 1),
-    (["--idea", "H1", "--delisting-stress"], 1),
-])
+@pytest.mark.parametrize(
+    "extra,code",
+    [
+        (["--stage", "holdout"], 1),
+        (["--acceptance-hash", "0" * 64], 1),
+        (["--idea", "H1", "--delisting-stress"], 1),
+    ],
+)
 def test_refusals(synth_cfg, extra, code):
     _, files, cfg = synth_cfg
     assert run.main(_args(cfg, files) + extra) == code
@@ -98,8 +103,16 @@ def test_pin_mismatch_and_identity_rc18(synth_cfg):
 
 
 def test_tr_cut_with_post_embargo_row_refused(tmp_path):
-    extra = pd.DataFrame({"symbol": ["AAA"], "session_date": [pd.Timestamp("2022-03-30")], "close_raw": [50.0],
-                          "volume_raw": [1e6], "ret_total_best": [0.0], "tr_index_best": [50.0]})
+    extra = pd.DataFrame(
+        {
+            "symbol": ["AAA"],
+            "session_date": [pd.Timestamp("2022-03-30")],
+            "close_raw": [50.0],
+            "volume_raw": [1e6],
+            "ret_total_best": [0.0],
+            "tr_index_best": [50.0],
+        }
+    )
     files = S.write_inputs(tmp_path / "in", tr_extra_rows=extra)
     cfg = S.write_config(tmp_path, files)
     assert run.main(_args(cfg, files, "--dry-run-signals")) == 1

@@ -1,4 +1,5 @@
 """Typed scalar access on unique-indexed float frames (pandas-stubs type these as any scalar)."""
+
 from __future__ import annotations
 
 from typing import Any

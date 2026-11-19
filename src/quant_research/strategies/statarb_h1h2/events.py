@@ -1,4 +1,5 @@
 """Earnings-event indexing (earliest possible session, blackout windows)."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -19,8 +20,7 @@ def earliest_possible_index(ev: pd.DataFrame, dates: pd.DatetimeIndex) -> pd.Dat
     ev["d0"] = pd.to_datetime(ev.reaction_session.fillna(ev.first_tradable_session))
     ann = pd.to_datetime(ev.announce_date_et)
     unk = ev.timing_quality.astype(str).str.startswith("unknown")
-    fb = (ev.source.astype(str).str.contains("fallback")
-          | ev.timing_quality.astype(str).str.startswith("periodic"))
+    fb = ev.source.astype(str).str.contains("fallback") | ev.timing_quality.astype(str).str.startswith("periodic")
     ev.loc[unk, "d0"] = np.minimum(ev.loc[unk, "d0"], ann[unk])
     ev["_ix"] = np.searchsorted(dates.to_numpy(), ev["d0"].to_numpy().astype("datetime64[ns]"))
     fbm = fb.to_numpy(dtype=bool)
