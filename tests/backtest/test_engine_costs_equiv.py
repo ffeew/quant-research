@@ -76,9 +76,7 @@ def _copy_panel(panel: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
 def _run(
     mod: Any, panel: dict[str, pd.DataFrame], targets: dict[pd.Timestamp, pd.Series], rf: pd.Series, **kw: Any
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame] | None:
-    result: tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame] | None = mod.simulate(
-        _copy_panel(panel), targets, rf, **kw
-    )
+    result: tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame] | None = mod.simulate(_copy_panel(panel), targets, rf, **kw)
     return result
 
 

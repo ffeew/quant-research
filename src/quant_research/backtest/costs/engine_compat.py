@@ -64,7 +64,6 @@ class TradeCostResult(TypedDict):
     warnings: list[str]
 
 
-
 def liq_bucket(adv_usd: float) -> str:
     for name, (lo, *_rest) in BUCKETS.items():
         if adv_usd >= lo:
@@ -175,4 +174,3 @@ def trade_cost(
         "sigma_daily": sigma_daily,
         "warnings": warnings,
     }
-
