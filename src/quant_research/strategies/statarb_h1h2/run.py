@@ -168,7 +168,7 @@ def _main(args: argparse.Namespace) -> int:
                 eval_end=eval_end,
                 last_exit_i=last_exit_i,
             )
-            results["H2_delisting_receipts"] = h2_delisting_receipts(bars, pos)
+            results["H2_delisting_receipts"] = h2_delisting_receipts(bars, W, pos)
             if args.delisting_stress:
                 stress_overlay, results["H2_delisting_stress_receipts"] = h2_delisting_stress(bars, W, pos)
         if args.dry_run_signals:

@@ -180,7 +180,7 @@ def test_h2_delisting_base_and_stress():
     W = pd.DataFrame(0.0, index=b["R"].index, columns=["A", "XLK"])
     W.iloc[10:28, 0] = 0.005
     pos = [{"sym": "A", "etf": "XLK", "w_sym": 0.005, "w_etf": -0.004, "entry_i": 10, "exit_i": 28, "N": 2.0}]
-    rec = pnl.h2_delisting_receipts(b, pos)
+    rec = pnl.h2_delisting_receipts(b, W, pos)
     assert len(rec) == 1 and rec[0]["last_close_session"] == str(b["R"].index[19].date())
     ov, _srec = pnl.h2_delisting_stress(b, W, pos)
     assert np.isclose(ov.iloc[20], 0.005 * -0.30) and ov.sum() == ov.iloc[20]
@@ -318,7 +318,7 @@ def test_one_last_print_definition():
     W = pd.DataFrame(0.0, index=b["R"].index, columns=["A", "B"])
     W.iloc[10:28, 0] = 0.005
     pos = [{"sym": "A", "etf": "XLK", "w_sym": 0.005, "w_etf": 0.0, "entry_i": 10, "exit_i": 28, "N": 2.0}]
-    assert pnl.h2_delisting_receipts(b, pos)[0]["last_close_session"] == str(b["R"].index[19].date())
+    assert pnl.h2_delisting_receipts(b, W, pos)[0]["last_close_session"] == str(b["R"].index[19].date())
 
 
 def test_exit_cost_is_charged_at_the_true_last_print():
@@ -349,3 +349,30 @@ def test_nothing_trades_on_a_no_print_day():
     assert out["daily"]["tc"].loc[d[16]] == 0 and np.isclose(out["daily"]["tc"].loc[d[17]], 0.1 * 10 / 1e4)
     b["PX"].iloc[15, 0] = 0.0  # a zero price is no print either
     assert pnl.held_positions(b, W)["A"].iloc[16] == 0
+
+
+def test_h2_receipts_and_stress_follow_the_held_remainder():
+    b = _thin_terminal_bars()  # A's last print is close 19; 1% ADV = 5e-4 of AUM per session
+    d = b["R"].index
+    # (a) capped exit: planned exit at 18 (before the last print), 2e-4 still held past it
+    W = pd.DataFrame(0.0, index=d, columns=["A", "XLK"])
+    W.iloc[12:18, 0] = 0.0012
+    pos = [{"sym": "A", "etf": "XLK", "w_sym": 0.0012, "w_etf": 0.0, "entry_i": 12, "exit_i": 18, "N": 2.0}]
+    rec = pnl.h2_delisting_receipts(b, W, pos)
+    assert len(rec) == 1 and np.isclose(rec[0]["held_weight"], 0.0002) and rec[0]["held_past_planned_exit"]
+    ov, srec = pnl.h2_delisting_stress(b, W, pos)
+    assert np.isclose(ov.iloc[20], 0.0002 * -0.30) and np.isclose(ov.sum(), ov.iloc[20])
+    assert np.isclose(srec[0]["stress_weight"], 0.0002)
+    # (b) last print at exit_i - 1: the exit is ordered at close 20, which has no print
+    W2 = pd.DataFrame(0.0, index=d, columns=["A", "XLK"])
+    W2.iloc[12:20, 0] = 0.001
+    pos2 = [dict(pos[0], w_sym=0.001, exit_i=20)]
+    rec2 = pnl.h2_delisting_receipts(b, W2, pos2)
+    assert len(rec2) == 1 and np.isclose(rec2[0]["held_weight"], 0.001)
+    ov2, _ = pnl.h2_delisting_stress(b, W2, pos2)
+    assert np.isclose(ov2.iloc[20], 0.001 * -0.30)
+    # (c) fully exited at the last print: nothing held past it, so no receipt and no stress
+    W3 = pd.DataFrame(0.0, index=d, columns=["A", "XLK"])
+    W3.iloc[12:19, 0] = 0.0004
+    pos3 = [dict(pos[0], w_sym=0.0004, exit_i=19)]
+    assert pnl.h2_delisting_receipts(b, W3, pos3) == [] and pnl.h2_delisting_stress(b, W3, pos3)[0].sum() == 0
