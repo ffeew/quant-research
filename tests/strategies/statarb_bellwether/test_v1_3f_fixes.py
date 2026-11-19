@@ -117,3 +117,49 @@ def test_b3_terminal_bound_borrow_overlay_accrues_calendar_days(mod: Any) -> Non
     per = -ov.iloc[401:].to_numpy() / gaps  # borrow-only sessions after booking
     assert np.allclose(per, 0.01 * cfg.borrow_rate / 360.0)  # per calendar day, weekends included
     assert (gaps == 3).any()
+
+
+def _delisting(n: int = 30, vol: float = 1e4) -> dict[str, pd.DataFrame]:
+    b = _flat(n=n, vol=vol)  # A: $50, ADV20 $500k at vol 1e4, so 1% = 5e-4 of AUM per session
+    b["PX"].iloc[20:, 0] = np.nan  # last print at session 19
+    b["VOL"].iloc[20:, 0] = 0.0
+    b["R"].iloc[20:, 0] = np.nan
+    return b
+
+
+def test_round2_h1_bound_applies_to_capped_exit_still_held_at_delisting(mod: Any) -> None:
+    b = _delisting()
+    d = b["R"].index
+    W = pd.DataFrame({"A": 0.0}, index=d)
+    W.iloc[12:17, 0] = 12_000 / float(mod.AUM)  # entry fills 5k, 5k, 2k; exit from row 17 is capped
+    step = 5_000 / float(mod.AUM)
+    held = mod.held_positions(b, W)["A"]
+    assert np.isclose(held.iloc[15], 12_000 / float(mod.AUM)) and np.isclose(held.iloc[19], 2_000 / float(mod.AUM))
+    cfg = mod.build_cost_config("unknown_borrow_required")
+    Wa, ov, rec = mod.h1_terminal_bound(b, W, [{"symbol": "A", "identity_ok": True}], cfg)
+    assert W["A"].iloc[19] == 0 and step > 0  # target already flat at tau, but 2k is still held
+    assert len(rec) == 1 and np.isclose(rec[0]["weight"], 2_000 / float(mod.AUM))
+    assert np.isclose(ov.iloc[20], -2_000 / float(mod.AUM)) and np.isclose(ov.sum(), ov.iloc[20])  # -100% of held
+    after = mod.held_positions(b, Wa)["A"]
+    assert after.iloc[20:].eq(0).all()  # settled at the last close once bound
+
+
+def test_round2_no_print_name_cannot_trade(mod: Any) -> None:
+    b = _flat(vol=1e7)
+    d = b["R"].index
+    b["PX"].iloc[14:17, 0] = np.nan  # suspended three sessions, prints again after
+    W = pd.DataFrame({"A": 0.0}, index=d)
+    W.iloc[11:13, 0] = 0.1
+    held = mod.held_positions(b, W)["A"]
+    assert np.isclose(held.iloc[14:17], 0.1).all() and held.iloc[17] == 0
+
+
+def test_round2_h2_stress_applies_to_held_position(mod: Any) -> None:
+    b = _delisting()
+    d = b["R"].index
+    W = pd.DataFrame({"A": 0.0}, index=d)
+    W.iloc[17:25, 0] = 12_000 / float(mod.AUM)  # capped entry: 10k held when A stops printing
+    pos = [{"sym": "A", "etf": "XLK", "w_sym": 12_000 / float(mod.AUM), "w_etf": 0.0, "entry_i": 17, "exit_i": 25}]
+    ov, srec = mod.h2_delisting_stress(b, W, pos)
+    assert np.isclose(srec[0]["stress_weight"], 10_000 / float(mod.AUM))
+    assert np.isclose(ov.iloc[20], -0.30 * 10_000 / float(mod.AUM)) and np.isclose(ov.sum(), ov.iloc[20])
