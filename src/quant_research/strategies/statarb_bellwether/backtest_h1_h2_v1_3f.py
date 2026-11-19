@@ -657,10 +657,16 @@ def last_print_index(bars: dict[str, Any], s: str, tp: pd.DataFrame | None = Non
 
 
 def require_aligned(bars: dict[str, Any], W: pd.DataFrame) -> None:
-    """Fail closed when a weight session is not a price session (it would silently never fill)."""
-    missing = W.index.difference(bars["PX"].index)
-    if len(missing):
-        raise Blocked(f"BLOCK: {len(missing)} weight session(s) not in the price index, e.g. {missing[0]!r}.")
+    """Fail closed unless the weight index equals the price index (same sessions, same order): a
+    weight session with no price row would silently never fill, and a price session with no weight
+    row would silently skip a session's return and borrow."""
+    if not W.index.equals(bars["PX"].index):
+        extra = W.index.difference(bars["PX"].index)
+        absent = bars["PX"].index.difference(W.index)
+        raise Blocked(
+            f"BLOCK: weight index != price index ({len(extra)} weight session(s) not in the price index, "
+            f"{len(absent)} price session(s) not in the weight index, or a different order)."
+        )
 
 
 def h2_delisting_receipts(
@@ -1349,7 +1355,7 @@ def signal_h2(
 FORCED_CUT = "zero_adv_cut"  # cut toward 0 with no usable ADV (cap 0): allowed, never a grow
 FORCED_SETTLEMENT = "post_last_print_settlement"  # held remainder closed at the last close
 # Stress cost on forced trades: STRESS_ONE_WAY_COST_MULT x the ONE-WAY cost of that trade, priced
-# with no ADV (adv_shares None). 2.0 is a desk choice for the one-way stress; it is deliberately
+# with no ADV (adv_shares None). 2.0 is a fixed design choice for the one-way stress; it is deliberately
 # NOT the shared cost model's net_edge stress_mult, a round-trip break-even multiple, reused here.
 STRESS_ONE_WAY_COST_MULT = 2.0
 
@@ -1421,7 +1427,7 @@ def _fills(bars: dict[str, Any], W: pd.DataFrame) -> Iterator[tuple[Any, Any, pd
             adv_sh = (adv / px) if (isinstance(adv, float) and adv > 0) else None
             if adv_sh is None:
                 # no usable ADV: cap 0, never left uncapped. It may not grow, but may always be cut
-                # toward 0 (the fund manager's ruling), at the stress cost.
+                # toward 0, at the stress cost.
                 h = float(held.loc[str(s)])
                 cut = _cut_only(h, float(target.loc[str(s)])) - h
                 fill.loc[str(s)] = cut
@@ -1565,7 +1571,8 @@ def h1_terminal_bound(
     Returns (W_adj, overlay, receipts). W_adj zeroes the stranded leg from tau+1 (no print there,
     so it can't fill: no exit-cost credit); overlay[d] is the fractional
     equity charge booked at tau+1 (long: -100% of marked value; short: max(P_tau, V_max)
-    liability) plus borrow from tau+1 to max(frozen exit, h). The bound applies to the position
+    liability) plus borrow from tau+2 to max(frozen exit, h) (tau -> tau+1 is the base borrow on
+    the held short, so it is not charged twice). The bound applies to the position
     actually held into tau+1 (after the ADV cap), not the target: a capped exit still holding at
     delisting is bound on what is left. Fails closed (Blocked).
     """
@@ -1643,7 +1650,9 @@ def h1_terminal_bound(
             rate = max(cfg.borrow_rate, float(terms.get("borrow_rate_source", 0.0)))
             per_day = borrow_usd(abs(w) * AUM, days=1.0, cfg=cfg)["usd"] / AUM
             per_day *= rate / cfg.borrow_rate if cfg.borrow_rate > 0 else 1.0
-            for j in range(book_i, end_i + 1):
+            # tau -> tau+1 is already charged by the base borrow on the held short (it is held over
+            # row tau+1), so the overlay starts at tau+2: each session is charged borrow once.
+            for j in range(book_i + 1, end_i + 1):
                 overlay.iloc[j] -= per_day * (dates[j] - dates[j - 1]).days  # calendar days, weekends accrue
             rec.update(
                 {
