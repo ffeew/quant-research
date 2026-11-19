@@ -79,7 +79,10 @@ class SharedCostModel:
         return float(cm.borrow_cost(short_mv_usd, days=days, annual_rate=cfg.borrow_rate)["usd"])
 
 
-# Desk validation standard, cost section: per-side minimum = asset-class floor + half-spread.
+# Source: desk validation STANDARD cost floor (cost section): per-side minimum = asset-class floor
+# + half-spread. The repo's shared backtest cost model (quant_research.backtest.costs.cost_model)
+# has no floor table; its BUCKETS / liq_bucket give the L1-L4 buckets and half-spreads used here,
+# and quant_research.backtest.engine carries the same 5/5/10/20 bp + 2 bp ETF floor table.
 # US large-cap 5 bps, mid-cap 10 bps, small-cap / thin 20 bps; liquid ETFs 2 bps (thin ETFs use the
 # small-cap row). Cost-model buckets map L1/L2 -> large, L3 -> mid, L4 -> small; the half-spread is
 # the bucket default. A modelled cost below the floor is raised to it, never lowered.
@@ -149,7 +152,10 @@ def _fills(
 
     W row k is the weight filled at close k (signals put it at their fill session, never the
     signal bar); it earns the next row's return, close k -> k+1. Each session trades at most 1%
-    of ADV20 shares toward the target; the unfilled remainder carries to later sessions. A name
+    of ADV20 shares toward the target, where ADV20 is the trailing 20-session mean dollar volume
+    ending the session before the fill day (the fill day's own volume is never in it); the
+    unfilled remainder carries to later sessions. A name with no ADV history has cap 0 and can't
+    trade until it has one (at least 10 sessions in the window). A name
     with no print can't trade, so it stays held. Once a name is past its last print and its
     target is flat, the held position is settled at its last close at no cost (null delisting
     return); the terminal bound and the delisting stress book their loss on that held amount.
@@ -157,7 +163,7 @@ def _fills(
     PX, VOL = bars["PX"], bars["VOL"]
     W_exec = W.shift(1).fillna(0.0)
     DV = PX * VOL
-    ADV20 = DV.rolling(20, min_periods=10).mean().shift(1)
+    ADV20 = DV.rolling(20, min_periods=10).mean().shift(1)  # row k: window ending k-1; read at the fill day
     printed = (PX > 0).to_numpy()
     last_print = {
         str(c): (int(np.flatnonzero(printed[:, k])[-1]) if printed[:, k].any() else -1)
@@ -182,10 +188,15 @@ def _fills(
                 if not (gone and abs(float(target.loc[str(s)])) < 1e-15):
                     fill.loc[str(s)] = 0.0  # no print: can't trade, the position stays held
                 continue  # (or: past its last print with a flat target, settled at last close)
-            adv = at_float(ADV20, d, s) if s in ADV20.columns else np.nan
+            fill_day = dates[j - 1]  # W_exec row j is the weight filled at close j-1
+            adv = at_float(ADV20, fill_day, s) if s in ADV20.columns and fill_day in pos else np.nan
             adv_sh = (adv / px) if (np.isfinite(adv) and adv > 0) else None
+            if adv_sh is None:
+                fill.loc[str(s)] = 0.0  # no ADV history: cap 0, can't trade (never left uncapped)
+                capped = True
+                continue
             sh = abs(delta) * AUM / px
-            if adv_sh and sh > PARTICIPATION_CAP * adv_sh:
+            if sh > PARTICIPATION_CAP * adv_sh:
                 sh = PARTICIPATION_CAP * adv_sh
                 fill.loc[str(s)] = math.copysign(sh * px / AUM, delta)  # remainder carries to the next session
                 capped = True

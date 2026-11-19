@@ -32,40 +32,40 @@ def test_weight_row_earns_next_close_to_close_zero_cost():
     b = _bars()
     d = b["R"].index
     W = pd.DataFrame(0.0, index=d, columns=["A", "B"])
-    W.iloc[5:10, 0] = 0.1  # filled at close d[5]; this is the fill session, not a signal bar
+    W.iloc[12:17, 0] = 0.1  # filled at close d[12] (after ADV history); the fill session, not a signal bar
     out = pnl.apply_costs_and_returns(
         b, W, pnl.build_cost_config("unknown_borrow_required"), idea="H1", costs=ZeroCost()
     )
     g = out["daily"]["gross"]
-    assert g.loc[d[5]] == 0  # nothing is earned on the fill session itself
-    assert np.isclose(g.loc[d[6]], 0.1 * b["R"]["A"].iloc[6])  # first return: close d[5] -> d[6]
+    assert g.loc[d[12]] == 0  # nothing is earned on the fill session itself
+    assert np.isclose(g.loc[d[13]], 0.1 * b["R"]["A"].iloc[13])  # first return: close d[12] -> d[13]
     assert np.isclose(g.sum(), 5 * 0.1 * 0.01) and (out["daily"]["net"] == g).all()
 
 
 def test_costs_and_borrow_reduce_net():
     b = _bars()
     W = pd.DataFrame(0.0, index=b["R"].index, columns=["A", "B"])
-    W.iloc[5:10, 1] = -0.1
+    W.iloc[12:17, 1] = -0.1
     cfg = pnl.build_cost_config("unknown_borrow_required")
     out = pnl.apply_costs_and_returns(b, W, cfg, idea="H2", costs=FlatCost())
     d = out["daily"]
     assert np.isclose(d["tc"].sum(), 2 * 0.1 * 10 / 1e4)
     assert (d["borrow"] == 0).all()
     shared = pnl.apply_costs_and_returns(b, W, cfg, idea="H2")["daily"]
-    held_days = sum((d.index[k] - d.index[k - 1]).days for k in range(6, 11))  # held over rows 6..10
+    held_days = sum((d.index[k] - d.index[k - 1]).days for k in range(13, 18))  # held over rows 13..17
     assert held_days == 7  # includes one weekend
     assert np.isclose(shared["borrow"].sum(), held_days * 0.1 * AUM * 0.10 / 360 / AUM)
     assert (shared["net"] <= shared["gross"]).all()
 
 
 def test_borrow_accrues_calendar_days_over_weekend_and_year():
-    d = pd.bdate_range("2018-01-01", "2019-01-01")
+    d = pd.bdate_range("2017-11-01", "2019-01-01")  # ADV history before the year measured
     one = {k: pd.DataFrame({"B": v}, index=d) for k, v in {"R": 0.0, "PX": 20.0, "VOL": 1e9}.items()}
     W = pd.DataFrame({"B": -0.1}, index=d)
     cfg = pnl.build_cost_config("unknown_borrow_required")
     br = pnl.apply_costs_and_returns(one, W, cfg, idea="H2")["daily"]["borrow"]
     per_day = 0.1 * 0.10 / 360
-    mon = d[(d.day_of_week == 0) & (d > d[2])][0]
+    mon = d[(d.day_of_week == 0) & (d > "2018-01-01")][0]
     assert np.isclose(br.loc[mon], 3 * per_day)  # Friday close -> Monday close: 3 days
     assert np.isclose(br.loc[mon + pd.Timedelta(days=1)], per_day)
     yr = br.loc["2018-01-02":"2019-01-01"].sum() / 0.1  # one full calendar year held short
@@ -106,7 +106,7 @@ def test_standard_cost_floor():
     assert pnl.FlooredCostModel(FlatCost()).one_way_bps("buy", 100.0, 10.0, 2e7, **kw) == 10.0  # higher model kept
     b = _bars()
     W = pd.DataFrame(0.0, index=b["R"].index, columns=["A", "B"])
-    W.iloc[5:10, 0] = 0.1
+    W.iloc[12:17, 0] = 0.1
     out = pnl.apply_costs_and_returns(b, W, cfg, idea="H1", costs=fl)
     assert out["cost_floor"] == pnl.FlooredCostModel.floor_label and out["daily"]["tc"].sum() > 0
 
@@ -274,3 +274,32 @@ def test_h1_terminal_borrow_over_a_year_is_about_ten_percent():
     assert days >= 365
     assert np.isclose(borrow, 0.05 * 0.10 * days / 360)
     assert 0.10 <= borrow / 0.05 < 0.1025  # ~10% of the short over a year (360-day basis)
+
+
+def test_adv20_excludes_fill_day_volume():
+    b = _bars()
+    d = b["R"].index
+    b["VOL"]["A"] = 1e4  # ADV20 = $500k; 1% = 5e-4 of AUM
+    b["VOL"].iloc[15, 0] = 1e9  # huge volume on the fill day itself must not lift its cap
+    W = pd.DataFrame(0.0, index=d, columns=["A", "B"])
+    W.iloc[15:, 0] = 0.01
+    held = pnl.held_positions(b, W)["A"]
+    step = pnl.PARTICIPATION_CAP * 50 * 1e4 / AUM
+    assert np.isclose(held.iloc[16], step)  # fill at close d[15] uses ADV20 ending d[14]
+    assert held.iloc[17] > 2 * step  # the next fill's window (ending d[15]) includes the spike
+
+
+def test_no_adv_history_means_no_trade():
+    b = _bars()
+    d = b["R"].index
+    W = pd.DataFrame(0.0, index=d, columns=["A", "B"])
+    W.iloc[2:, 0] = 0.1  # wants to trade before any ADV history exists
+    out = pnl.apply_costs_and_returns(
+        b, W, pnl.build_cost_config("unknown_borrow_required"), idea="H1", costs=FlatCost()
+    )
+    held = pnl.held_positions(b, W)["A"]
+    assert held.iloc[:11].eq(0).all() and np.isclose(held.iloc[11], 0.1)  # 10 sessions of history first
+    assert out["daily"]["gross"].loc[: d[10]].eq(0).all() and out["n_sessions_adv_capped"] == 8  # rows 3-10 blocked
+    b["VOL"]["B"] = 0.0  # B never trades volume: no ADV, never filled
+    W.iloc[2:, 1] = -0.1
+    assert pnl.held_positions(b, W)["B"].eq(0).all()

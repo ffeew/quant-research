@@ -46,6 +46,11 @@ ratio (DSR) and purged cross-validation land in a later PR. No DEV run yet; no r
   H2 caps single-name legs first and re-solves each ETF hedge from the capped leg, so the book
   stays beta-neutral (H1 has no hedge leg; its name cap still trims without reallocating); the
   standard's cost floor is applied to every run.
+- Second review: the H1 terminal bound and the H2 delisting stress now apply to the position
+  actually held (a capped exit still open when a name delists is bound on what is left), and a
+  name with no print can't trade. ADV20 is the trailing window ending the session before the fill
+  day, and a name with no ADV history can't trade (cap 0). The cost-floor table cites its source,
+  the desk validation STANDARD cost floor.
 - Not done yet: DSR and purged CV. Until they land there is no Stage A verdict, whatever a DEV
   Sharpe shows.
 
