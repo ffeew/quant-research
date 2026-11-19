@@ -104,9 +104,20 @@ BORROW_BASE, BORROW_HTB_SENS = 0.01, 0.10
 COST_MULT_PRIMARY, COST_MULT_STRESS = 1.0, 2.0
 HTB_GATE_APPLIES = True  # Review 2026-11-06: applies to SPDR ETF shorts (G11)
 HTB_GATE_RULE = "sharpe(simulate(..., borrow=BORROW_HTB_SENS)) > 0 else FAIL_ON_COSTS"
-COSTS_INPUTS = f"{_QR.DESK_DIR}/tca/ethan_cost_inputs.md"
 COSTS_INPUTS_SHA = desk_pin("strategies.news_sentiment.prereg_run", "COSTS_INPUTS_SHA")
-COSTS_INPUTS_DIR = f"{_QR.DESK_DIR}/tca/ethan_inputs"
+
+
+# The TCA owner's cost inputs are required inputs (no default): the .md and the measured-costs folder.
+def costs_inputs() -> str:
+    """The cost-inputs .md (pinned by COSTS_INPUTS_SHA); $QR_COSTS_INPUTS, required."""
+    return _QR.required_env("QR_COSTS_INPUTS", "the TCA owner's cost-inputs .md (COSTS_INPUTS_SHA)")
+
+
+def costs_inputs_dir() -> str:
+    """The folder holding the COSTS_FILE_SHA files; $QR_COSTS_INPUTS_DIR, required."""
+    return _QR.required_env("QR_COSTS_INPUTS_DIR", "the TCA owner's measured-costs folder (COSTS_FILE_SHA)")
+
+
 COSTS_FILE_SHA = {
     "asset_flags_paper.json": desk_pin("strategies.news_sentiment.prereg_run", "COSTS_FILE_SHA.asset_flags_paper.json"),
     "bucket_costs.csv": desk_pin("strategies.news_sentiment.prereg_run", "COSTS_FILE_SHA.bucket_costs.csv"),
@@ -142,9 +153,10 @@ def check(strict: bool) -> bool:
     )
     need("cost_model.py v1.1", sha(COST_MODEL) == COST_MODEL_SHA)
     need("cost_model.md v1.1", sha(COST_DOC) == COST_DOC_SHA)
-    need("ethan_cost_inputs.md", sha(COSTS_INPUTS) == COSTS_INPUTS_SHA)
+    need("ethan_cost_inputs.md", sha(costs_inputs()) == COSTS_INPUTS_SHA)
+    costs_dir = costs_inputs_dir()
     for fn, h in COSTS_FILE_SHA.items():
-        need(f"tca/ethan_inputs/{fn}", sha(os.path.join(COSTS_INPUTS_DIR, fn)) == h)
+        need(f"tca/ethan_inputs/{fn}", sha(os.path.join(costs_dir, fn)) == h)
     need("lm_positive", sha("lexicon/lm_positive.txt") == LM_POS_SHA)
     need("lm_negative", sha("lexicon/lm_negative.txt") == LM_NEG_SHA)
     try:
@@ -282,7 +294,7 @@ def costs_per_side(sym: str) -> tuple[float, float]:
     """the TCA owner's measured per-side costs (tca/ethan_inputs/per_side_costs.csv): (base at the open, base_mktlim continuous)."""
     global _COSTS_SIDE
     if _COSTS_SIDE is None:
-        _COSTS_SIDE = pd.read_csv(os.path.join(COSTS_INPUTS_DIR, "per_side_costs.csv")).set_index("name")
+        _COSTS_SIDE = pd.read_csv(os.path.join(costs_inputs_dir(), "per_side_costs.csv")).set_index("name")
     if sym in _COSTS_SIDE.index:
         return float(cast(Any, _COSTS_SIDE.at[sym, "base"])), float(cast(Any, _COSTS_SIDE.at[sym, "base_mktlim"]))
     return 0.0, 0.0
