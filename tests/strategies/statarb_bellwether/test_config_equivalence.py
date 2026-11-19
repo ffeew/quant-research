@@ -548,7 +548,7 @@ def run_all(mod: Any, tmp: Path) -> dict[str, Any]:
 # apply_costs_and_returns and everything priced from it (B2 ADV cap on the trade, B3 calendar-day
 # borrow), and h1_terminal_bound (built on the H1 weights; B3 borrow overlay). Everything else,
 # including every pin and config value, must still match the pre-cleanup module exactly.
-FIXED = {"W1": "B1", "r1": "B1 B2", "r2": "B2", "tb": "B1", "sharpe": "B1 B2"}
+FIXED = {"W1": "B1", "r1": "B1 B2 B3", "r2": "B2 B3", "tb": "B1 B3", "sharpe": "B1 B2 B3"}
 
 
 def test_computations_identical_on_synthetic_fixtures(old_src, tmp_path):

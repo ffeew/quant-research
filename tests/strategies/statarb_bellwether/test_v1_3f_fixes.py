@@ -66,13 +66,54 @@ def test_b2_adv_cap_limits_the_trade_and_carries_the_remainder(mod: Any) -> None
     b = _flat(vol=1e4)  # ADV20 = $500k; 1% = $5k per session
     d = b["R"].index
     W = pd.DataFrame({"A": 0.0}, index=d)
-    W.iloc[15:, 0] = 12_000 / mod.AUM  # target $12k: two capped sessions, then the rest
+    tgt = 12_000 / float(mod.AUM)
+    W.iloc[15:, 0] = tgt  # target $12k: two capped sessions, then the rest
     out = mod.apply_costs_and_returns(b, W, mod.build_cost_config("unknown_borrow_required"), idea="H1")
     g = out["daily"]["gross"]
     step = mod.PARTICIPATION_CAP * 50 * 1e4 / mod.AUM
     assert np.isclose(g.loc[d[16]], step * 0.01)  # only the capped slice is held and earns
     assert np.isclose(g.loc[d[17]], 2 * step * 0.01)  # remainder carried to the next session
-    assert np.isclose(g.loc[d[18]], W.iloc[15, 0] * 0.01) and np.isclose(g.loc[d[25]], W.iloc[15, 0] * 0.01)
+    assert np.isclose(g.loc[d[18]], tgt * 0.01) and np.isclose(g.loc[d[25]], tgt * 0.01)
     assert out["n_sessions_adv_capped"] == 2
     traded = out["daily"]["tc"].sum() / (3.0 / 1e4)  # fake cost model: 3 bps on each buy
-    assert np.isclose(traded, W.iloc[15, 0])  # cost on shares actually traded, once
+    assert np.isclose(traded, tgt)  # cost on shares actually traded, once
+
+
+def test_b3_borrow_accrues_calendar_days_over_a_weekend(mod: Any) -> None:
+    b = _flat(n=60, r=0.0)
+    d = b["R"].index
+    W = pd.DataFrame({"A": -0.5}, index=d)
+    cfg = mod.build_cost_config("unknown_borrow_required")
+    out = mod.apply_costs_and_returns(b, W, cfg, idea="H1")["daily"]["borrow"]
+    per_day = 0.5 * cfg.borrow_rate / 360.0
+    mon = [t for t in out.index[1:] if t.day_of_week == 0][0]
+    assert np.isclose(out.loc[mon], 3 * per_day)  # Fri close -> Mon close accrues 3 days
+    assert np.isclose(out.loc[mon + pd.Timedelta(days=1)], per_day)
+    span = (out.index[-1] - out.index[0]).days
+    assert np.isclose(out.iloc[1:].sum(), span * per_day)  # = rate * span / 360 on the short
+
+
+def test_b3_terminal_bound_borrow_overlay_accrues_calendar_days(mod: Any) -> None:
+    from .test_config_equivalence import FakeClient
+
+    B = bars()
+    d = pd.DatetimeIndex(B["R"].index)
+    W = pd.DataFrame(0.0, index=d, columns=B["R"].columns)
+    W.loc[d[380] :, "CCC"] = -0.01  # short held through its last print (tau = session 399)
+    roster = [
+        {
+            "symbol": "CCC",
+            "identity_ok": True,
+            "short_terms": {
+                "h": str(d[410].date()),
+                "alternatives": [{"cash": 5.0, "ratio": 1.0, "acquirer_id": "ACQ", "acquirer_identity_accepted": True}],
+            },
+        }
+    ]
+    cfg = mod.build_cost_config("unknown_borrow_required")
+    _, ov, rec = mod.h1_terminal_bound(B, W, roster, cfg, client=FakeClient(), path="A")
+    assert rec and rec[0]["booking_session"] == str(d[400].date())
+    gaps = d.to_series().diff().dt.days.to_numpy()[401:]
+    per = -ov.iloc[401:].to_numpy() / gaps  # borrow-only sessions after booking
+    assert np.allclose(per, 0.01 * cfg.borrow_rate / 360.0)  # per calendar day, weekends included
+    assert (gaps == 3).any()
