@@ -1332,6 +1332,21 @@ def signal_h2(
 # ---- Returns path (gated; not invoked without acceptance hash) ----
 
 
+FORCED_CUT = "zero_adv_cut"  # cut toward 0 with no usable ADV (cap 0): allowed, never a grow
+FORCED_SETTLEMENT = "post_last_print_settlement"  # held remainder closed at the last close
+# Stress cost on forced trades: STRESS_COST_MULT x the one-way cost with no ADV (adv_shares None).
+STRESS_COST_MULT = 2.0
+
+
+def _cut_only(held: float, target: float) -> float:
+    """Position after a cut toward 0 that never grows it or flips its sign."""
+    if held > 0:
+        return min(held, max(target, 0.0))
+    if held < 0:
+        return max(held, min(target, 0.0))
+    return 0.0
+
+
 def _fills(bars: dict[str, Any], W: pd.DataFrame) -> Iterator[tuple[Any, Any, pd.Series, list[Any], bool]]:
     """Walk the book session by session from the position actually held.
 
@@ -1342,12 +1357,14 @@ def _fills(bars: dict[str, Any], W: pd.DataFrame) -> Iterator[tuple[Any, Any, pd
     Participation cap: each session
     trades at most 1% of ADV20 shares toward the target, where ADV20 is the trailing 20-session
     mean dollar volume ending the session before the fill day (the fill day's own volume is never
-    in it); the unfilled remainder carries to later sessions. A name with no ADV history has cap 0
-    and can't trade until it has one (at least 10 sessions in the window). A name with no print can't trade, so it stays held. Once a name is past its last
-    print and its target is flat, the held position is settled at its last close at no cost (null
-    delisting return); the H1 terminal bound and the H2 delisting stress book their loss on that
-    held amount. Yields (session, previous session, held after the fills, trades, capped), each
-    trade as (symbol, side, px, shares, adv_shares)."""
+    in it); the unfilled remainder carries to later sessions. A name with no usable ADV (no
+    history, 0 or NaN) has cap 0: it can never grow, but it may always be cut toward 0 (a forced
+    cut, charged the stress cost). A name with no print can't trade, so it stays held. Once a name
+    is past its last print and its target is flat, the held position is settled at its last close
+    (null delisting return); that settlement is not free: it is charged the stress cost, and the
+    H1 terminal bound and the H2 delisting stress book their loss on that held amount. Yields
+    (session, previous session, held after the fills, trades, capped), each trade as (symbol,
+    side, px, shares, adv_shares, forced), forced being None, FORCED_CUT or FORCED_SETTLEMENT."""
     PX, VOL = bars["PX"], bars["VOL"]
     W_exec = W.shift(1).fillna(0.0)
     DV = PX * VOL
@@ -1369,15 +1386,26 @@ def _fills(bars: dict[str, Any], W: pd.DataFrame) -> Iterator[tuple[Any, Any, pd
                 continue
             px = float(PX.at[fill_day, s]) if s in PX.columns and fill_day in pos else float("nan")
             if not has_print(px):
-                gone = pos.get(fill_day, len(PX.index)) > last_print.get(str(s), -1)
-                if not (gone and abs(float(target.loc[str(s)])) < 1e-15):
+                lp = last_print.get(str(s), -1)
+                gone = pos.get(fill_day, len(PX.index)) > lp
+                if not (gone and lp >= 0 and abs(float(target.loc[str(s)])) < 1e-15):
                     fill.loc[str(s)] = 0.0  # no print: can't trade, the position stays held
-                continue  # (or: past its last print with a flat target, settled at last close)
+                    continue
+                px_last = float(PX[s].iloc[lp])  # past its last print, target flat: settle at last close
+                side = "buy" if delta > 0 else "sell"
+                trades.append((s, side, px_last, abs(delta) * AUM / px_last, None, FORCED_SETTLEMENT))
+                continue
             adv = ADV20.at[fill_day, s] if s in ADV20.columns and fill_day in pos else np.nan
             adv_sh = (adv / px) if (isinstance(adv, float) and adv > 0) else None
             if adv_sh is None:
-                fill.loc[str(s)] = 0.0  # no ADV history: cap 0, can't trade (never left uncapped)
-                capped = True
+                # no usable ADV: cap 0, never left uncapped. It may not grow, but may always be cut
+                # toward 0 (the fund manager's ruling), at the stress cost.
+                h = float(held.loc[str(s)])
+                cut = _cut_only(h, float(target.loc[str(s)])) - h
+                fill.loc[str(s)] = cut
+                capped = capped or abs(cut - delta) > 1e-15
+                if abs(cut) > 1e-15:
+                    trades.append((s, "buy" if cut > 0 else "sell", px, abs(cut) * AUM / px, None, FORCED_CUT))
                 continue
             sh = abs(delta) * AUM / px
             # 1% ADV cap on the trade itself; the remainder carries
@@ -1385,7 +1413,7 @@ def _fills(bars: dict[str, Any], W: pd.DataFrame) -> Iterator[tuple[Any, Any, pd
                 sh = PARTICIPATION_CAP * adv_sh
                 fill.loc[str(s)] = math.copysign(sh * px / AUM, delta)
                 capped = True
-            trades.append((s, "buy" if delta > 0 else "sell", px, sh, adv_sh))
+            trades.append((s, "buy" if delta > 0 else "sell", px, sh, adv_sh, None))
         held = held + fill
         yield d, dates[j - 1], held, trades, capped
 
@@ -1400,7 +1428,9 @@ def held_positions(bars: dict[str, Any], W: pd.DataFrame) -> pd.DataFrame:
 def apply_costs_and_returns(bars: dict[str, Any], W: pd.DataFrame, cfg: Any, *, idea: str) -> dict[str, Any]:
     """Apply one-session execution lag, participation cap, borrow, and daily net returns.
 
-    REQUIRED path must use cfg from build_cost_config('unknown_borrow_required').
+    REQUIRED path must use cfg from build_cost_config('unknown_borrow_required'). Forced trades
+    (cuts at zero ADV, settlements after the last print) pay the stress cost (STRESS_COST_MULT x
+    the one-way cost at no ADV) and are counted, with their traded notional, in the output.
     """
     if cfg.borrow_rate < BORROW_UNKNOWN_REQUIRED and cfg.is_pass_bar:
         raise RuntimeError("pass-bar config must have borrow_rate >= 10%/yr")
@@ -1410,12 +1440,17 @@ def apply_costs_and_returns(bars: dict[str, Any], W: pd.DataFrame, cfg: Any, *, 
     R = bars["R"]
     rets = []
     capped_sessions = 0
+    forced: dict[str, list[float]] = {FORCED_CUT: [], FORCED_SETTLEMENT: []}
     for d, prev, held, trades, capped in _fills(bars, W):
         trade_cost_frac = 0.0
-        for s, side, px, sh, adv_sh in trades:
+        for s, side, px, sh, adv_sh, kind in trades:
             sig = None
             c = one_way_bps(side, float(px), float(sh), adv_sh, sig, cfg=cfg, venue="close", symbol=s, etf_symbols=ETFS)
-            trade_cost_frac += (sh * px / AUM) * c["bps"] / 1e4
+            bps = float(c["bps"])
+            if kind is not None:  # forced trade: stress cost, counted with its notional
+                bps *= STRESS_COST_MULT
+                forced[kind].append(float(sh * px))
+            trade_cost_frac += (sh * px / AUM) * bps / 1e4
         capped_sessions += capped
         w = held
         # asset return contribution, on the held position only
@@ -1438,6 +1473,11 @@ def apply_costs_and_returns(bars: dict[str, Any], W: pd.DataFrame, cfg: Any, *, 
         "k_impact": cfg.k_impact,
         "n_sessions": int(len(df)),
         "n_sessions_adv_capped": int(capped_sessions),
+        "n_forced_cuts_zero_adv": len(forced[FORCED_CUT]),
+        "forced_cut_notional_usd": float(sum(forced[FORCED_CUT])),
+        "n_post_last_print_settlements": len(forced[FORCED_SETTLEMENT]),
+        "post_last_print_settlement_notional_usd": float(sum(forced[FORCED_SETTLEMENT])),
+        "forced_trade_cost": f"stress: {STRESS_COST_MULT} x one-way cost at no ADV",
         "daily": df,
     }
 
