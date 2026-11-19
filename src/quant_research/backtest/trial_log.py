@@ -10,12 +10,11 @@ from typing import Any, cast
 
 import pandas as pd
 
+from quant_research.utils import env as _env
 from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DATA_DIR, ...)
 
 ROOT = pathlib.Path(f"{_QR.DESK_DIR}/research/replication")
-import os
-
-LOG = pathlib.Path(os.environ.get("RESEARCH_TRIAL_LOG", ROOT / "TRIAL_LOG.csv"))  # override only for code smoke tests
+LOG = pathlib.Path(_env.getenv("RESEARCH_TRIAL_LOG", ROOT / "TRIAL_LOG.csv"))  # override only for code smoke tests
 COLS = [
     "trial_id",
     "logged_at_sgt",

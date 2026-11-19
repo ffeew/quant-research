@@ -21,12 +21,14 @@ import urllib.request
 from pathlib import Path
 from typing import Any, cast
 
+from quant_research.utils import env as _env
+
 HERE = Path(__file__).resolve().parent
 RAW = HERE / "raw" / "sec"
 STATE = HERE / "cache" / "sec_rate.state.json"
 LEDGER = HERE / "cache" / "sec_requests.log"
 UA = os.environ.get("SEC_USER_AGENT", "CIO-Desk-Research research-data@example.com")
-RPS = float(os.environ.get("RESEARCH_SEC_RPS", "8"))
+RPS = float(_env.getenv("RESEARCH_SEC_RPS", "8"))
 BURST = 4.0
 
 

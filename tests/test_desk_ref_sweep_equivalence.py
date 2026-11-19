@@ -11,7 +11,7 @@ dropping docstrings and the added ``desk_pin`` import:
   renaming whose new names add nothing but role words and do not collide with any old name;
 - everything else must be identical.
 
-A file edited after the sweep is skipped (its recorded git blob no longer matches).
+Each file is checked as the sweep left it (its recorded git blob), so later edits do not trip it.
 """
 
 from __future__ import annotations
@@ -249,12 +249,15 @@ def sweep_check() -> tuple[dict[str, Result], Renames, set[str]]:
         except (OSError, subprocess.SubprocessError):
             results[path] = ("skip", [], f"ref {rec['ref']} not in git history")
             continue
-        if _git("hash-object", path).strip() != rec["blob"]:
-            results[path] = ("skip", [], f"{path} changed after the sweep")
+        # later edits are not part of the sweep: compare the file as the sweep left it
+        try:
+            swept_src = _git("cat-file", "blob", rec["blob"])
+        except (OSError, subprocess.SubprocessError):
+            results[path] = ("skip", [], f"swept blob of {path} not in git history")
             continue
         old = _strip(ast.parse(_git("show", f"{rec['ref']}:{path}")), False)
         old_names |= _old_names(old)
-        new = _strip(ast.parse((REPO_ROOT / path).read_text()), True)
+        new = _strip(ast.parse(swept_src), True)
         seen: list[tuple[str, str]] = []
         try:
             compare(old, new, ctx, seen, path)
