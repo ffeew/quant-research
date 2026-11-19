@@ -1307,8 +1307,10 @@ def _fills(bars: dict[str, Any], W: pd.DataFrame) -> Iterator[tuple[Any, Any, pd
 
     W row k is the weight filled at close k (signals put it at their fill session, never the
     signal bar); it earns the next row's return, close k -> k+1. Participation cap: each session
-    trades at most 1% of ADV20 shares toward the target; the unfilled remainder carries to later
-    sessions. A name with no print can't trade, so it stays held. Once a name is past its last
+    trades at most 1% of ADV20 shares toward the target, where ADV20 is the trailing 20-session
+    mean dollar volume ending the session before the fill day (the fill day's own volume is never
+    in it); the unfilled remainder carries to later sessions. A name with no ADV history has cap 0
+    and can't trade until it has one (at least 10 sessions in the window). A name with no print can't trade, so it stays held. Once a name is past its last
     print and its target is flat, the held position is settled at its last close at no cost (null
     delisting return); the H1 terminal bound and the H2 delisting stress book their loss on that
     held amount. Yields (session, previous session, held after the fills, trades, capped), each
@@ -1316,7 +1318,7 @@ def _fills(bars: dict[str, Any], W: pd.DataFrame) -> Iterator[tuple[Any, Any, pd
     PX, VOL = bars["PX"], bars["VOL"]
     W_exec = W.shift(1).fillna(0.0)
     DV = PX * VOL
-    ADV20 = DV.rolling(20, min_periods=10).mean().shift(1)
+    ADV20 = DV.rolling(20, min_periods=10).mean().shift(1)  # row k: window ending k-1; read at the fill day
     printed = (PX > 0).to_numpy()
     last_print = {
         str(c): (int(np.flatnonzero(printed[:, k])[-1]) if printed[:, k].any() else -1)
@@ -1341,11 +1343,16 @@ def _fills(bars: dict[str, Any], W: pd.DataFrame) -> Iterator[tuple[Any, Any, pd
                 if not (gone and abs(float(target.loc[str(s)])) < 1e-15):
                     fill.loc[str(s)] = 0.0  # no print: can't trade, the position stays held
                 continue  # (or: past its last print with a flat target, settled at last close)
-            adv = ADV20.at[d, s] if s in ADV20.columns else np.nan
+            fill_day = dates[j - 1]  # W_exec row j is the weight filled at close j-1
+            adv = ADV20.at[fill_day, s] if s in ADV20.columns and fill_day in pos else np.nan
             adv_sh = (adv / px) if (isinstance(adv, float) and adv > 0) else None
+            if adv_sh is None:
+                fill.loc[str(s)] = 0.0  # no ADV history: cap 0, can't trade (never left uncapped)
+                capped = True
+                continue
             sh = abs(delta) * AUM / px
             # 1% ADV cap on the trade itself; the remainder carries
-            if adv_sh and sh > PARTICIPATION_CAP * adv_sh:
+            if sh > PARTICIPATION_CAP * adv_sh:
                 sh = PARTICIPATION_CAP * adv_sh
                 fill.loc[str(s)] = math.copysign(sh * px / AUM, delta)
                 capped = True
