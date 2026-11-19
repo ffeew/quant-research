@@ -1,6 +1,6 @@
 """Run: $QR_DESK_DIR/portfolio/.venv/bin/python $QR_DESK_DIR/portfolio/tests/test_earnings.py
-LIMITS H7 earnings gate (default policy risk_ruling_20261030_0227; strict = pre-decision option) (earnings_gate.py) + LIMITS §5 T12 sigma_target rule (construct.sigma_target_rule).
-Synthetic calendars only; plus one smoke test against the data owner's real calendar (read-only)."""
+LIMITS H7 earnings gate (default: the 2026-10-30 02:27 policy; strict = pre-decision option) (earnings_gate.py) + LIMITS §5 T12 sigma_target rule (construct.sigma_target_rule).
+Synthetic calendars only; plus one smoke test against the real store calendar (read-only)."""
 
 import datetime as dt
 import math
@@ -105,7 +105,7 @@ def test_sigma_target_rule():
     assert abs(v3 - r.std() * math.sqrt(252)) < 1e-12 and v != v3
 
 
-# ======== Risk decision risk_ruling_20261030_0227 (DEFAULT policy): rules 1-5, strict CLI option, file checks ========
+# ======== Default earnings-gate policy (2026-10-30 02:27): rules 1-5, strict CLI option, file checks ========
 import tempfile
 
 NOW2 = dt.datetime(

@@ -11,11 +11,11 @@
 - Costs now follow `baseline_report.md` §5 (see §1 and §4).
 
 **BAB card.**
-- Derivatives researcher overwrote `research/papers/frazzini-pedersen-2014-betting-against-beta.md`. I did **not** edit that file. Per the new desk rule, BAB as a signal is the derivatives researcher's.
+- `research/papers/frazzini-pedersen-2014-betting-against-beta.md` was overwritten by its signal owner; this report did **not** edit it. BAB as a signal belongs to the academic-replications track.
 - My construction material is now `research/papers/beta-estimation-and-neutralisation.md`, a reference card citing Frazzini–Pedersen 2014 and Novy-Marx–Velikov 2022. It cites the derivatives researcher's replication in `research/replication/frazzini-pedersen-2014-betting-against-beta/` (read only).
 - My temporary `…--construction.md` file has been removed.
 - My REGISTRY row now points at the new slug. No other owner's row was touched.
-- Ownership of the main BAB card is pending the fund manager. Note that no REGISTRY row now references that slug: the derivatives researcher or the fund manager should add one.
+- Ownership of the main BAB card is open. No REGISTRY row now references that slug; one should be added.
 
 **the macro strategist's notes.** A scratch notes draft (vol-managed duplicate) was read only and treated as data.
 - Only items I verified against Moreira–Muir (2017) or Cederburg et al. (2020) were folded into my MM card, cited as "notes from Macro Strategist (the macro strategist)":

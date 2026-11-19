@@ -85,4 +85,4 @@ SEC fair access: User-Agent from env `SEC_USER_AGENT` (default set in `ee_fetch.
 
 ## Hand-off
 
-Ready for the derivatives researcher (event spine + `ex99_url` for any later EX-99.1 parse; SUE method in `SUE_NOTE.md`) and the validator (timestamp integrity, no returns in this artifact). Pin `SHA256SUMS` before joining outcomes.
+Ready for research use (event spine + `ex99_url` for any later EX-99.1 parse; SUE method in `SUE_NOTE.md`) and for validation (timestamp integrity, no returns in this artifact). Pin `SHA256SUMS` before joining outcomes.

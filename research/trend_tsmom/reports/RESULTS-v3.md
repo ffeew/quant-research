@@ -21,7 +21,7 @@
 
 ## Mechanical verdict: **FAIL** (trend shelved for this sprint)
 
-This is the pipeline's mechanical verdict from `outputs_v3/criteria.csv` / `meta.json` (`mechanical_verdict`). **The validator's formal verdict is now logged:** FAIL; trend v3 shelved for this sprint. See the internal review record and `validation/verdicts-log.md` (06:29 SGT).
+This is the pipeline's mechanical verdict from `outputs_v3/criteria.csv` / `meta.json` (`mechanical_verdict`). **The formal validation verdict is FAIL** (06:29 SGT); trend v3 is shelved for this sprint.
 
 ## Criteria (exactly `outputs_v3/criteria.csv`)
 

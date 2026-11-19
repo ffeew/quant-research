@@ -68,7 +68,7 @@ PINS = {
         f"{_QR.DESK_DIR}/research/original/sentiment_returns_fiscal_diag_s6b_20261111/FYE_MONTH_FROZEN.tsv",
         desk_pin("strategies.sentiment_returns.h2c_dev_run", "PINS.FYE_MONTH_FROZEN[1]"),
     ),  # path+sha as pinned in h2_dev.py/L32
-    # ---- LOCK SLOTS (COST, fund manager decision): filled at LOCK only ----
+    # ---- LOCK SLOTS (COST decision): filled at LOCK only ----
     "COST_EARNINGS_CLEAN": (
         f"{_QR.DESK_DIR}/validation/dmitri/h2c_cost_clean_20261114_r4_inc70/COST_EARNINGS_DEV_CLEAN.json",
         desk_pin("strategies.sentiment_returns.h2c_dev_run", "PINS.COST_EARNINGS_CLEAN[1]"),
@@ -93,7 +93,7 @@ EXPECTED_PURGE_2020 = {
     "purged": 6,
     "kept": 7,
     "excl_no_reporttime": 0,
-}  # Fund manager FI-8; FD-3 column names
+}  # FI-8; FD-3 column names
 PURGE_WINDOW_START, PURGE_WINDOW_END = "2020-11-01", "2020-12-31"  # FI-7 AMEND: mirrors route.py (BRIEF_H2C_d4 c16)
 EXPECTED_PURGE_HEADER = ["boundary", "in_window_rows", "purged", "kept", "excl_no_reporttime"]  # FD-3 (walk 1)
 PURGE_BOUNDARY_DEV = "2020"
@@ -439,7 +439,7 @@ def main(argv: list[str]) -> int:
     )
     if not (sys.flags.isolated and sys.flags.dont_write_bytecode) or vers != VERSIONS or not py_ok:
         raise Stop(9, "interpreter/flags/version mismatch")
-    # ---- LOCK slots BEFORE any data byte (fund manager COST decision) ----
+    # ---- LOCK slots BEFORE any data byte (COST decision) ----
     unfilled = []
     if S["RUN_DIR"] is None:
         unfilled.append("RUN_DIR")
@@ -763,7 +763,7 @@ def main(argv: list[str]) -> int:
             ev["status"] = "excl_dup_symbol_quarter"
         else:
             seenq[qkey] = ev
-    # PURGE counts (2020 boundary only; 2013 row checked at holdout run per fund manager decision)
+    # PURGE counts (2020 boundary only; 2013 row checked at holdout run per the COST decision)
     # FI-7 AMEND: mirror route.py c16 exactly: window reportedDate 2020-11-01..2020-12-31; excl = reportTime not pre/post ONLY;
     # OQ-18 duplicates are NOT excl (classified by timing like route.py); purged = session(day0+21) > 2020-12-31; kept = rest.
     pw = [

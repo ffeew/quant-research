@@ -73,7 +73,7 @@ POLICY_STRICT = "strict"
 POLICIES = (POLICY_RULING, POLICY_STRICT)
 # sha256 pins of sidecar files verified by Risk / the CIO brief.
 # Require an EXACT accepted hash for the basename; missing/unknown basename OR mismatch -> FULL FAIL-SAFE.
-# next_earnings_20261105.parquet approved by risk manager signed decision 2026-11-06 (decision); any other file/hash remains unauthorized -> fail-closed.
+# next_earnings_20261105.parquet accepted by the signed risk decision of 2026-11-06; any other file/hash remains unauthorized -> fail-closed.
 PINNED_SHA256 = {
     "next_earnings_20261030.parquet": desk_pin(
         "strategies.portfolio_construction.earnings_gate", "PINNED_SHA256.next_earnings_20261030.parquet"

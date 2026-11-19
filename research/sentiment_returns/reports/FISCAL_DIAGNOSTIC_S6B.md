@@ -1,11 +1,11 @@
 # FISCAL_DIAGNOSTIC_S6B: prereg v5 §2 step 4 rerun under validator decision plus Erratum 1, DEV metadata only
 Run 2026-11-11 ~14:58 SGT with `python3 -I -B fiscal_diag_s6b.py` (EDGE defaults to 2024-12-31; log: fiscal_diag_s6b.log).
 No transcript file was opened. No returns, sentiment, holdout/, raw/, news, staging, verdicts-log or network were touched.
-The S6 folder sentiment_returns_fiscal_diag_s6_20261111/ was read only (SUMS, -c 6/6 OK) and not modified.
+The S6 folder sentiment_returns_fiscal_diag_s6_20261111/ was read only (checksums 6/6 OK) and not modified.
 
 Inputs:
-- annual_fye_dev.csv (SUMS OK)
-- partitioned/dev/earnings_dev.csv (dev SUMS OK)
+- annual_fye_dev.csv (checksum OK)
+- partitioned/dev/earnings_dev.csv (dev checksum OK)
 - coverage_transcripts.tsv (labels and status only, same use as S6)
 - FYE_MONTH_FROZEN.tsv, a byte-for-byte copy of the S6 table that the validator accepted
 - Erratum and decision (sha verified)

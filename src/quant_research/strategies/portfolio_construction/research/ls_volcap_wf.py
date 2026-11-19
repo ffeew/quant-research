@@ -26,7 +26,7 @@ Each weekly rebalance date t (close of t, hold from t+1, no look-ahead):
   costs     = 10 bp one-way flat + 25 bp/yr borrow on shorts.
 NOT simulated: panic flag, drawdown breakers, stops being hit, 1% min-position, no-trade band, share rounding.
 Forecast = sqrt(w' Sigma_LW w) at the rebalance (raw, k NOT applied); bias = std(r_t / sigma_hat_t,daily).
-DESK_RULES #5 provenance: history only, read-only from the data owner's store files (bulk pd.read_parquet of the partitioned store; no
+Data provenance: history only, read-only from the shared store files (bulk pd.read_parquet of the partitioned store; no
 API/HTTP, no live calls, no data.json). desk_data_client.get_daily_bars is the per-symbol equivalent for bars; the bulk read is
 kept because the client has no total_return / membership / delisting accessors. PROVISIONAL until the data owner's defect fixes land.
 """

@@ -2,7 +2,7 @@ from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DA
 import json, glob
 # DESK_RULES #5 (2026-10-30 02:12 SGT): every table below was built from RETIRED sources (statarb daily_bars.json, data.json)
 # before the rule; kept for the audit trail. New runs use src="store" (riskmodels_wf/volcap_wf/gp_wf defaults).
-L = [f"> **Built from RETIRED data sources (pre DESK_RULES #5): statarb daily_bars.json (the derivatives researcher, deprecated 02:09 SGT) and {_QR.DESK_DIR}/data.json. "
+L = [f"> **Built from RETIRED data sources (pre data-provenance rule): statarb daily_bars.json (deprecated 02:09 SGT) and data.json. "
      "Audit trail only; not a current result. See out/RETIRED_SOURCES.md.**\n"]
 names = {"wf_statarb_L120_w": "A. statarb bars, L120, weekly", "wf_statarb_L120_m": "B. statarb bars, L120, monthly (21d)",
          "wf_statarb_L252_m": "C. statarb bars, L252, monthly", "wf_datajson_L120_w": "D. data.json, L120, weekly",

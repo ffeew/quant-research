@@ -158,7 +158,7 @@ def main() -> None:
     primary = cast(bool, st["primary_ready"])
     if not primary:
         raise SystemExit(
-            "the data owner's store is not ready (see data/STATUS.md). No fallback by design (DESK_RULES.md rule #5)."
+            "the shared data store is not ready (see data/STATUS.md). No fallback by design (data-provenance rule)."
         )
     if primary:
         panel = dd.load_panel(clean=True)

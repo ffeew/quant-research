@@ -13,7 +13,7 @@ Status snapshot for the CIO: `STATUS.md`. Machine-readable run summary (counts, 
 | path | what it is | note |
 |---|---|---|
 | `$QR_DESK_DIR/data.json` (CIO, quant.py) | Alpaca **IEX** daily bars, `adjustment=all` (split+div adjusted), ~420 calendar days, ~120 symbols, plus snapshots and BTC/ETH/SOL | Prices are adjusted. **Volume is IEX-only (~2-4% of consolidated)**. Survivor-only universe. |
-| `$QR_DESK_DIR/statarb/data/daily_bars.json` (the stat-arb researcher/statarb) | IEX daily bars (2020-07+) | Same IEX volume issue, survivor universe. Use `bars/daily/adjusted` instead. |
+| `statarb/data/daily_bars.json` (legacy statarb pull) | IEX daily bars (2020-07+) | Same IEX volume issue, survivor universe. Use `bars/daily/adjusted` instead. |
 | `research/replication/_public_data/` (the derivatives researcher) | Ken French CSV/zip copies, AQR BAB | Superseded by `factors/ken_french/` (parsed, decimal). |
 
 "Bars look unadjusted": `bars/daily/raw/` is **intentionally** unadjusted (as traded). The adjusted set is `bars/daily/adjusted/`, and total returns are in `bars/daily/total_return/`.
@@ -279,7 +279,7 @@ Sample of 22 liquid stocks/ETFs, 2016-2026:
 | `crypto_bars.py` | DEPRECATED | - | - |
 | `alfred_store.py` | macro/treasury, macro/carry/g10_3m, sentiment/credit (frozen dated ALFRED vintages; `python alfred_store.py treasury g10_3m credit treasury_extra`) | weekly (daily for treasury/credit if needed); each run writes new dated files | ~1-2 min |
 
-Suggested daily order: corporate_actions, then daily_bars, total_return, assets_snapshot, earnings, qa. Run it at **07:30 SGT Tue-Sat** (US close + about 3.5 h; robust to the 1 Nov 2026 DST change). No schedules are configured; the desk head sets routines.
+Suggested daily order: corporate_actions, then daily_bars, total_return, assets_snapshot, earnings, qa. Run it at **07:30 SGT Tue-Sat** (US close + about 3.5 h; robust to the 1 Nov 2026 DST change). No schedules are configured.
 
 ## Blockers / not freely obtainable
 - **Macro release calendar (CPI/NFP/GDP/PCE/ISM), vintage-aware.**
@@ -491,7 +491,7 @@ tr = pd.read_parquet(f"{R}/bars/daily/total_return/daily_total_return.parquet")
 
 ### Gate primary-calendar candidate — DATA usable for replay but adoption WITHHELD
 - `/earnings/gate/DATA_ADOPTION_WITHHELD.md` is the controlling disposition for this candidate: **Historical disposition of the original rejection**—the risk manager has since re-verified the corrected gate (signed2026-11-06~06:54 SGT); exact state below: **pin replacement/cutover is false** and old accepted Risk pin registry is unchanged. Tables 20261105 retain exact observed hashes (`earnings_events`, `nasdaq_calendar`, sidecar) for independent replay, not for Risk adoption. Future-bias note: future rows are schedules/estimates, not proof a company announced a forthcoming date. `fetched_at_utc` is provenance of my fetch, not company knowledge time; EDGAR acceptance belongs to realised filings, not advance confirmation of a future earnings release.
-- Portfolio-construction lead currently found 20 forecasts incorrectly marked confirmed by consumer branch, skipping estimate buffer; 11 names fell outside required warning/entry window and three had late/wrong exits. Previous 0 stale-fail-safe count was source-freshness behavior ONLY, not an all-clear. Raw hashes still validate content integrity, not policy correctness. Do not point production construct at candidate; no construct/target rerun by the data owner. Full fail-safe state/CIO hold remains until consumer correction + independent tests + risk manager Risk re-verification. Unknown AVGO stays unknown; BAC/JNJ carried-forward records are explicitly NOT freshly rechecked.
+- The portfolio-construction check found 20 forecasts incorrectly marked confirmed by consumer branch, skipping estimate buffer; 11 names fell outside required warning/entry window and three had late/wrong exits. Previous 0 stale-fail-safe count was source-freshness behavior ONLY, not an all-clear. Raw hashes still validate content integrity, not policy correctness. Do not point production construct at candidate; no construct/target rerun. The full fail-safe state and the trading hold remain until consumer correction + independent tests + risk re-verification. Unknown AVGO stays unknown; BAC/JNJ carried-forward records are explicitly NOT freshly rechecked.
 - `/earnings/next_earnings/` sidecar stored dates are unbuffered. Estimated short/entry window = 15 sessions before earliest candidate; long-buffer release = 5 sessions before; preserve minimum actual candidate dates and exact exit contracts in consumer, not hack dates stored in data. Required future explicit forecast-vs-company-confirmed metadata does not authorize retroactively altering pinned candidate bytes.
 
 

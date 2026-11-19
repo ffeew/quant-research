@@ -131,7 +131,7 @@ def part_b(src: str, gross: float = 0.58, cap: float = 0.095, borrow_yr: float =
     return out, phis
 
 if __name__ == "__main__":
-    # DESK_RULES #5: default = the data owner's store via desk_data_client. `--retired` reproduces the pre-rule-5 run
+    # Data-provenance rule: default = the shared store via desk_data_client. `--retired` reproduces the pre-rule-5 run
     # (statarb audit copy + data.json) for audit only. New output never overwrites the retired-source file out/gp_wf.json.
     retired = "--retired" in sys.argv
     if retired:

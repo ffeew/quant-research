@@ -355,7 +355,7 @@ def verify_tr_cut_sums() -> None:
 
 
 def verify_b1c_accepted() -> None:
-    """H1/H2 refuse until B1c is accepted: the accepted B1c SUMS must exist and
+    """H1/H2 refuse until B1c is accepted: the accepted B1c checksum file must exist and
     match its pin. Hash only; nothing in it is parsed."""
     if PENDING in (B1C_ACCEPTED_SUMS_PATH, B1C_ACCEPTED_SUMS_SHA256):
         raise Blocked("REFUSING: B1c not accepted (B1C_ACCEPTED_SUMS_PATH / B1C_ACCEPTED_SUMS_SHA256 PENDING).")

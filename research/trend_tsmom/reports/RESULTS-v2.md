@@ -186,5 +186,5 @@ The band saved about 0.6× turnover and added about 0.04 to net Sharpe.
 - **Directory hash:** manifest at `../outputs_v2.MANIFEST.sha256`, hash at `../outputs_v2.HASH.txt`.
 
 ## Next steps (proposals only; any of them is a new trial and needs a new pre-registration)
-- **Stage B:** run the frozen V1 spec unchanged on the 2005+ backfill (needs the data owner's sign-off on the spliced file). This is the only route to a STANDARD verdict, and it requires DSR ≥ 0.95 and net Sharpe > 0.5.
+- **Stage B:** run the frozen V1 spec unchanged on the 2005+ backfill (needs the spliced file accepted first). This is the only route to a STANDARD verdict, and it requires DSR ≥ 0.95 and net Sharpe > 0.5.
 - **Optional new pre-registration:** a long-only-plus-trend-overlay or vol-target-8% variant would have to be pre-registered as new trials (N → 25+) and judged on Stage B only.

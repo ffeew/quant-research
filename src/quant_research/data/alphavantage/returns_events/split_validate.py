@@ -6,7 +6,7 @@ import hashlib
 import io
 import json
 
-# Pinned stage-2 script (validator P1-P6 + fund manager X2; boundary). No network.
+# Pinned stage-2 script (checks P1-P6 + X2; boundary). No network.
 # HOLDOUT values are held in memory only; only counts/shas reach stdout or files other than holdout/*.csv.
 # stderr is captured into a buffer and included in the negtest; exceptions print type name only.
 import os

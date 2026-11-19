@@ -925,7 +925,7 @@ def main() -> None:
         LOG.close()
         sys.stderr.write(f"DATA STOP {e} (exit 9)\n")
         sys.exit(EXIT_DATA)
-    except Exception as e:  # any other failure after LOCK = incident to the fund manager, no retry (PREREG v2 sec.0)
+    except Exception as e:  # any other failure after LOCK = reported incident, no retry (PREREG v2 sec.0)
         log("ABORT", type(e).__name__, str(e))
         LOG.close()
         sys.stderr.write(f"ABORT {type(e).__name__} {e} (exit 9)\n")
@@ -1159,7 +1159,7 @@ def compute(
         header=DECL_D,
         prereg="PREREG_H3_DRAFT_v2.md ecce2bbf",
         seal="40ddcc9c (S1-S6)",
-        rulings="the validator's rulings",
+        rulings="the validation decisions",
         env=ENV,
         calendar=facts,
         inputs=inputs,

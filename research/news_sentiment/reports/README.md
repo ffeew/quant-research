@@ -84,7 +84,7 @@ Panels for the validator: `out_*/stock_day_scores.parquet` (symbol, d, text_lm, 
 ### 2026-10-30 ~02:30 SGT: the validator's decisions (02:24) applied
 - N = 153 (sector-LM, breadth, spillover); hype-fade gates at 345 (153 + 192 PEAD) and reports both. +4 VADER-twin trials; +1 R151 (breadth NB7, included: it is in the ±20% grid of R126).
 - VADER finance-domain handling: `lexicon/vader_finance_neutral_v1.txt` (LM 2011 cited words + plurals; removes liability, liabilities, cancer, crude from VADER 3.3.2) applied by `vader_fin.py`; pinned in `prereg_run.py`.
-- All four documents: pre-2024 years count as OOS only after the ≥90% coverage floor is shown from the fetch; verdict capped at CONDITIONAL until the TCA owner's 2-9 Nov opening-auction pilot is in; G9 (2019+) kept.
+- All four documents: pre-2024 years count as OOS only after the ≥90% coverage floor is shown from the fetch; verdict capped at CONDITIONAL until the 2-9 Nov opening-auction cost pilot is in; G9 (2019+) kept.
 - Nothing frozen; no returns computed; no hold-out text read.
 
 ### 2026-10-30 ~02:35 SGT: TCA owner cost inputs wired in

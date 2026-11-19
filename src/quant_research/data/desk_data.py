@@ -284,7 +284,7 @@ def load_closes(prefer: str = "store") -> tuple[pd.DataFrame, str]:
     """Legacy (turn-1 backtest.py scripts). Store only; new pipelines use load_panel()."""
     files = list(ADJ_DIR.glob("*.parquet")) if ADJ_DIR.exists() else []
     if not files:
-        raise RuntimeError(f"The data owner's store not found at {ADJ_DIR}; no fallback (DESK_RULES.md rule #5).")
+        raise RuntimeError(f"The shared data store was not found at {ADJ_DIR}; no fallback (data-provenance rule).")
     df = pd.concat([pd.read_parquet(f, columns=["symbol", "session_date", "close"]) for f in files])
     df["session_date"] = pd.to_datetime(df["session_date"])
     return df.pivot(index="session_date", columns="symbol", values="close").sort_index(), "dmitri_store_adjusted_sip"

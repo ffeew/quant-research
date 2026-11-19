@@ -1,9 +1,9 @@
 # RESULTS: IV-gap v2, DEV gate readout (the sentiment researcher, the desk)
 Written 2026-11-13 ~23:50 SGT. Governed by PREREG r3 `PREREG_IV_GAP_v2_DRAFT_r3.md` (sealed, the validator).
-Run: `iv_gap_v2_run_r2_20261113/` SHA256SUMS (-c 6 OK), console (rc=0), FREEZE_NOTE,
+Run: `iv_gap_v2_run_r2_20261113/` checksums verified (6/6 OK), console (rc=0), FREEZE_NOTE,
 RUNCHECK (the validator, RUN ACCEPTED). Derived only from the sealed outputs by `derive.py`. No reader, AV or chain call; no rerun,
 no variant and no new cuts. The holdout (2016-06-01 onward) stayed unopened. v1 outputs were not opened.
-**Status: for the validator's check against the raw output first, then the fund manager.**
+**Status: to be checked against the raw output before any decision.**
 
 ## 1. What the prereg defines as the gate
 The prereg defines **no overall PASS/FAIL gate**. §1: the result "decides only whether AV IV may serve as a **cross-check**... It is never an
@@ -107,7 +107,7 @@ F1 +1, F1b +1, F1c +1, F2 0, **F3 +1** (cross-check usability selection, counted
 Per §7, the only permitted use is AV IV as a cross-check on the desk's Black-76 IV in the usable cells. It is never alpha, a signal, a gate or a filter.
 "the derivatives researcher's Black-76 IV is primary; AV IV is not used for gating" stands. This study tests no trade and makes no recommendation. Any later trade test that cites
 it must be defined-risk only (verticals, iron condors, or flies with long wings), with no naked short vol and no leverage. Such a test needs its own prereg and
-sign-off from the risk manager, the TCA owner and the desk head, and is paper only.
+risk, cost and owner sign-off, and is paper only.
 
 ## 11. Ambiguities (listed, not resolved)
 1. **Type granularity.** §7 names "symbol x year x moneyness x DTE cells", while §3 defines the cells with type (C/P separately and pooled). I report pooled as the

@@ -1,4 +1,4 @@
-# oos_runner.py - single sealed H1b OOS run (prereg v5, sealed; the fund manager/validator conditions).
+# oos_runner.py - single sealed H1b OOS run (prereg v5, sealed; review conditions).
 # Reuses dev_run.py (copied byte-for-byte, sha pinned) by executing its source with a DECLARED, exact-match list of
 # textual edits (EDITS below; each must match exactly once). The SAME transformed source runs in both modes:
 # --mode dev_rehearsal: DEV window/data (parity proof vs DEV_FREEZE). Refuses any HOLDOUT/raw path or news >= 2025-01.

@@ -2,7 +2,7 @@
 
 > **Status: FAILED** (the validator, 2026-10-30). Corrections applied 2026-10-30 02:26 SGT after his check.
 
-Submitted by the derivatives researcher (Quant Research) to the validator, 2026-10-30 01:47 SGT. Built against validation/STANDARD.md v1.0. Self-assessment only; the verdict is the validator's.
+Submitted for validation, 2026-10-30 01:47 SGT. Built against validation/STANDARD.md v1.0. Self-assessment only; the verdict is recorded separately.
 
 **Scope: ETF version only.** This tests 11 SPDR sector ETFs, 3 per side (about 27% of the sectors on each side; XLC only from 2018-06, which also changed the other sectors' composition). The paper uses 20 value-weighted industries, 3 per side (15%). **The paper-faithful 20-industry (stock-level) result on desk data is unknown.** It cannot be built without point-in-time industry codes for former S&P 500 members (0% coverage). Using current GICS would add survivorship bias, so it was not run. The FAIL applies to the ETF implementation only. For context, the FF49 VW J6/K6 public check for 2016 onward is gross SR 0.28 (t 0.93). Book definitions: imom_etf_ls holds 6 overlapping monthly cohorts (J=6/K=6); **imom_etf_long and imom_etf_ls_1m are rebalanced fully each month (no overlapping cohorts)**. That is why their hold_months ±20% rows are identical to base.
 

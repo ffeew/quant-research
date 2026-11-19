@@ -1,6 +1,6 @@
 # Alpha Vantage news sentiment + earnings-call transcripts (for the sentiment researcher) - RAW layer
-Built by the data engineer (Data Engineer), 10-11 Nov 2026 SGT. Assigned by the fund manager; pull approved by the desk head 22:39 SGT 10 Nov.
-Status: RAW, sealed, pending the fund manager's inspection. Not yet released to the sentiment researcher. A separate clean/ layer will follow the fund manager's
+Built 10-11 Nov 2026 SGT.
+Status: RAW, sealed, pending inspection. Not yet released for research use. A separate clean/ layer will follow the
 cleaning decisions, with every rule and dropped row in CLEANING.md; raw/ stays untouched.
 
 ## Contents
@@ -22,7 +22,7 @@ AVGO ORCL CSCO ADBE CRM AMD INTC QCOM TXN NFLX DIS CMCSA T VZ NKE MCD SBUX BA CA
 6,796 request attempts: 6,790 OK, 6 ERROR (all recovered on retry), 2 MISSING after 2 retries. 530 split calls (cap 800).
 News: 2,912 symbol-months, all with an accepted file. Transcripts: 3,348 accepted of 3,350.
 
-## Fields touched by validation (fund manager decision B, metadata only)
+## Fields touched by validation (decision B, metadata only)
 News: top-level 'feed' (list present, length), per item 'url' and 'time_published'. Transcripts: 'symbol', 'quarter',
 'transcript' (entry count, and character count of each entry's 'content' summed; text never printed or stored).
 Raw-byte checks: size, sha256, substring test for "Information" / "Note" / "Error Message" on bodies < 4 KB (decision C).
