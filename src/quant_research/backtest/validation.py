@@ -253,7 +253,7 @@ def walk_forward(
 
 
 # ---------------------------------------------------------------------------------------------------------------
-# Shared overfitting guards (Victor). Minimal, dependency-free helpers so every trial uses the same purged CV and
+# Shared overfitting guards (validator). Minimal, dependency-free helpers so every trial uses the same purged CV and
 # the same hold-out check instead of re-implementing them per strategy. Code above keeps its original arithmetic.
 # ---------------------------------------------------------------------------------------------------------------
 
