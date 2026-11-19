@@ -10,6 +10,10 @@ import pandas as pd
 from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DATA_DIR, ...)
 from quant_research.utils.pins import desk_pin
 
+# The v2 review document lives outside the repo; its location is a required input with no default.
+REVIEW_DOC_ENV = "QR_V2_1_REVIEW_DOC"
+REVIEW_DOC = _QR.required_env(REVIEW_DOC_ENV, "the path of the v2 review document pinned by VALIDATION_SHA")
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(ROOT)
 V1 = desk_pin("data.earnings_events.v2_1.validate_v2_1", "V1")
@@ -32,7 +36,7 @@ assert sha("v2/earnings_events_8k202_v2.parquet") == V2
 assert sha("v2.1/earnings_events_8k202_v2.parquet") == V2
 assert sha("v2/SHA256SUMS") == sha("v2.1/PARENT_V2_SHA256SUMS")
 assert sha(f"{_QR.DATA_DIR}/earnings/edgar_8k_202.parquet") == OLD
-assert sha(f"{_QR.DESK_DIR}/validation/prereg_rulings/2026-11-06-ethan-8k202-v2-review.md") == VALIDATION_SHA
+assert sha(REVIEW_DOC) == VALIDATION_SHA
 assert sha(f"{_QR.DATA_DIR}/derived/earnings_events_8k202_v1_reconciliation/DECISION.md") == DATA_SHA
 
 v2 = pd.read_parquet("v2.1/earnings_events_8k202_v2.parquet")

@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 # h2c_dev_run.py - H2-C DEV runner (confirmatory DEV leg), FROZEN CODE, per sealed PREREG r3 + Erratum 01
 # + Erratum 02 (seal note). Method adapted from h2_dev.py (helpers copied, not imported).
 # DEV ONLY. Never opens HOLDOUT / TRANSCRIPTS_HOLDOUT / TRANSCRIPTS_EXCLUDED / ROUTE_TABLE / clean/. No network, no env vars.
-# Real run: no arguments (LOCK command, PREREG r3 §12). Test run: --synthetic <cfg.json>, all paths must sit under SYNTH_ROOT.
+# Real run: --pull_root <dir> only (LOCK command, PREREG r3 §12; required, no default). Test run: --synthetic <cfg.json>, all paths must sit under SYNTH_ROOT.
 # Exit codes: 0 ok | 2 sha mismatch | 3 mapping cross-check | 4 schema | 5 LOCK slots unfilled | 6 allowlist/forbidden path
 #             7 purge mismatch | 8 partition (row outside DEV) | 9 interpreter/flags/version/import | 10 argv/config | 11 calendar
 #             12 uncaught exception BEFORE any output (coded STOP, FD-6) | 13 any STOP/exception AFTER RUN_DIR/STATS exist (FD-6, final)
@@ -42,18 +42,20 @@ except BaseException as _e:
 # ============================ CONSTANTS BLOCK (all paths + shas; LOCK edits only this block) ============================
 FREEZE_DIR = f"{_QR.DESK_DIR}/research/original/h2c_freeze_r2_20261114"
 SYNTH_ROOT = FREEZE_DIR + "/synthetic_test/"
-PULL_ROOT = f"{_QR.DESK_DIR}/validation/dmitri/h2c_av_pull_20261114_r1_inc70b"  # FD-4: copy (no scratch path)
+# FD-4: the AV pull copy (no scratch path). Its root is a required real-run argument (--pull_root), no default.
+PULL_ROOT_PLACEHOLDER = "<--pull_root>"
+PULL_REL = {"COPY_SUMS": "/COPY_SUMS", "PRICES_DEV": "/DEV/PRICES_DEV.json", "EARNINGS_DEV": "/DEV/EARNINGS_DEV.json"}
 PINS = {
     "COPY_SUMS": (
-        PULL_ROOT + "/COPY_SUMS",
+        PULL_ROOT_PLACEHOLDER + PULL_REL["COPY_SUMS"],
         desk_pin("strategies.sentiment_returns.h2c_dev_run", "PINS.COPY_SUMS[1]"),
     ),  # FD-4
     "PRICES_DEV": (
-        PULL_ROOT + "/DEV/PRICES_DEV.json",
+        PULL_ROOT_PLACEHOLDER + PULL_REL["PRICES_DEV"],
         desk_pin("strategies.sentiment_returns.h2c_dev_run", "PINS.PRICES_DEV[1]"),
     ),
     "EARNINGS_DEV": (
-        PULL_ROOT + "/DEV/EARNINGS_DEV.json",
+        PULL_ROOT_PLACEHOLDER + PULL_REL["EARNINGS_DEV"],
         desk_pin("strategies.sentiment_returns.h2c_dev_run", "PINS.EARNINGS_DEV[1]"),
     ),
     "PURGE": (
@@ -384,6 +386,12 @@ def load_config(argv: list[str]) -> dict[str, Any]:
         synthetic=False,
     )
     if len(argv) == 1:
+        raise Stop(10, "missing required --pull_root <dir> (AV pull copy root; no default)")
+    if len(argv) == 3 and argv[1] == "--pull_root":
+        root = argv[2].rstrip("/")
+        if not root:
+            raise Stop(10, "missing required --pull_root <dir> (AV pull copy root; no default)")
+        S["PINS"].update({k: (root + rel, S["PINS"][k][1]) for k, rel in PULL_REL.items()})
         return S
     if len(argv) != 3 or argv[1] != "--synthetic":
         raise Stop(10, f"bad argv {argv[1:]}")
