@@ -35,6 +35,10 @@ Numbers above are copied from these documents:
 ## Status update: H2-C and H3
 - H2-C: DEV passed gates G0 and G1. The holdout test is pending; no holdout result yet.
   - Code: `src/quant_research/strategies/sentiment_returns/h2c/`
+  - Run command: the LOCK command in [PREREG_H2C_r3.md](reports/PREREG_H2C_r3.md) §12 predates the required-input
+    change. `h2c_dev_run.py` now refuses a real run (exit 10) unless it is given `--pull_root <dir>` (the AV pull copy
+    root) and also `--purge`, `--tx_dev_root`, `--fye_month_frozen`, `--cost_clean` and `--cost_tx_root`. None has a
+    default. Add these flags to the §12 command at LOCK. The prereg is frozen and is not edited.
 - H3: code only. Not run; no findings.
   - Code: `src/quant_research/strategies/sentiment_returns/h3/`
   - Design choices that are not yet settled are explicit parameters with no committed value in `configs/sentiment_returns.toml`.
