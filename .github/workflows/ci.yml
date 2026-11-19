@@ -3,22 +3,29 @@ name: CI
 on:
   push:
   pull_request:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
 
+# Least privilege for every job. The test job raises actions to write so it can upload
+# the coverage artifact. CodeQL lives in its own workflow.
 permissions:
+  actions: read
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   lint:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v10.3.3
-        with:
-          version: "0.13.9"
-          python-version: "3.12"
-          enable-cache: true
-      - name: Sync
-        run: uv sync --locked
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Setup uv
+        uses: ./.github/actions/setup-uv
       - name: Ruff
         run: uv run ruff check .
       - name: Ruff format
@@ -26,30 +33,170 @@ jobs:
 
   typecheck:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v10.3.3
-        with:
-          version: "0.13.9"
-          python-version: "3.12"
-          enable-cache: true
-      - name: Sync
-        run: uv sync --locked
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Setup uv
+        uses: ./.github/actions/setup-uv
       - name: Mypy
         run: uv run mypy
 
   test:
-    runs-on: ubuntu-latest
+    name: test (${{ matrix.os }}, py${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    permissions:
+      actions: write
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python: "3.12"
+            coverage: true
+            randomly: false
+          - os: ubuntu-latest
+            python: "3.13"
+            coverage: false
+            randomly: true
+          - os: macos-latest
+            python: "3.12"
+            coverage: false
+            randomly: false
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v10.3.3
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Setup uv
+        uses: ./.github/actions/setup-uv
         with:
-          version: "0.13.9"
-          python-version: "3.12"
-          enable-cache: true
-      - name: Sync
-        run: uv sync --locked
+          python-version: ${{ matrix.python }}
       - name: Compile
         run: uv run python -m compileall -q src tests scripts
       - name: Test
-        run: uv run pytest
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmd=(uv run pytest)
+          if [[ "${{ matrix.randomly }}" != "true" ]]; then
+            cmd+=(-p no:randomly)
+          fi
+          if [[ "${{ matrix.coverage }}" == "true" ]]; then
+            cmd+=(--cov --cov-report=term-missing --cov-report=xml --cov-report=html)
+          fi
+          "${cmd[@]}"
+      - name: Upload coverage report
+        if: ${{ !cancelled() && matrix.coverage }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage
+          path: |
+            coverage.xml
+            htmlcov/
+          if-no-files-found: error
+          retention-days: 14
+
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Setup uv
+        uses: ./.github/actions/setup-uv
+      - name: Lockfile, wheel, and import smoke test
+        run: bash scripts/package_smoke.sh
+
+  pre-commit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Setup uv
+        uses: ./.github/actions/setup-uv
+      - name: Run hooks
+        run: uv run pre-commit run --all-files
+
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Setup uv
+        uses: ./.github/actions/setup-uv
+      - name: Audit the exported lock
+        run: bash scripts/audit_deps.sh
+
+  gitleaks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Install gitleaks 8.30.1
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="8.30.1"
+          file="gitleaks_${version}_linux_x64.tar.gz"
+          url="https://github.com/gitleaks/gitleaks/releases/download/v${version}/${file}"
+          sha="551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
+          curl -sSfL -o "/tmp/${file}" "$url"
+          echo "${sha}  /tmp/${file}" | sha256sum -c -
+          tar -xzf "/tmp/${file}" -C /tmp gitleaks
+          mkdir -p "$HOME/.local/bin"
+          install -m 0755 /tmp/gitleaks "$HOME/.local/bin/gitleaks"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/gitleaks" version
+      - name: Scan full git history
+        run: gitleaks detect --source . --redact --no-banner --exit-code 1 --log-opts="--all"
+
+  hygiene:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Setup uv
+        uses: ./.github/actions/setup-uv
+      - name: Repository hygiene
+        run: uv run python scripts/check_repo_hygiene.py
+
+  ci-ok:
+    name: ci-ok
+    needs: [lint, typecheck, test, package, pre-commit, audit, gitleaks, hygiene]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every job to succeed
+        env:
+          JOB_LINT: ${{ needs.lint.result }}
+          JOB_TYPECHECK: ${{ needs.typecheck.result }}
+          JOB_TEST: ${{ needs.test.result }}
+          JOB_PACKAGE: ${{ needs.package.result }}
+          JOB_PRE_COMMIT: ${{ needs.pre-commit.result }}
+          JOB_AUDIT: ${{ needs.audit.result }}
+          JOB_GITLEAKS: ${{ needs.gitleaks.result }}
+          JOB_HYGIENE: ${{ needs.hygiene.result }}
+        run: |
+          python3 - <<'PY'
+          import os
+          import sys
+
+          bad = []
+          for key in sorted(name for name in os.environ if name.startswith("JOB_")):
+              value = os.environ[key]
+              print(f"{key}={value}")
+              if value != "success":
+                  bad.append(f"{key}={value}")
+          if bad:
+              print("ci-ok failed: " + ", ".join(bad), file=sys.stderr)
+              sys.exit(1)
+          print("ci-ok: all required jobs succeeded")
+          PY

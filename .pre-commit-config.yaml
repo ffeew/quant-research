@@ -2,20 +2,23 @@ repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
+      # Research prose is frozen. Ruff already excludes it; keep the whitespace hooks aligned.
       - id: end-of-file-fixer
+        exclude: ^research/|^docs/data/sue_spec\.md$
       - id: trailing-whitespace
+        exclude: ^research/|^docs/data/sue_spec\.md$
       - id: check-yaml
 
   - repo: local
     hooks:
       - id: ruff-check
         name: ruff
-        entry: uv run ruff check --fix
+        entry: uv run ruff check --fix --force-exclude
         language: system
         types_or: [python, pyi]
       - id: ruff-format
         name: ruff-format
-        entry: uv run ruff format
+        entry: uv run ruff format --force-exclude
         language: system
         types_or: [python, pyi]
       - id: mypy
@@ -24,6 +27,12 @@ repos:
         language: system
         pass_filenames: false
         types: [python]
+      - id: repo-hygiene
+        name: repo hygiene
+        entry: uv run python scripts/check_repo_hygiene.py
+        language: system
+        pass_filenames: false
+        always_run: true
 
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.30.1

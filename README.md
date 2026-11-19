@@ -26,8 +26,8 @@ quant-research/
 ├── pyproject.toml       package, dependency groups, ruff, mypy, and pytest
 ├── uv.lock              locked environment (uv sync --locked)
 ├── .python-version      3.12
-├── Makefile             install / lint / typecheck / test / build-data
-└── .github/workflows/   CI (Python 3.12: ruff, mypy, pytest)
+├── Makefile             install / check / lint / typecheck / test / build-data
+└── .github/workflows/   CI (`ci-ok`) and CodeQL; see CONTRIBUTING.md
 ```
 
 ## Quick start
