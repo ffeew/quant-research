@@ -78,6 +78,49 @@ class SharedCostModel:
         return float(cm.borrow_cost(short_mv_usd, days=days, annual_rate=cfg.borrow_rate)["usd"])
 
 
+# Desk validation standard, cost section: per-side minimum = asset-class floor + half-spread.
+# US large-cap 5 bps, mid-cap 10 bps, small-cap / thin 20 bps; liquid ETFs 2 bps (thin ETFs use the
+# small-cap row). Cost-model buckets map L1/L2 -> large, L3 -> mid, L4 -> small; the half-spread is
+# the bucket default. A modelled cost below the floor is raised to it, never lowered.
+STANDARD_FLOOR_BPS = {"L1": 5.0, "L2": 5.0, "L3": 10.0, "L4": 20.0}
+STANDARD_ETF_FLOOR_BPS = 2.0
+
+
+def standard_floor_bps(px: float, adv_shares: float | None, *, is_etf: bool) -> float:
+    bucket = cm.liq_bucket(adv_shares * px) if adv_shares else "L4 small (<$50M)"
+    code = bucket.split()[0]
+    base = STANDARD_ETF_FLOOR_BPS if (is_etf and code != "L4") else STANDARD_FLOOR_BPS[code]
+    return base + float(cm.BUCKETS[bucket][1])
+
+
+class FlooredCostModel:
+    """Wraps a cost model so no trade is charged less than the standard's per-side minimum."""
+
+    floor_label = "standard_minimum_plus_half_spread"
+
+    def __init__(self, inner: CostModel | None = None) -> None:
+        self.inner: CostModel = inner or SharedCostModel()
+
+    def one_way_bps(
+        self,
+        side: str,
+        px: float,
+        shares: float,
+        adv_shares: float | None,
+        *,
+        symbol: str,
+        is_etf: bool,
+        cfg: CostConfig,
+    ) -> float:
+        if not (shares > 0):
+            return 0.0
+        model = self.inner.one_way_bps(side, px, shares, adv_shares, symbol=symbol, is_etf=is_etf, cfg=cfg)
+        return max(model, standard_floor_bps(px, adv_shares, is_etf=is_etf))
+
+    def borrow_usd(self, short_mv_usd: float, days: float, cfg: CostConfig) -> float:
+        return self.inner.borrow_usd(short_mv_usd, days, cfg)
+
+
 def build_cost_config(path: str) -> CostConfig:
     paths = {
         "unknown_borrow_required": CostConfig("unknown_borrow_required", BORROW_UNKNOWN_REQUIRED, True),
@@ -149,6 +192,7 @@ def apply_costs_and_returns(
         "k_impact": cfg.k_impact,
         "n_sessions": int(len(df)),
         "n_sessions_adv_capped": int(capped_sessions),
+        "cost_floor": getattr(costs, "floor_label", None),
         "daily": df,
     }
 

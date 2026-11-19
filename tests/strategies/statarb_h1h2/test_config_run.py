@@ -73,6 +73,7 @@ def test_end_to_end_returns_and_out_no_clobber(synth_cfg, capsys):
     assert res["returns_computed"] is True
     assert {"H1_pathA", "H1_pathB", "H2"} <= set(res)
     assert res["H2"]["borrow_rate_used"] == 0.10 and res["H2"]["required_borrow_gate"] in ("PASS", "FAIL on costs")
+    assert res["H2"]["cost_floor"] == res["H1_pathA"]["cost_floor"] == "standard_minimum_plus_half_spread"
     with pytest.raises(FileExistsError):
         run.main(_args(cfg, files, "--out", "res.json"))
     assert run.main(_args(cfg, files, "--out", "../escape.json")) == 1

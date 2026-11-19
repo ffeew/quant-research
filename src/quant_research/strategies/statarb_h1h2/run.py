@@ -27,6 +27,7 @@ from .events import earliest_possible_index, make_evidx
 from .frames import iloc_int
 from .guards import Blocked, require_acceptance_hash
 from .pnl import (
+    FlooredCostModel,
     apply_costs_and_returns,
     build_cost_config,
     h1_terminal_bound,
@@ -192,7 +193,7 @@ def _main(args: argparse.Namespace) -> int:
         for key, W_run, ov, recs in runs:
             if idea == "H2" and args.delisting_stress:
                 key = "H2_delisting_stress"
-            out = apply_costs_and_returns(bars, W_run, cost_cfg, idea=idea)
+            out = apply_costs_and_returns(bars, W_run, cost_cfg, idea=idea, costs=FlooredCostModel())
             daily = out.pop("daily")
             if ov is not None:
                 daily["net"] = daily["net"] + ov.reindex(daily.index).fillna(0.0)

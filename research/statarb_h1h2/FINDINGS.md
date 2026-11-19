@@ -1,7 +1,8 @@
 # Statarb H1/H2 harness (bellwether lag, earnings peer read-through)
 
 **Status:** in_progress  
-**Verdict:** harness code-reviewed; no DEV run yet; no results
+**Verdict:** none. There is no Stage A verdict, and there will be none until the deflated Sharpe
+ratio (DSR) and purged cross-validation land in a later PR. No DEV run yet; no results.
 
 ## Hypotheses
 - **H1 (bellwether lag).** Within a GICS sub-industry with at least 4 eligible members, an unusual
@@ -20,14 +21,33 @@
   hold window (2-session margin), name cap 9.5% of equity at 58% gross.
 - H2 primary: H = 40, |N| >= 1.5, already-reported window 50 sessions, unit 0.5%, at most 100 live
   positions; hedge = sector SPDR (SPY if it has < 252 sessions).
-- Execution: signal at the close of t, fill at the close of t+1; participation capped at 1% of 20-day ADV.
-- Costs: required path uses >= 10%/yr borrow on every historically unknown short, ETF hedges included;
+- Execution: signal at the close of t, fill at the close of t+1, first return t+1 -> t+2 (H1 and H2
+  alike); each session trades at most 1% of 20-day ADV and the unfilled rest carries forward.
+- Costs: every trade pays at least the desk standard's per-side minimum (5 bps large-cap, 10 bps
+  mid-cap, 20 bps small-cap/thin, 2 bps liquid ETFs, each plus half-spread); required path uses >= 10%/yr borrow on every historically unknown short, ETF hedges included;
   impact k = 1.0 base (0.75 is a lighter sensitivity); 1%/yr general-collateral path is a labelled
   counterfactual only.
 - Terminal treatments: H1 stranded positions in unresolved delistings take an adverse bound (long -100%,
   short max(last price, deal value)); H2 counted delisting stress is -30% long / 0% short.
 - Trial count N = 212 for the deflated Sharpe ratio. Stage A (DEV) pass bar: net Sharpe > 0.85 on the
   required cost path with the predicted sign; a fail ends the idea and the holdout stays closed.
+
+## Fixes after the validator's review (harness only; the sealed desk runner is unchanged)
+- **B1, look-ahead in H1.** H1 used to hold each tranche on its own signal bar, so it effectively
+  filled at the signal close. Each tranche is now held from the next session, the same as H2: a
+  signal at t first earns t+1 -> t+2.
+- **B2, ADV cap.** The 1% ADV cap used to trim only the shares used to price costs, while gross
+  return was earned on the full target. The cap now limits the trade itself, the unfilled rest
+  carries to later sessions, and gross, cost and borrow are all on the position actually held.
+- **B3, borrow.** Borrow used to accrue one day per session on a 360-day basis (about 7%/yr at a
+  10% rate). It now accrues the calendar days between sessions (a weekend counts 3 days), so a
+  year held short costs the full rate (365/360 of it).
+- Minor fixes: the universe receipt lists only rows dated on or before the DEV end (2021-12-31);
+  H2 caps single-name legs first and re-solves each ETF hedge from the capped leg, so the book
+  stays beta-neutral (H1 has no hedge leg; its name cap still trims without reallocating); the
+  standard's cost floor is applied to every run.
+- Not done yet: DSR and purged CV. Until they land there is no Stage A verdict, whatever a DEV
+  Sharpe shows.
 
 ## Data window
 | Split | Dates | Notes |
@@ -37,7 +57,8 @@
 | Holdout | 2022-03-30 to 2026-10-28 | read once, in a single sitting; not bound in this harness |
 
 ## Method
-`quant_research.strategies.statarb_h1h2` is a config-driven port of the pre-registered runner. All
+`quant_research.strategies.statarb_h1h2` is a config-driven port of the pre-registered runner, with
+the review fixes above. All
 input paths and sha256 pins come from a TOML config (`configs/statarb_h1h2.toml` is an all-PENDING
 example). The harness fails closed: any PENDING or mismatched pin, a total-return cut holding rows
 after the embargo end, or rows past the read-time end stops the run before any return is computed.

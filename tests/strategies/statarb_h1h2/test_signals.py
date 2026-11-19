@@ -108,3 +108,18 @@ def test_h2_unit_and_max_positions():
     )
     assert len(pos) == 2 and all(p["w_sym"] == 0.004 for p in pos)
     assert [p["sym"] for p in pos] == ["CCC", "DDD"]  # ties broken by symbol
+
+
+def test_h2_hedge_stays_beta_neutral_when_name_cap_binds():
+    d = pd.bdate_range("2018-01-01", periods=30)
+    betas = {"CCC": 1.2, "DDD": 0.8, "EEE": 1.5}
+    pos = [
+        {"sym": s, "etf": "XLK", "w_sym": 0.3, "w_etf": -b * 0.3, "entry_i": 5 + k, "exit_i": 20, "N": 2.0}
+        for k, (s, b) in enumerate(betas.items())
+    ]
+    W = signals.h2_book(pos, d)
+    assert np.isclose(W[list(betas)].abs().max().max(), NAME_CAP)  # the cap binds on every name
+    book_beta = sum(W[s] * b for s, b in betas.items()) + W["XLK"]
+    assert np.allclose(book_beta, 0.0, atol=1e-12)  # hedge re-solved after the cap
+    assert W["XLK"].abs().max() > NAME_CAP  # the hedge leg itself is not trimmed
+    assert (W.iloc[:5] == 0).all().all() and (W.iloc[20:] == 0).all().all()

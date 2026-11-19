@@ -93,6 +93,24 @@ def test_adv_cap_fills_over_several_sessions():
     assert np.isclose(tc["daily"]["tc"].sum(), 0.0012 * 10 / 1e4)  # cost only on shares actually traded
 
 
+def test_standard_cost_floor():
+    cfg = pnl.build_cost_config("unknown_borrow_required")
+    fl = pnl.FlooredCostModel(ZeroCost())
+    kw = {"symbol": "A", "is_etf": False, "cfg": cfg}
+    # ADV $2B (L1): 5 + 2.75; $100M (L3): 10 + 12; unknown ADV -> small: 20 + 30
+    assert np.isclose(fl.one_way_bps("buy", 100.0, 10.0, 2e7, **kw), 5.0 + 2.75)
+    assert np.isclose(fl.one_way_bps("buy", 100.0, 10.0, 1e6, **kw), 10.0 + 12.0)
+    assert np.isclose(fl.one_way_bps("buy", 100.0, 10.0, None, **kw), 20.0 + 30.0)
+    assert np.isclose(fl.one_way_bps("buy", 100.0, 10.0, 2e7, symbol="XLK", is_etf=True, cfg=cfg), 2.0 + 2.75)
+    assert fl.one_way_bps("buy", 100.0, 0.0, 2e7, **kw) == 0.0
+    assert pnl.FlooredCostModel(FlatCost()).one_way_bps("buy", 100.0, 10.0, 2e7, **kw) == 10.0  # higher model kept
+    b = _bars()
+    W = pd.DataFrame(0.0, index=b["R"].index, columns=["A", "B"])
+    W.iloc[5:10, 0] = 0.1
+    out = pnl.apply_costs_and_returns(b, W, cfg, idea="H1", costs=fl)
+    assert out["cost_floor"] == pnl.FlooredCostModel.floor_label and out["daily"]["tc"].sum() > 0
+
+
 def test_pass_bar_borrow_floor():
     with pytest.raises(RuntimeError):
         pnl.apply_costs_and_returns(_bars(), pd.DataFrame(), pnl.CostConfig("x", 0.01, True), idea="H1")

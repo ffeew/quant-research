@@ -257,11 +257,23 @@ def signal_h2(
                 live.add(s)
                 n_live += 1
 
-    cols = sorted({p["sym"] for p in positions} | {p["etf"] for p in positions})
-    W = pd.DataFrame(0.0, index=dates, columns=cols)
+    return h2_book(positions, dates), positions
+
+
+def h2_book(positions: list[dict[str, Any]], dates: pd.DatetimeIndex) -> pd.DataFrame:
+    """Daily H2 weights. The name cap trims the single-name legs first; each position's ETF hedge
+    is then re-solved from its capped leg (-beta * held leg), so the book stays beta-neutral.
+    ETF hedge legs are hedge instruments and are not name-capped."""
+    syms = sorted({p["sym"] for p in positions})
+    etfs = sorted({p["etf"] for p in positions})
+    S = pd.DataFrame(0.0, index=dates, columns=syms)
+    for p in positions:
+        S.iloc[p["entry_i"] : p["exit_i"], _iloc(S.columns, p["sym"])] += p["w_sym"]
+    capped = S.clip(-NAME_CAP, NAME_CAP)
+    scale = (capped / S.where(S != 0)).fillna(1.0)  # share of each name's leg kept by the cap
+    H = pd.DataFrame(0.0, index=dates, columns=etfs)
     for p in positions:
         sl = slice(p["entry_i"], p["exit_i"])
-        W.iloc[sl, _iloc(W.columns, p["sym"])] += p["w_sym"]
-        W.iloc[sl, _iloc(W.columns, p["etf"])] += p["w_etf"]
-    W = W.clip(-NAME_CAP, NAME_CAP)
-    return W, positions
+        kept = scale[p["sym"]].iloc[sl].to_numpy(dtype=float)
+        H.iloc[sl, _iloc(H.columns, p["etf"])] += p["w_etf"] * kept
+    return pd.concat([capped, H], axis=1)[sorted(syms + etfs)]

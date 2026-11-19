@@ -3,14 +3,20 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from datetime import date
 from typing import Any
 
 import pandas as pd
 
 from .guards import Blocked
-from .splits import ETFS
+from .splits import DEV1, ETFS
 
 Interval = tuple[pd.Timestamp, Any]  # end may be NaT (open)
+
+
+def _open(x: Any) -> bool:
+    """NaT / None end = open interval (plain bool, so later comparisons stay type-checked)."""
+    return bool(pd.isna(x))
 
 
 def subtract_intervals(iv: Interval, cuts: list[Interval]) -> list[Interval]:
@@ -42,13 +48,23 @@ def build_membership(
     dev_universe: Iterable[str] | None = None,
     final_list: dict[str, Any] | None = None,
     listing_overlap_treatment: dict[str, str] | None = None,
+    receipt_end: date = DEV1,
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
     """PIT membership clipped to listing windows, minus reused-ticker original-member periods,
     minus missing names, minus ETFs, minus identity exclusions. Returns (mem, receipt).
 
     pm:      symbol, start_date_filled, end_date (NaT = open; end exclusive) [, after_boundary]
     listing: symbol, ipoDate, delistingDate ('null' / NaN = still listed), listing_source (active|delisted)
+
+    The receipt lists only rows dated on or before receipt_end (the stage's last evaluation day),
+    and a clip or cut only when it changes membership on or before that day.
     """
+    cut = pd.Timestamp(receipt_end)
+    upto = cut + pd.Timedelta(days=1)
+
+    def trunc(ivs: list[Interval]) -> list[tuple[Any, Any]]:
+        return [(a, upto if _open(b) or b > upto else b) for a, b in ivs if a <= cut]
+
     treatment = dict(listing_overlap_treatment or {})
     r18_cuts = {
         t["ticker"]: [(pd.Timestamp(a), pd.Timestamp(b) if b else pd.NaT) for a, b in t["original_member_periods"]]
@@ -91,34 +107,42 @@ def build_membership(
         "final_list_kept": sorted(fl_kept),
         "final_list_kept_covered_overlap": sorted(in_uni & fl_kept),
         "after_boundary_member_rows": (
-            sorted(pm.loc[pm["after_boundary"].astype(bool), "symbol"]) if "after_boundary" in pm.columns else []
+            sorted(
+                pm.loc[pm["after_boundary"].astype(bool) & (pd.to_datetime(pm["start_date_filled"]) <= cut), "symbol"]
+            )
+            if "after_boundary" in pm.columns
+            else []
         ),
     }
     for sym, start_raw, end_raw in zip(pm["symbol"], pm["start_date_filled"], pm["end_date"]):
         s = str(sym)
+        iv: Interval = (pd.Timestamp(start_raw), pd.Timestamp(end_raw) if pd.notna(end_raw) else pd.NaT)
+        dated = bool(iv[0] <= cut)  # rows starting after receipt_end never appear in the receipt
         if s in lineage:
-            rec["lineage_excl_dropped"].append(s)
+            if dated:
+                rec["lineage_excl_dropped"].append(s)
             continue
         if s in fl_excl:
-            rec["final_list_excluded"].append({"symbol": s, "reason": fl_excl[s]})
+            if dated:
+                rec["final_list_excluded"].append({"symbol": s, "reason": fl_excl[s]})
             continue
-        iv: Interval = (pd.Timestamp(start_raw), pd.Timestamp(end_raw) if pd.notna(end_raw) else pd.NaT)
         if s in ETFS:
-            rec["etf_rows_dropped"].append(s)
+            if dated:
+                rec["etf_rows_dropped"].append(s)
             continue
         if s in m14_set:
-            rec["missing_gap"].append(
-                {"symbol": s, "start": str(iv[0].date()), "end": None if pd.isna(iv[1]) else str(iv[1].date())}
-            )
+            if dated:
+                end_s = None if _open(iv[1]) or iv[1] > upto else str(iv[1].date())
+                rec["missing_gap"].append({"symbol": s, "start": str(iv[0].date()), "end": end_s})
             continue
         parts = [iv]
         if s in r18_cuts:
             parts = subtract_intervals(iv, r18_cuts[s])
-            if parts != [iv]:
+            if trunc(parts) != trunc([iv]):
                 rec["reused_removed"].append(s)
         w = windows.get(s)
         if not w:
-            if parts:
+            if trunc(parts):
                 rec["no_listing_record"].append(s)
             continue
         clipped = []
@@ -129,7 +153,7 @@ def build_membership(
                 e0 = min(e_candidates) if e_candidates else pd.NaT
                 if pd.isna(e0) or s0 < e0:
                     clipped.append((s0, e0))
-        if clipped != parts:
+        if trunc(clipped) != trunc(parts):  # only clips that bite on or before receipt_end
             rec["listing_clipped"].append(s)
         for cs, ce in clipped:
             rows.append({"symbol": s, "start_date_filled": cs, "end_date": ce if pd.notna(ce) else None})

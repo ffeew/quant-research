@@ -53,6 +53,38 @@ def test_membership_rules():
     assert (T(ccc.start_date_filled), T(ccc.end_date)) == (T("2016-06-01"), T("2017-02-01"))
 
 
+def test_receipt_lists_only_rows_dated_on_or_before_dev_end():
+    pm = pd.DataFrame(
+        {
+            "symbol": ["OLD", "CLP", "NEW", "XLK", "MIS", "LAT"],
+            "start_date_filled": [T("2016-01-04")] * 2
+            + [T("2022-06-01"), T("2023-01-03"), T("2016-01-04")]
+            + [T("2022-02-01")],
+            "end_date": [None, None, None, None, T("2024-01-02"), None],
+            "after_boundary": [False, False, True, False, False, True],
+        }
+    )
+    ls = pd.DataFrame(
+        {
+            "symbol": ["OLD", "CLP", "LAT"],
+            "ipoDate": ["2000-01-03", "2000-01-03", "2000-01-03"],
+            "delistingDate": ["2023-05-01", "2017-03-01", "null"],  # OLD's clip is after the DEV end
+            "listing_source": "active",
+        }
+    )
+    reused = {"tickers": [{"ticker": "OLD", "original_member_periods": [["2023-06-01", None]]}]}
+    mem, rec = u.build_membership(pm, ls, reused, {"tickers": [{"ticker": "MIS"}]})
+    assert rec["listing_clipped"] == ["CLP"]  # OLD is clipped only in 2023: not listed
+    assert rec["reused_removed"] == [] and rec["no_listing_record"] == [] and rec["etf_rows_dropped"] == []
+    assert rec["missing_gap"] == [{"symbol": "MIS", "start": "2016-01-04", "end": None}]  # 2024 end not shown
+    assert rec["after_boundary_member_rows"] == []
+    flat = str(rec)
+    assert "NEW" not in flat and "LAT" not in flat and "2023" not in flat and "2024" not in flat
+    assert set(mem.symbol) == {"OLD", "CLP", "LAT"}  # membership itself is unchanged
+    _, rec_h = u.build_membership(pm, ls, reused, {"tickers": [{"ticker": "MIS"}]}, receipt_end=T("2026-10-28").date())
+    assert rec_h["listing_clipped"] == ["OLD", "CLP"] and rec_h["no_listing_record"] == ["NEW"]
+
+
 def test_listing_overlap_fails_closed():
     pm = S.membership()
     ls = pd.concat([S.listing(), S.listing().iloc[:1].assign(listing_source="delisted", delistingDate="2010-01-04")])
