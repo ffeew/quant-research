@@ -56,6 +56,27 @@ def test_costs_and_borrow_reduce_net():
     assert (shared["net"] <= shared["gross"]).all()
 
 
+def test_adv_cap_fills_over_several_sessions():
+    b = _bars()
+    d = b["R"].index
+    b["VOL"]["A"] = 1e4  # ADV20 = 50 * 1e4 = $500k; 1% = $5k = 5e-4 of AUM per session
+    W = pd.DataFrame(0.0, index=d, columns=["A", "B"])
+    W.iloc[15:, 0] = 0.0012  # target $12k: needs 3 sessions at the cap
+    out = pnl.apply_costs_and_returns(
+        b, W, pnl.build_cost_config("unknown_borrow_required"), idea="H1", costs=ZeroCost()
+    )
+    g = out["daily"]["gross"]
+    step = pnl.PARTICIPATION_CAP * 50 * 1e4 / AUM
+    assert np.isclose(g.loc[d[16]], step * 0.01)  # first session: only the capped slice is held
+    assert np.isclose(g.loc[d[17]], 2 * step * 0.01)  # remainder carried and filled next session
+    assert np.isclose(g.loc[d[18]], 0.0012 * 0.01) and np.isclose(g.loc[d[25]], 0.0012 * 0.01)
+    assert out["n_sessions_adv_capped"] == 2  # third session fills the 0.0002 remainder uncapped
+    tc = pnl.apply_costs_and_returns(
+        b, W, pnl.build_cost_config("unknown_borrow_required"), idea="H1", costs=FlatCost()
+    )
+    assert np.isclose(tc["daily"]["tc"].sum(), 0.0012 * 10 / 1e4)  # cost only on shares actually traded
+
+
 def test_pass_bar_borrow_floor():
     with pytest.raises(RuntimeError):
         pnl.apply_costs_and_returns(_bars(), pd.DataFrame(), pnl.CostConfig("x", 0.01, True), idea="H1")

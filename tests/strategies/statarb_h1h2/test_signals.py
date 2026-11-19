@@ -48,8 +48,9 @@ def test_h1_signal_at_t_first_earns_t1_to_t2():
         k = d.get_loc(t)
         if k + 1 < len(d):
             assert (W.iloc[k] == W.iloc[k - 1]).all()
+    deep = dict(bars, VOL=bars["VOL"] * 1e6)  # keep the ADV cap out of this timing check
     g = pnl.apply_costs_and_returns(
-        bars, W, pnl.build_cost_config("unknown_borrow_required"), idea="H1", costs=_ZeroCost()
+        deep, W, pnl.build_cost_config("unknown_borrow_required"), idea="H1", costs=_ZeroCost()
     )["daily"]["gross"]
     assert g.loc[d[i + 1]] == 0
     R = bars["R"].iloc[i + 2].reindex(W.columns).fillna(0.0)

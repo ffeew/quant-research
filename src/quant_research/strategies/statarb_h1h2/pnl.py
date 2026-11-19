@@ -91,7 +91,11 @@ def build_cost_config(path: str) -> CostConfig:
 def apply_costs_and_returns(
     bars: dict[str, pd.DataFrame], W: pd.DataFrame, cfg: CostConfig, *, idea: str, costs: CostModel | None = None
 ) -> dict[str, Any]:
-    """One-session execution lag, 1% ADV participation cap, trading cost, borrow, daily net."""
+    """One-session execution lag, 1% ADV participation cap, trading cost, borrow, daily net.
+
+    The cap limits the trade itself: each session trades at most 1% of ADV20 shares toward the
+    target weight; the unfilled remainder carries to the next session. Gross, cost and borrow are
+    all on the position actually held."""
     if cfg.is_pass_bar and cfg.borrow_rate < BORROW_UNKNOWN_REQUIRED:
         raise RuntimeError("pass-bar config must have borrow_rate >= 10%/yr")
     costs = costs or SharedCostModel()
@@ -101,15 +105,17 @@ def apply_costs_and_returns(
     W_exec = W.shift(1).fillna(0.0)
     DV = PX * VOL
     ADV20 = DV.rolling(20, min_periods=10).mean().shift(1)
-    dW = W_exec.diff().fillna(W_exec)
+    held = pd.Series(0.0, index=W_exec.columns)
     rets = []
     dates = W_exec.index
+    capped_sessions = 0
     for j in range(1, len(dates)):
         d = dates[j]
-        w = W_exec.iloc[j]
-        dw = dW.iloc[j]
+        want = W_exec.iloc[j] - held
+        fill = want.copy()
         trade_cost_frac = 0.0
-        for s, delta in dw.items():
+        capped = False
+        for s, delta in want.items():
             if abs(delta) < 1e-15 or s not in PX.columns:
                 continue
             px = at_float(PX, d, s)
@@ -120,12 +126,16 @@ def apply_costs_and_returns(
             sh = abs(delta) * AUM / px
             if adv_sh and sh > PARTICIPATION_CAP * adv_sh:
                 sh = PARTICIPATION_CAP * adv_sh
+                fill.loc[str(s)] = math.copysign(sh * px / AUM, delta)  # remainder carries to the next session
+                capped = True
             side = "buy" if delta > 0 else "sell"
             bps = costs.one_way_bps(side, float(px), float(sh), adv_sh, symbol=str(s), is_etf=s in ETFS, cfg=cfg)
             trade_cost_frac += (sh * px / AUM) * bps / 1e4
-        rrow = R.loc[d].reindex(w.index).fillna(0.0) if d in R.index else None
-        gross = float((w * rrow).sum()) if rrow is not None else 0.0
-        short_mv = float((-w.clip(upper=0)).sum() * AUM)
+        capped_sessions += capped
+        held = held + fill
+        rrow = R.loc[d].reindex(held.index).fillna(0.0) if d in R.index else None
+        gross = float((held * rrow).sum()) if rrow is not None else 0.0
+        short_mv = float((-held.clip(upper=0)).sum() * AUM)
         b = costs.borrow_usd(short_mv, 1.0, cfg) / AUM
         rets.append((d, gross - trade_cost_frac - b, gross, trade_cost_frac, b))
     df = pd.DataFrame(rets, columns=["session_date", "net", "gross", "tc", "borrow"]).set_index("session_date")
@@ -136,6 +146,7 @@ def apply_costs_and_returns(
         "is_pass_bar": cfg.is_pass_bar,
         "k_impact": cfg.k_impact,
         "n_sessions": int(len(df)),
+        "n_sessions_adv_capped": int(capped_sessions),
         "daily": df,
     }
 
