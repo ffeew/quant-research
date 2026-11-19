@@ -20,7 +20,7 @@ from collections.abc import Mapping, Sequence
 from typing import Any, NoReturn, cast
 
 from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DATA_DIR, ...)
-from quant_research.utils.pins import desk_pin
+from quant_research.utils.pins import desk_pin, require_pins
 
 STAGE = os.path.dirname(os.path.abspath(__file__))
 DEV_RUN_SHA = desk_pin("strategies.sentiment_returns.oos_runner", "DEV_RUN_SHA")  # = DEV MANIFEST entry
@@ -197,6 +197,8 @@ def a4_materiality(u: Mapping[str, Any], e: Mapping[str, Any]) -> dict[str, Any]
 
 # ---------------- main ----------------
 def main() -> None:
+    # O.prereg is only recorded in the output, so refuse up front on a PENDING / missing pin
+    require_pins("strategies.sentiment_returns.oos_runner", "DEV_RUN_SHA", "O.prereg")
     ap = argparse.ArgumentParser()
     ap.add_argument("--mode", required=True, choices=["dev_rehearsal", "oos"])
     ap.add_argument("--config", required=True)

@@ -26,6 +26,7 @@ import numpy as np
 import pandas as pd
 
 from quant_research.data.sec_edgar import common, pit_period
+from quant_research.utils.pins import require_pins
 
 OUT = common.OUT
 STORE = common.STORE
@@ -375,6 +376,7 @@ def gap_classes(
 
 
 def main() -> None:
+    require_pins("data.sec_edgar.common", "RELEASE_TOP_HASH")  # only recorded in the log: refuse if PENDING
     eps8k = pd.read_parquet(OUT / "eps8k_full_with_validation.parquet")
     xq = pd.read_parquet(OUT / "xbrl_eps_quarterly.parquet")
     splits = load_splits()

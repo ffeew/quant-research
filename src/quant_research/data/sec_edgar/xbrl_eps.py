@@ -24,11 +24,13 @@ import numpy as np
 import pandas as pd
 
 from quant_research.data.sec_edgar import common
+from quant_research.utils.pins import require_pins
 
 TAGS = ["EarningsPerShareDiluted", "EarningsPerShareBasicAndDiluted"]
 
 
 def build(save: bool = True) -> tuple[pd.DataFrame, dict[str, Any]]:
+    require_pins("data.sec_edgar.common", "RELEASE_TOP_HASH")  # only recorded in the log: refuse if PENDING
     x = pd.read_parquet(common.STORE / "fundamentals/xbrl_facts.parquet", filters=[("tag", "in", TAGS)])
     x = x[(x.unit == "USD/shares") & x.form.isin(["10-Q", "10-K"])].copy()
     x["period_start"] = pd.to_datetime(x.period_start)

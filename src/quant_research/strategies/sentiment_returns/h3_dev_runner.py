@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING, Any, TypedDict, cast
 
-from quant_research.utils.pins import desk_pin
+from quant_research.utils.pins import PENDING, desk_pin
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -824,7 +824,9 @@ def main() -> None:
             sys.exit(EXIT_CFG)
     else:
         C = cast(dict[str, Any], dict(REAL))
-    missing = [k for k in CFG_KEYS if not C.get(k)]
+    # a PENDING desk pin counts as unset (fail closed before any lock or data read)
+    missing = [k for k in CFG_KEYS if not C.get(k) or C.get(k) == PENDING]
+    missing += ["coverage sha"] if any(h == PENDING for _, h in C.get("coverage") or []) else []
     if missing or len(C["coverage"]) != 7:
         sys.stderr.write(
             f"CONFIG BLOCKED (exit 6): unset {missing} / coverage files {len(C.get('coverage') or [])}. No lock taken, no data read.\n"

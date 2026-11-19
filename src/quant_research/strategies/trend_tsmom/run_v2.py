@@ -24,7 +24,12 @@ from quant_research.strategies.trend_tsmom.tsmom.data import ASSET_CLASS, EXT_EX
 from quant_research.strategies.trend_tsmom.tsmom.engine import Config, run
 from quant_research.strategies.trend_tsmom.tsmom.stats import corr_to, monthly, perf, sharpe_se
 from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DATA_DIR, ...)
-from quant_research.utils.pins import desk_pin
+from quant_research.utils.pins import require_pins
+
+# recorded in meta.json only, so refuse up front on a PENDING / missing pin (before any work)
+PINS = require_pins(
+    "strategies.trend_tsmom.run_v2", "meta.data_build.prereg_tr_sha256", "meta.cost_model.prereg_sha256"
+)
 
 OUT = "outputs_v2"
 os.makedirs(OUT, exist_ok=True)
@@ -409,13 +414,13 @@ meta = {
             "sha256": sha(f"{_QR.DATA_DIR}/factors/ken_french/ff3_daily.parquet"),
             "rf_last_date": panel["rf_last"],
         },
-        "prereg_tr_sha256": desk_pin("strategies.trend_tsmom.run_v2", "meta.data_build.prereg_tr_sha256"),
+        "prereg_tr_sha256": PINS["meta.data_build.prereg_tr_sha256"],
     },
     "cost_model": {
         "name": "TCA owner v1.1",
         "path": f"{_QR.COSTS_DIR}/cost_model.py",
         "sha256": sha(f"{_QR.COSTS_DIR}/cost_model.py"),
-        "prereg_sha256": desk_pin("strategies.trend_tsmom.run_v2", "meta.cost_model.prereg_sha256"),
+        "prereg_sha256": PINS["meta.cost_model.prereg_sha256"],
     },
     "code_version": {
         "vcs": "none (not a git repo); per-file sha256",

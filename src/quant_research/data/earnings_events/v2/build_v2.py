@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 
 from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DATA_DIR, ...)
-from quant_research.utils.pins import desk_pin
+from quant_research.utils.pins import desk_pin, require_pins
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 V2 = os.path.dirname(os.path.abspath(__file__))
@@ -18,6 +18,8 @@ V1_HASH = desk_pin("data.earnings_events.v2.build_v2", "V1_HASH")
 OLD_HASH = desk_pin("data.earnings_events.v2.build_v2", "OLD_HASH")
 PARENT_V13 = desk_pin("data.earnings_events.v2.build_v2", "PARENT_V13")
 VALIDATION_PIT = desk_pin("data.earnings_events.v2.build_v2", "VALIDATION_PIT")
+# VALIDATION_PIT is only recorded in the output: refuse on any PENDING / missing pin before any work
+require_pins("data.earnings_events.v2.build_v2", "V1_HASH", "OLD_HASH", "PARENT_V13", "VALIDATION_PIT")
 
 os.chdir(ROOT)
 
