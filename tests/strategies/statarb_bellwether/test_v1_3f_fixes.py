@@ -325,23 +325,21 @@ def test_round3_h1_suspension_gap_check_uses_the_held_position(mod: Any) -> None
 
 
 def test_round3_zero_adv_allows_cuts_toward_zero_at_stress_cost_never_grows(mod: Any) -> None:
-    b = _flat(vol=1e7)
+    b = _flat(n=40, vol=1e7)
     d = b["R"].index
-    b["PX"].iloc[13:25, 0] = np.nan  # no prints 13-24 (suspended); from fill day 25 the ADV20
-    b["VOL"].iloc[13:25, 0] = np.nan  # window has 8 sessions, fewer than 10, so ADV20 is NaN
-    W = pd.DataFrame({"A": 0.0}, index=d)
-    W.iloc[11:25, 0] = 0.1  # held 0.1 from close 11
-    W.iloc[25, 0] = 0.04  # cut at close 25 with no ADV: allowed, in full
-    W.iloc[26, 0] = 0.08  # grow at close 26 with no ADV: never
-    W.iloc[27:, 0] = -0.05  # flip at close 27: cut to 0 only
-    held = mod.held_positions(b, W)["A"]
-    assert np.isclose(held.iloc[25], 0.1) and np.isclose(held.iloc[26], 0.04)
-    assert np.isclose(held.iloc[27], 0.04) and held.iloc[28:].eq(0).all()
-    out = mod.apply_costs_and_returns(b, W, mod.build_cost_config("unknown_borrow_required"), idea="H1")
-    tc = out["daily"]["tc"]
+    b["PX"].iloc[13:33, 0] = np.nan  # suspended 13-32: the ADV20 window for fill day 33 is all $0
+    b["VOL"].iloc[13:33, 0] = np.nan
     stress = 2.0 * 4.0  # fake cost model: 4 bp on a sell, doubled
-    assert np.isclose(tc.loc[d[26]], 0.06 * stress / 1e4) and np.isclose(tc.loc[d[28]], 0.04 * stress / 1e4)
-    assert out["n_forced_cuts_zero_adv"] == 2 and np.isclose(out["forced_cut_notional_usd"], 0.10 * mod.AUM)
+    for at_33, want_held, traded in ((0.04, 0.04, 0.06), (0.15, 0.1, 0.0), (-0.05, 0.0, 0.1)):
+        W = pd.DataFrame({"A": 0.0}, index=d)
+        W.iloc[11:33, 0] = 0.1
+        W.iloc[33:, 0] = at_33  # cut / grow / flip at close 33, when ADV20 is 0
+        held = mod.held_positions(b, W)["A"]
+        assert np.isclose(held.iloc[33], 0.1) and np.isclose(held.iloc[34], want_held), at_33
+        out = mod.apply_costs_and_returns(b, W, mod.build_cost_config("unknown_borrow_required"), idea="H1")
+        assert np.isclose(out["daily"]["tc"].loc[d[34]], traded * stress / 1e4), at_33
+        assert out["n_forced_cuts_zero_adv"] == (1 if traded else 0)
+        assert np.isclose(out["forced_cut_notional_usd"], traded * mod.AUM)
 
 
 def test_round3_settlement_after_the_last_print_is_not_free(mod: Any) -> None:
@@ -432,3 +430,21 @@ def test_round4_weights_off_the_price_index_fail_closed(mod: Any) -> None:
         mod.held_positions(b, W)
     with pytest.raises(SystemExit, match="not in the price index"):
         mod.h1_terminal_bound(b, W, [{"symbol": "A", "identity_ok": True}], cfg)
+
+
+def test_round4_adv20_counts_non_print_sessions_as_zero_dollars(mod: Any) -> None:
+    b = _flat(vol=1e4)  # $500k a session when it prints
+    d = b["R"].index
+    b["VOL"].iloc[10:13, 0] = np.nan  # no volume: not a print
+    b["PX"].iloc[13:15, 0] = np.nan  # no close: not a print
+    W = pd.DataFrame({"A": 0.0}, index=d)
+    W.iloc[15:, 0] = 0.01  # entry at close 15: window rows 0-14, 10 prints and 5 non-prints
+    held = mod.held_positions(b, W)["A"]
+    adv = 10 * 50 * 1e4 / 15  # the 5 non-print sessions count as $0, not skipped
+    assert np.isclose(held.iloc[16], mod.PARTICIPATION_CAP * adv / mod.AUM)
+    pre = _flat()
+    pre["PX"].iloc[:5, 0] = np.nan  # before the first print there is no history, not $0
+    pre["VOL"].iloc[:5, 0] = np.nan
+    W2 = pd.DataFrame({"A": 0.0}, index=d)
+    W2.iloc[2:, 0] = 0.1
+    assert mod.held_positions(pre, W2)["A"].iloc[:16].eq(0).all()  # 10 sessions of history first

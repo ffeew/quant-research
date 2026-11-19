@@ -39,6 +39,22 @@ Review round 4 fixes (ported from #10):
 - **Stress cost.** `STRESS_ONE_WAY_COST_MULT = 2.0` x the one-way cost of the forced trade, a
   desk choice pinned by a test; it is not the cost model's round-trip break-even multiple.
 - Weights on sessions outside the price index fail closed.
+- **Two design choices kept (both conservative).** (1) Past a name's last tradable print its
+  return is blanked: the held position earns 0 gross, even where the input still carries stale
+  nonzero returns on later zero-volume closes, so no gain can be booked on a name that no longer
+  trades. (2) After the H1 -100% bound there is exactly one forced settlement of the held
+  remainder at the last real close, charged at the 2x one-way stress cost. That cost comes on
+  top of the bound and is never an exit credit, so it can only lower H1's result.
+- **ADV20 counts non-print sessions as $0.** From a name's first tradable print on, a session in
+  the t-1 window with zero or NaN volume, no close, or a forward-filled row adds $0 to ADV20
+  rather than being skipped (skipping raised the cap). Before the first print the name has no
+  history, so the 10-session minimum still applies. A test fails if this is reverted.
+- **FFILL.** The AV sensitivity loader (`load_bars`) supplies FFILL from the bar file's
+  `ffilled` column, so forward-filled rows are not prints there. The PRIMARY TR loader
+  (`load_bars_tr`) returns R, TRI, PX and VOL only, so the forward-fill test is inert on the
+  primary path. There, forward-filled rows are excluded only when they also have zero or NaN
+  volume or no positive close. A missing flag counts as forward-filled only when FFILL is
+  supplied.
 
 ## Results
 - No returns computed.
