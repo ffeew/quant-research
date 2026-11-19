@@ -39,7 +39,7 @@ from __future__ import annotations
 import math
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 import numpy as np
@@ -47,30 +47,30 @@ import numpy.typing as npt
 
 __all__ = [
     "MAX_GROSS",
-    "RiskInputError",
-    "VolTargetConfig",
-    "VolTargetResult",
-    "DrawdownStats",
+    "BreakerDecision",
     "BreakerState",
     "DrawdownBreakerConfig",
-    "BreakerDecision",
+    "DrawdownStats",
     "ExposureLimits",
     "LimitResult",
-    "Violation",
     "PreTradeResult",
+    "RiskInputError",
     "RiskReport",
-    "gross_exposure",
-    "net_exposure",
-    "portfolio_vol_from_returns",
-    "portfolio_vol_from_covariance",
-    "scale_to_target_vol",
-    "vol_target_weights",
+    "Violation",
+    "VolTargetConfig",
+    "VolTargetResult",
+    "apply_exposure_limits",
+    "build_risk_report",
     "drawdown_stats",
     "evaluate_drawdown_breaker",
-    "run_drawdown_breaker",
-    "apply_exposure_limits",
+    "gross_exposure",
+    "net_exposure",
+    "portfolio_vol_from_covariance",
+    "portfolio_vol_from_returns",
     "pre_trade_check",
-    "build_risk_report",
+    "run_drawdown_breaker",
+    "scale_to_target_vol",
+    "vol_target_weights",
 ]
 
 #: Structural no-leverage ceiling. This is not a desk limit; it is the hard invariant of the
@@ -346,7 +346,7 @@ def drawdown_stats(equity: Sequence[float]) -> DrawdownStats:
     return DrawdownStats(tuple(peaks), tuple(dds), dds[-1], max(dds))
 
 
-class BreakerState(str, Enum):
+class BreakerState(StrEnum):
     NORMAL = "NORMAL"
     REDUCE = "REDUCE"
     FLAT = "FLAT"
@@ -403,9 +403,10 @@ def _decision(state: BreakerState, cfg: DrawdownBreakerConfig, rearmed: bool, re
 
 
 def evaluate_drawdown_breaker(
-    current_drawdown: float, previous_state: BreakerState, config: DrawdownBreakerConfig
+    current_drawdown: float, previous_state: BreakerState | str, config: DrawdownBreakerConfig
 ) -> BreakerDecision:
-    """One breaker step. Fails closed: an invalid drawdown or unknown state returns FLAT."""
+    """One breaker step. Fails closed: an invalid drawdown, or a previous state that is not a
+    :class:`BreakerState` member (plain strings included), returns FLAT."""
     if not isinstance(previous_state, BreakerState):
         return _decision(BreakerState.FLAT, config, False, f"fail-closed: unknown previous state {previous_state!r}")
     if not _finite(current_drawdown) or not 0.0 <= float(current_drawdown) <= 1.0:
@@ -478,10 +479,13 @@ class ExposureLimits:
         if self.group_caps is not None:
             for grp, cap in self.group_caps.items():
                 _require_fraction(f"group_caps[{grp}]", cap)
-        for name, coll in (("prohibited_symbols", self.prohibited_symbols),
-                           ("prohibited_asset_classes", self.prohibited_asset_classes)):
-            if isinstance(coll, str) or not all(isinstance(x, str) for x in coll):
-                raise RiskInputError(f"{name} must be a collection of strings")
+        named: tuple[tuple[str, object], ...] = (
+            ("prohibited_symbols", self.prohibited_symbols),
+            ("prohibited_asset_classes", self.prohibited_asset_classes),
+        )
+        for name, coll in named:
+            if not isinstance(coll, (frozenset, set)) or not all(isinstance(x, str) for x in coll):
+                raise RiskInputError(f"{name} must be a frozenset of strings")
 
     def is_prohibited(self, symbol: str, asset_class: str | None) -> str | None:
         """Return the reason a symbol is prohibited, or None."""
@@ -676,7 +680,7 @@ def pre_trade_check(
     """
     try:
         violations = _check(weights, limits, groups, asset_classes, portfolio_vol_annual)
-    except Exception as exc:  # noqa: BLE001 - fail closed, surfaced as a violation, never swallowed
+    except Exception as exc:  # fail closed: surfaced as a violation, never swallowed
         violations = [Violation("INTERNAL_ERROR", f"{type(exc).__name__}: {exc}")]
     return PreTradeResult(passed=not violations, violations=tuple(violations))
 

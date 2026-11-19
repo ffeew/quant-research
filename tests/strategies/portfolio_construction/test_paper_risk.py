@@ -145,7 +145,7 @@ def test_scale_rejects_bad_gross_cap(cap):
 
 def test_vol_target_end_to_end_on_synthetic_data():
     rets = _synthetic_returns(4, 2000, 0.02, seed=7)
-    w = {s: 0.1 for s in rets}
+    w = dict.fromkeys(rets, 0.1)
     cfg = VolTargetConfig(target_vol_annual=0.05, lookback=1000, annualisation_factor=252.0, gross_cap=1.0)
     res = pr.vol_target_weights(w, rets, cfg)
     after = pr.portfolio_vol_from_returns(res.weights, rets, 1000, 252.0)
@@ -156,7 +156,7 @@ def test_vol_target_end_to_end_on_synthetic_data():
 def test_vol_target_low_vol_hits_gross_cap():
     rets = _synthetic_returns(3, 500, 0.0005, seed=3)
     cfg = VolTargetConfig(target_vol_annual=0.50, lookback=250, annualisation_factor=252.0, gross_cap=1.0)
-    res = pr.vol_target_weights({s: 0.2 for s in rets}, rets, cfg)
+    res = pr.vol_target_weights(dict.fromkeys(rets, 0.2), rets, cfg)
     assert res.capped_by_gross and pr.gross_exposure(res.weights) <= 1.0
 
 
@@ -230,7 +230,7 @@ def test_breaker_fails_closed_on_bad_drawdown(dd):
 
 
 def test_breaker_fails_closed_on_unknown_state():
-    d = pr.evaluate_drawdown_breaker(0.0, "NORMAL", EX_BREAKER)  # type: ignore[arg-type]
+    d = pr.evaluate_drawdown_breaker(0.0, "NORMAL", EX_BREAKER)
     assert d.state is BreakerState.FLAT
 
 
@@ -394,7 +394,7 @@ def test_pre_trade_reports_each_breach():
     ],
 )
 def test_pre_trade_fails_closed_on_bad_weights(weights, code):
-    chk = pr.pre_trade_check(weights, EX_LIMITS)  # type: ignore[arg-type]
+    chk = pr.pre_trade_check(weights, EX_LIMITS)
     assert not chk.passed and code in chk.codes
 
 
@@ -405,13 +405,13 @@ def test_pre_trade_fails_closed_on_bad_vol(vol):
 
 
 def test_pre_trade_bad_limits_object():
-    chk = pr.pre_trade_check({"A": 0.05}, {"gross_cap": 1.0})  # type: ignore[arg-type]
+    chk = pr.pre_trade_check({"A": 0.05}, {"gross_cap": 1.0})
     assert not chk.passed and chk.codes == ("BAD_LIMITS",)
 
 
 def test_pre_trade_internal_error_is_surfaced_not_raised():
     class Boom(dict):  # a mapping whose iteration explodes
-        def items(self):  # type: ignore[override]
+        def items(self):
             raise RuntimeError("boom")
 
     chk = pr.pre_trade_check(Boom(A=0.1), EX_LIMITS)
