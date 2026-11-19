@@ -234,7 +234,7 @@ def _fills(
             adv_sh = (adv / px) if (np.isfinite(adv) and adv > 0) else None
             if adv_sh is None:
                 # no usable ADV: cap 0, never left uncapped. It may not grow, but may always be cut
-                # toward 0 (Jeremy's ruling), at the stress cost.
+                # toward 0 (review ruling), at the stress cost.
                 h = float(held.loc[str(s)])
                 cut = _cut_only(h, float(target.loc[str(s)])) - h
                 fill.loc[str(s)] = cut
