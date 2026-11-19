@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+# Secrets
+.env
+*.key
+
+# Data and outputs (never commit vendor data).
+# Anchor at the repo root so the source package src/quant_research/data is committed.
+/data/
+tmp/
+out/
+outputs/
+outputs_*/
+results/
+work/
+raw/
+*.parquet
+*.csv.gz
+*.feather
+*.h5
+*.log

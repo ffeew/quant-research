@@ -1,0 +1,13 @@
+# Trial config. Strategy parameters are frozen (pre-registered) constants in the code;
+# this file records the entry point, status and data needs.
+
+[trial]
+title = "Trade-size compression"
+status = "parked"
+verdict = "Parked; no returns"
+entry = ""
+findings = "research/trade_size_compression/FINDINGS.md"
+
+[data]
+root_env = "QR_DATA_DIR"
+requires = []

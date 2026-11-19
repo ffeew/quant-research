@@ -1,0 +1,163 @@
+# Dataset builders: `qr build-data <name>` runs the module as __main__.
+# Outputs go under $QR_DATA_DIR. Keys come from env vars (see .env.example).
+
+[datasets.daily-bars]
+module = "quant_research.data.pipelines.daily_bars"
+description = "Daily OHLCV bars (Alpaca SIP)"
+
+[datasets.extended-bars]
+module = "quant_research.data.pipelines.extended_bars"
+description = "Extended-history daily bars"
+
+[datasets.total-return]
+module = "quant_research.data.pipelines.total_return"
+description = "Dividend/split-adjusted total-return series"
+
+[datasets.corporate-actions]
+module = "quant_research.data.pipelines.corporate_actions"
+description = "Splits and dividends"
+
+[datasets.delisting]
+module = "quant_research.data.pipelines.delisting"
+description = "Delisting events"
+
+[datasets.delisting-terms]
+module = "quant_research.data.pipelines.delisting_terms"
+description = "Delisting terms / cash-outs"
+
+[datasets.security-master]
+module = "quant_research.data.pipelines.security_master"
+description = "Security master (ids, share classes)"
+
+[datasets.shares-classes]
+module = "quant_research.data.pipelines.shares_classes"
+description = "Share-class mapping"
+
+[datasets.reference]
+module = "quant_research.data.pipelines.reference"
+description = "Reference data"
+
+[datasets.assets-snapshot]
+module = "quant_research.data.pipelines.assets_snapshot"
+description = "Broker asset list snapshot"
+
+[datasets.universe]
+module = "quant_research.data.pipelines.universe"
+description = "Point-in-time universes"
+
+[datasets.sp500-index]
+module = "quant_research.data.pipelines.update_sp500_index"
+description = "S&P 500 index level"
+
+[datasets.vix-vix3m]
+module = "quant_research.data.pipelines.update_vix_vix3m"
+description = "VIX / VIX3M"
+
+[datasets.sec-fundamentals]
+module = "quant_research.data.pipelines.sec_fundamentals"
+description = "SEC XBRL fundamentals"
+
+[datasets.earnings]
+module = "quant_research.data.pipelines.earnings"
+description = "Earnings events"
+
+[datasets.earnings-calendar-pit]
+module = "quant_research.data.pipelines.earnings_calendar_pit"
+description = "Point-in-time earnings calendar"
+
+[datasets.earnings-enrich]
+module = "quant_research.data.pipelines.earnings_enrich"
+description = "Earnings enrichment"
+
+[datasets.earnings-forward]
+module = "quant_research.data.pipelines.earnings_forward"
+description = "Forward earnings calendar"
+
+[datasets.fomc]
+module = "quant_research.data.pipelines.fomc"
+description = "FOMC calendar"
+
+[datasets.macro-calendar]
+module = "quant_research.data.pipelines.macro_calendar"
+description = "Macro release calendar"
+
+[datasets.alfred]
+module = "quant_research.data.pipelines.alfred_store"
+description = "ALFRED real-time macro vintages"
+
+[datasets.ken-french]
+module = "quant_research.data.pipelines.ken_french"
+description = "Ken French factor library"
+
+[datasets.news-counts]
+module = "quant_research.data.pipelines.news_counts"
+description = "News counts"
+
+[datasets.price-qa]
+module = "quant_research.data.pipelines.price_qa"
+description = "Price QA report"
+
+[datasets.qa]
+module = "quant_research.data.pipelines.qa"
+description = "Dataset QA"
+
+[datasets.feed-compare]
+module = "quant_research.data.pipelines.feed_compare"
+description = "Cross-feed price comparison"
+
+[datasets.snapshot]
+module = "quant_research.data.pipelines.snapshot"
+description = "Dataset snapshot"
+
+[datasets.av-options]
+module = "quant_research.data.alphavantage.options.fetch_options_history"
+description = "Alpha Vantage historical options"
+
+[datasets.av-options-dq]
+module = "quant_research.data.alphavantage.options.dq_options"
+description = "Options data-quality checks"
+
+[datasets.av-transcripts]
+module = "quant_research.data.alphavantage.options.fetch_news_earnings_transcripts"
+description = "AV news + earnings transcripts"
+
+[datasets.av-news-sentiment]
+module = "quant_research.data.alphavantage.news_sentiment.fetch_av2"
+description = "AV news sentiment"
+
+[datasets.av-daily-adjusted]
+module = "quant_research.data.alphavantage.daily_adjusted.fetch_av_h1h2"
+description = "AV daily adjusted bars"
+
+[datasets.sec-exhibits]
+module = "quant_research.data.sec_edgar.fetch_exhibits"
+description = "EDGAR 8-K exhibits"
+
+[datasets.sec-xbrl-eps]
+module = "quant_research.data.sec_edgar.xbrl_eps"
+description = "EDGAR XBRL EPS"
+
+[datasets.sec-eps-extract]
+module = "quant_research.data.sec_edgar.run_extract_full"
+description = "8-K EPS extraction"
+
+[datasets.sue]
+module = "quant_research.data.sec_edgar.sue_build"
+description = "Standardised unexpected earnings (SUE)"
+
+[datasets.earnings-events-fetch]
+module = "quant_research.data.earnings_events.ee_fetch"
+description = "Earnings-events raw fetch"
+
+[datasets.earnings-events-map]
+module = "quant_research.data.earnings_events.ee_map"
+description = "Earnings-events mapping"
+
+[datasets.earnings-events-v2_1]
+module = "quant_research.data.earnings_events.v2_1.build_recon_aligned"
+description = "Earnings events v2.1 (reconciled)"
+
+[datasets.etf-distributions]
+module = "quant_research.data.etf_distributions.fetch"
+description = "ETF distributions"
+

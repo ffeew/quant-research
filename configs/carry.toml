@@ -1,0 +1,13 @@
+# Trial config. Strategy parameters are frozen (pre-registered) constants in the code;
+# this file records the entry point, status and data needs.
+
+[trial]
+title = "Cross-asset carry (E1)"
+status = "parked"
+verdict = "Draft pre-registration; parked, no returns"
+entry = "quant_research.strategies.carry.v1_mechanics"
+findings = "research/carry/FINDINGS.md"
+
+[data]
+root_env = "QR_DATA_DIR"
+requires = ["etf distributions", "bars/daily"]

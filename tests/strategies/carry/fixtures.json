@@ -1,0 +1,2053 @@
+{
+  "meta": {
+    "scope": "V1 synthetic/fixture mechanics only \u2014 parent \u00a75 + erratum E1\u2013E4",
+    "no_market_data": true,
+    "no_optional_synthetic_pnl": true,
+    "excluded": [
+      "R1",
+      "R2",
+      "R3",
+      "R4",
+      "R5",
+      "R5b",
+      "R6",
+      "R6x2",
+      "R7"
+    ],
+    "note": "Dates/labels in fixtures are synthetic tags only; not performance claims.",
+    "live_label_notes": "Breaker/panic fixtures mirror risk_state.read_breaker/read_panic L101-178: FAILSAFE_BREAKER HALVED/30/NTAtrue; RESUMED_DISARMED invalid backstop -> fail-safe; NORMAL/HALVED halt_armed=false -> fail-safe; backstop breach -> HALTED NTAfalse; stale/fail_closed -> FAILSAFE_PANIC; provisional/status PROVISIONAL returned as file with provisional=True, construct context-only unless forced.",
+    "preflight": {
+      "ruling": "validation/prereg_rulings/2026-11-06-maya-vix-mechanics-preflight.md",
+      "sha256": "3bed621e668f8d42e7eae33f6a99efe5341c986e98c351b8d3d7f48ddb9e3f56",
+      "verdict": "RETURN FOR AMENDMENT \u2014 suite NOT authorised to run"
+    },
+    "planned_outputs": [
+      "pytest-output.txt"
+    ],
+    "restoration_note": "apply_restoration does NOT use min(base,max(current,target)). Eligible prior longs with base>0 restore up to path-capped target; prior>=target preserves prior (no cut). Shorts/flat/prior-only/base-only unchanged. Independent base de-risk via apply_base_derisk only.",
+    "long_only_gross": true,
+    "stops_scope": "quantity coverage only; no stop-price/gap/intraday certification",
+    "lift_paths_certified": false
+  },
+  "fixtures": [
+    {
+      "id": "B1",
+      "invariant": "NORMAL, NTA=true, V1 OFF => w_final=w_base",
+      "w_base": {
+        "AAA": 0.1,
+        "BBB": 0.08
+      },
+      "m": 1.0,
+      "breaker": {
+        "state": "NORMAL",
+        "new_trades_allowed": true,
+        "gross_cap_pct": 60.0,
+        "halt_armed": true
+      },
+      "panic": {
+        "panic": false
+      },
+      "prior_vix_state": "OFF",
+      "session": {
+        "R": 0.9,
+        "available": true,
+        "hash_ok": true
+      },
+      "expect": {
+        "vix_state": "OFF",
+        "w_final": {
+          "AAA": 0.1,
+          "BBB": 0.08
+        }
+      }
+    },
+    {
+      "id": "B2",
+      "invariant": "NORMAL, V1 ON => eligible longs halved; no weight increase; gross<=base",
+      "w_base": {
+        "AAA": 0.1,
+        "BBB": 0.08,
+        "CCC": -0.05,
+        "DDD": 0.0
+      },
+      "m": 1.0,
+      "breaker": {
+        "state": "NORMAL",
+        "new_trades_allowed": true,
+        "gross_cap_pct": 60.0,
+        "halt_armed": true
+      },
+      "panic": {
+        "panic": false
+      },
+      "prior_vix_state": "OFF",
+      "prior_weights": {
+        "AAA": 0.1,
+        "BBB": 0.08,
+        "CCC": -0.05,
+        "DDD": 0.0
+      },
+      "transition": "OFF\u2192ON",
+      "session": {
+        "R": 1.2,
+        "available": true,
+        "hash_ok": true
+      },
+      "expect": {
+        "vix_state": "ON",
+        "w_vix": {
+          "AAA": 0.05,
+          "BBB": 0.04,
+          "CCC": -0.05,
+          "DDD": 0.0
+        },
+        "shorts_unchanged": true,
+        "flat_unchanged": true,
+        "no_redeploy": true
+      }
+    },
+    {
+      "id": "B3",
+      "invariant": "HALVED: V1 cannot raise gross above 30% path",
+      "w_base": {
+        "AAA": 0.2,
+        "BBB": 0.2
+      },
+      "m": 1.0,
+      "breaker": {
+        "state": "HALVED",
+        "new_trades_allowed": true,
+        "gross_cap_pct": 30.0,
+        "halt_armed": true
+      },
+      "panic": {
+        "panic": false
+      },
+      "prior_vix_state": "OFF",
+      "session": {
+        "R": 1.5,
+        "available": true,
+        "hash_ok": true
+      },
+      "expect": {
+        "vix_state": "ON",
+        "max_long_gross": 0.3
+      },
+      "name_cap": 0.2
+    },
+    {
+      "id": "B4",
+      "invariant": "HALTED: V1 never sets NTA=true; no new buys/increases",
+      "w_base": {
+        "AAA": 0.1
+      },
+      "prior_weights": {
+        "AAA": 0.05
+      },
+      "m": 1.0,
+      "breaker": {
+        "state": "HALTED",
+        "new_trades_allowed": false,
+        "gross_cap_pct": 30.0,
+        "halt_armed": true
+      },
+      "panic": {
+        "panic": false
+      },
+      "prior_vix_state": "ON",
+      "sessions": [
+        {
+          "R": 0.9,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.9,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.9,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.9,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.9,
+          "available": true,
+          "hash_ok": true
+        }
+      ],
+      "transition": "ON\u2192OFF",
+      "expect": {
+        "vix_state": "OFF",
+        "nta_false": true,
+        "no_weight_increase": true,
+        "no_auto_lift": true
+      }
+    },
+    {
+      "id": "B5",
+      "invariant": "RESUMED_DISARMED: V1 cannot clear backstop/halt_armed/restore 60%",
+      "w_base": {
+        "AAA": 0.4
+      },
+      "prior_weights": {
+        "AAA": 0.2
+      },
+      "m": 1.0,
+      "breaker": {
+        "state": "RESUMED_DISARMED",
+        "new_trades_allowed": true,
+        "gross_cap_pct": 30.0,
+        "halt_armed": false,
+        "backstop_equity": 90000.0,
+        "current_equity": 95000.0
+      },
+      "panic": {
+        "panic": false
+      },
+      "prior_vix_state": "ON",
+      "sessions": [
+        {
+          "R": 0.8,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.8,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.8,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.8,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.8,
+          "available": true,
+          "hash_ok": true
+        }
+      ],
+      "transition": "ON\u2192OFF",
+      "expect": {
+        "vix_state": "OFF",
+        "restoration_mode": "min_base_30",
+        "max_long_gross": 0.3,
+        "halt_armed_unchanged": false,
+        "backstop_unchanged": 90000.0,
+        "no_60_restore": true
+      },
+      "name_cap": 0.5
+    },
+    {
+      "id": "B6",
+      "invariant": "fail-safe breaker (missing/stale) => effective HALVED 30%; V1 cannot loosen",
+      "w_base": {
+        "AAA": 0.4,
+        "BBB": 0.2
+      },
+      "m": 1.0,
+      "breaker": {
+        "state": "NORMAL",
+        "missing_or_stale_file": true,
+        "new_trades_allowed": true,
+        "gross_cap_pct": 60.0
+      },
+      "panic": {
+        "panic": false
+      },
+      "prior_vix_state": "OFF",
+      "session": {
+        "R": 1.3,
+        "available": true,
+        "hash_ok": true
+      },
+      "expect": {
+        "breaker_state": "HALVED",
+        "fail_safe": true,
+        "new_trades_allowed": true,
+        "gross_cap_pct": 30.0,
+        "max_long_gross": 0.3,
+        "vix_state": "ON"
+      }
+    },
+    {
+      "id": "B7",
+      "invariant": "backstop breach path treated as HALTED; V1 inert for lifts",
+      "w_base": {
+        "AAA": 0.1
+      },
+      "prior_weights": {
+        "AAA": 0.05
+      },
+      "m": 1.0,
+      "breaker": {
+        "state": "NORMAL",
+        "new_trades_allowed": true,
+        "gross_cap_pct": 60.0,
+        "halt_armed": true,
+        "backstop_equity": 100000.0,
+        "current_equity": 99000.0
+      },
+      "panic": {
+        "panic": false
+      },
+      "prior_vix_state": "ON",
+      "sessions": [
+        {
+          "R": 0.7,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.7,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.7,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.7,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.7,
+          "available": true,
+          "hash_ok": true
+        }
+      ],
+      "transition": "ON\u2192OFF",
+      "expect": {
+        "breaker_state": "HALTED",
+        "nta_false": true,
+        "no_weight_increase": true,
+        "no_auto_lift": true,
+        "new_trades_allowed": false,
+        "gross_cap_pct": 30.0
+      }
+    },
+    {
+      "id": "H1",
+      "invariant": "CIO/ops hold NTA=false while NORMAL: V1 never flips NTA; no buy/increase",
+      "w_base": {
+        "AAA": 0.1
+      },
+      "prior_weights": {
+        "AAA": 0.05
+      },
+      "m": 1.0,
+      "breaker": {
+        "state": "NORMAL",
+        "new_trades_allowed": false,
+        "gross_cap_pct": 60.0,
+        "halt_armed": true,
+        "trading_hold": true,
+        "cio_hold": true
+      },
+      "panic": {
+        "panic": false
+      },
+      "prior_vix_state": "ON",
+      "sessions": [
+        {
+          "R": 0.9,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.9,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.9,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.9,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.9,
+          "available": true,
+          "hash_ok": true
+        }
+      ],
+      "transition": "ON\u2192OFF",
+      "expect": {
+        "nta_false": true,
+        "no_weight_increase": true,
+        "hold_uncleared": true
+      }
+    },
+    {
+      "id": "H2",
+      "invariant": "V1 OFF after five V1-valid closes does not clear hold",
+      "w_base": {
+        "AAA": 0.1
+      },
+      "prior_weights": {
+        "AAA": 0.05
+      },
+      "m": 1.0,
+      "breaker": {
+        "state": "NORMAL",
+        "new_trades_allowed": false,
+        "gross_cap_pct": 60.0,
+        "halt_armed": true,
+        "trading_hold": true
+      },
+      "panic": {
+        "panic": false
+      },
+      "prior_vix_state": "ON",
+      "sessions": [
+        {
+          "R": 0.95,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.95,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.95,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.95,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.95,
+          "available": true,
+          "hash_ok": true
+        }
+      ],
+      "transition": "ON\u2192OFF",
+      "expect": {
+        "vix_state": "OFF",
+        "hold_uncleared": true,
+        "nta_false": true,
+        "no_auto_lift": true
+      }
+    },
+    {
+      "id": "P1",
+      "invariant": "panic false, V1 ON: m and V1 logged separately; panic_factor=1; longs halved",
+      "w_base": {
+        "AAA": 0.1
+      },
+      "m": 0.8,
+      "breaker": {
+        "state": "NORMAL",
+        "new_trades_allowed": true,
+        "gross_cap_pct": 60.0,
+        "halt_armed": true
+      },
+      "panic": {
+        "panic": false
+      },
+      "prior_vix_state": "OFF",
+      "session": {
+        "R": 1.1,
+        "available": true,
+        "hash_ok": true
+      },
+      "expect": {
+        "vix_state": "ON",
+        "panic_factor": 1.0,
+        "log_fields": [
+          "m",
+          "panic_factor",
+          "vix_state",
+          "w_base",
+          "w_vix",
+          "w_final"
+        ]
+      }
+    },
+    {
+      "id": "P2",
+      "invariant": "panic true binding: panic responses unchanged by V1",
+      "w_base": {
+        "AAA": 0.1
+      },
+      "m": 1.0,
+      "breaker": {
+        "state": "NORMAL",
+        "new_trades_allowed": true,
+        "gross_cap_pct": 60.0,
+        "halt_armed": true
+      },
+      "panic": {
+        "panic": true,
+        "multiplier": 0.5,
+        "loser_short_ban": true,
+        "beta_floor": 0.0
+      },
+      "prior_vix_state": "OFF",
+      "session": {
+        "R": 1.4,
+        "available": true,
+        "hash_ok": true
+      },
+      "expect": {
+        "panic_binding": true,
+        "loser_short_ban": true,
+        "vix_state": "ON"
+      }
+    },
+    {
+      "id": "P3",
+      "invariant": "stale/fail_closed => fail-safe panic ON; V1 reduced+block-new; no clean-day synthesis",
+      "w_base": {
+        "AAA": 0.1
+      },
+      "m": 1.0,
+      "breaker": {
+        "state": "NORMAL",
+        "new_trades_allowed": true,
+        "gross_cap_pct": 60.0,
+        "halt_armed": true
+      },
+      "panic": {
+        "panic": false,
+        "stale": true,
+        "fail_closed": true
+      },
+      "prior_vix_state": "ON",
+      "prior_streak_valid_le1": 3,
+      "session": {
+        "R": 0.5,
+        "available": true,
+        "hash_ok": true,
+        "stale": true,
+        "hash_fail": true
+      },
+      "expect": {
+        "vix_state": "FAILSAFE_REDUCED",
+        "block_new": true,
+        "streak_valid_le1": 3,
+        "panic": true,
+        "panic_binding": true,
+        "panic_fail_safe": true,
+        "multiplier_momentum_trend": 0.5,
+        "momentum_short_notional_multiplier": 0.5,
+        "new_loser_shorts_allowed": false,
+        "net_beta_floor": -0.1
+      }
+    },
+    {
+      "id": "P4",
+      "invariant": "provisional panic: V1 must not treat provisional as licence to add risk",
+      "w_base": {
+        "AAA": 0.1
+      },
+      "prior_weights": {
+        "AAA": 0.05
+      },
+      "m": 1.0,
+      "breaker": {
+        "state": "NORMAL",
+        "new_trades_allowed": true,
+        "gross_cap_pct": 60.0,
+        "halt_armed": true
+      },
+      "panic": {
+        "panic": true,
+        "provisional": true,
+        "status": "PROVISIONAL"
+      },
+      "prior_vix_state": "ON",
+      "session": {
+        "R": 1.2,
+        "available": true,
+        "hash_ok": true
+      },
+      "transition": "OFF\u2192ON",
+      "expect": {
+        "panic": true,
+        "provisional": true,
+        "panic_binding": false,
+        "multiplier_momentum_trend": 1.0,
+        "no_weight_increase": true,
+        "vix_state": "ON"
+      }
+    },
+    {
+      "id": "M1",
+      "invariant": "w_signal -> single m -> (panic off) -> V1 ON; m_applied_once from call count",
+      "apply_m_to_signal": true,
+      "w_signal": {
+        "AAA": 0.1
+      },
+      "m": 0.75,
+      "breaker": {
+        "state": "NORMAL",
+        "new_trades_allowed": true,
+        "gross_cap_pct": 60.0,
+        "halt_armed": true
+      },
+      "panic": {
+        "panic": false
+      },
+      "prior_vix_state": "OFF",
+      "prior_weights": {
+        "AAA": 0.075
+      },
+      "session": {
+        "R": 1.05,
+        "available": true,
+        "hash_ok": true
+      },
+      "expect": {
+        "vix_state": "ON",
+        "m": 0.75,
+        "m_applied_once": true,
+        "m_apply_count": 1,
+        "w_base": {
+          "AAA": 0.075
+        },
+        "w_vix": {
+          "AAA": 0.0375
+        },
+        "log_fields": [
+          "m",
+          "panic_factor",
+          "vix_state",
+          "w_base",
+          "w_vix",
+          "w_final"
+        ]
+      }
+    },
+    {
+      "id": "M2",
+      "invariant": "m=1, V1 ON: only V1 reduces; no phantom second scaler",
+      "w_base": {
+        "AAA": 0.1
+      },
+      "m": 1.0,
+      "breaker": {
+        "state": "NORMAL",
+        "new_trades_allowed": true,
+        "gross_cap_pct": 60.0,
+        "halt_armed": true
+      },
+      "panic": {
+        "panic": false
+      },
+      "prior_vix_state": "OFF",
+      "session": {
+        "R": 1.2,
+        "available": true,
+        "hash_ok": true
+      },
+      "expect": {
+        "m": 1.0,
+        "w_vix": {
+          "AAA": 0.05
+        },
+        "no_second_scaler": true
+      }
+    },
+    {
+      "id": "S1",
+      "invariant": "stop price/quantity identical with vs without V1 at equal shares; never loosen; 100% qty",
+      "w_base": {
+        "AAA": 0.1
+      },
+      "m": 1.0,
+      "breaker": {
+        "state": "NORMAL",
+        "new_trades_allowed": true,
+        "gross_cap_pct": 60.0,
+        "halt_armed": true
+      },
+      "panic": {
+        "panic": false
+      },
+      "prior_vix_state": "OFF",
+      "session": {
+        "R": 1.2,
+        "available": true,
+        "hash_ok": true
+      },
+      "stop": {
+        "shares": 100.0,
+        "stop_covers_shares": 100.0,
+        "with_v1_shares": 100.0,
+        "with_v1_stop_covers_shares": 100.0,
+        "applicability": "full_quantity_ATR"
+      },
+      "expect": {
+        "stop_ok": true
+      }
+    },
+    {
+      "id": "S2",
+      "invariant": "H1/H2/H3 buffers: post-V1 weights still respect name/risk/gross caps",
+      "w_base": {
+        "AAA": 0.12,
+        "BBB": 0.12
+      },
+      "m": 1.0,
+      "name_cap": 0.1,
+      "breaker": {
+        "state": "NORMAL",
+        "new_trades_allowed": true,
+        "gross_cap_pct": 60.0,
+        "halt_armed": true
+      },
+      "panic": {
+        "panic": false
+      },
+      "prior_vix_state": "OFF",
+      "session": {
+        "R": 1.3,
+        "available": true,
+        "hash_ok": true
+      },
+      "expect": {
+        "name_cap_respected": 0.1,
+        "vix_state": "ON"
+      }
+    },
+    {
+      "id": "S3",
+      "invariant": "H6/H7: stops full-quantity; earnings/corporate unchanged; broad ETFs H7 N/A as drafted",
+      "w_base": {
+        "SPY": 0.1,
+        "EWJ": 0.09
+      },
+      "m": 1.0,
+      "breaker": {
+        "state": "NORMAL",
+        "new_trades_allowed": true,
+        "gross_cap_pct": 60.0,
+        "halt_armed": true
+      },
+      "panic": {
+        "panic": false
+      },
+      "prior_vix_state": "OFF",
+      "session": {
+        "R": 1.1,
+        "available": true,
+        "hash_ok": true
+      },
+      "h7_applicable": false,
+      "h7_blocked": [],
+      "stop": {
+        "shares": 50.0,
+        "stop_covers_shares": 50.0,
+        "applicability": "H6_full_qty"
+      },
+      "expect": {
+        "h7_applicable": false,
+        "stop_ok": true,
+        "vix_state": "ON"
+      }
+    },
+    {
+      "id": "V1",
+      "invariant": "OFF\u2192ON on first valid R>1: only reduce/flatten; never buy to increase",
+      "w_base": {
+        "AAA": 0.1,
+        "BBB": 0.0
+      },
+      "prior_weights": {
+        "AAA": 0.1,
+        "BBB": 0.0
+      },
+      "m": 1.0,
+      "breaker": {
+        "state": "NORMAL",
+        "new_trades_allowed": true,
+        "gross_cap_pct": 60.0,
+        "halt_armed": true
+      },
+      "panic": {
+        "panic": false
+      },
+      "prior_vix_state": "OFF",
+      "transition": "OFF\u2192ON",
+      "session": {
+        "R": 1.01,
+        "available": true,
+        "hash_ok": true
+      },
+      "expect": {
+        "vix_state": "ON",
+        "w_vix": {
+          "AAA": 0.05,
+          "BBB": 0.0
+        },
+        "no_new_long_open": true
+      }
+    },
+    {
+      "id": "V2",
+      "invariant": "ON, four V1-valid R<=1 closes => still ON",
+      "w_base": {
+        "AAA": 0.1
+      },
+      "prior_weights": {
+        "AAA": 0.05
+      },
+      "m": 1.0,
+      "breaker": {
+        "state": "NORMAL",
+        "new_trades_allowed": true,
+        "gross_cap_pct": 60.0,
+        "halt_armed": true
+      },
+      "panic": {
+        "panic": false
+      },
+      "prior_vix_state": "ON",
+      "prior_streak_valid_le1": 0,
+      "sessions": [
+        {
+          "R": 0.9,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.9,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.9,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.9,
+          "available": true,
+          "hash_ok": true
+        }
+      ],
+      "expect": {
+        "vix_state": "ON",
+        "streak_valid_le1": 4
+      }
+    },
+    {
+      "id": "V3a",
+      "invariant": "NORMAL NTA=true no other bind; fifth V1-valid ON\u2192OFF: restore toward base only",
+      "w_base": {
+        "AAA": 0.1
+      },
+      "prior_weights": {
+        "AAA": 0.05
+      },
+      "m": 1.0,
+      "breaker": {
+        "state": "NORMAL",
+        "new_trades_allowed": true,
+        "gross_cap_pct": 60.0,
+        "halt_armed": true
+      },
+      "panic": {
+        "panic": false
+      },
+      "prior_vix_state": "ON",
+      "sessions": [
+        {
+          "R": 0.9,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.9,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.9,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.9,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.9,
+          "available": true,
+          "hash_ok": true
+        }
+      ],
+      "transition": "ON\u2192OFF",
+      "expect": {
+        "vix_state": "OFF",
+        "w_final": {
+          "AAA": 0.1
+        },
+        "restoration_mode": "full_base",
+        "no_breaker_lift": true
+      },
+      "name_cap": 0.1
+    },
+    {
+      "id": "V3b",
+      "invariant": "NORMAL NTA=false/hold; ON\u2192OFF: no weight increase; NTA/hold unchanged",
+      "w_base": {
+        "AAA": 0.1
+      },
+      "prior_weights": {
+        "AAA": 0.05
+      },
+      "m": 1.0,
+      "breaker": {
+        "state": "NORMAL",
+        "new_trades_allowed": false,
+        "gross_cap_pct": 60.0,
+        "halt_armed": true,
+        "trading_hold": true
+      },
+      "panic": {
+        "panic": false
+      },
+      "prior_vix_state": "ON",
+      "sessions": [
+        {
+          "R": 0.9,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.9,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.9,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.9,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.9,
+          "available": true,
+          "hash_ok": true
+        }
+      ],
+      "transition": "ON\u2192OFF",
+      "expect": {
+        "vix_state": "OFF",
+        "restoration_mode": "none",
+        "new_trades_allowed": false,
+        "trading_hold": true,
+        "no_weight_increase": true,
+        "w_final": {
+          "AAA": 0.05
+        },
+        "hold_uncleared": true
+      }
+    },
+    {
+      "id": "V3c",
+      "invariant": "HALTED or backstop-HALTED; ON\u2192OFF: no weight increase; no hold/backstop/breaker lift",
+      "w_base": {
+        "AAA": 0.1
+      },
+      "prior_weights": {
+        "AAA": 0.05
+      },
+      "m": 1.0,
+      "breaker": {
+        "state": "HALTED",
+        "new_trades_allowed": false,
+        "gross_cap_pct": 30.0,
+        "halt_armed": true,
+        "backstop_equity": 90000.0
+      },
+      "panic": {
+        "panic": false
+      },
+      "prior_vix_state": "ON",
+      "sessions": [
+        {
+          "R": 0.9,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.9,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.9,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.9,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.9,
+          "available": true,
+          "hash_ok": true
+        }
+      ],
+      "transition": "ON\u2192OFF",
+      "expect": {
+        "vix_state": "OFF",
+        "breaker_state": "HALTED",
+        "restoration_mode": "none",
+        "new_trades_allowed": false,
+        "no_weight_increase": true,
+        "w_final": {
+          "AAA": 0.05
+        },
+        "no_auto_lift": true
+      }
+    },
+    {
+      "id": "V3d",
+      "invariant": "RESUMED_DISARMED ON\u2192OFF: <=min(base,30% path); backstop/halt_armed unchanged; no re-arm",
+      "w_base": {
+        "AAA": 0.5
+      },
+      "prior_weights": {
+        "AAA": 0.25
+      },
+      "m": 1.0,
+      "breaker": {
+        "state": "RESUMED_DISARMED",
+        "new_trades_allowed": true,
+        "gross_cap_pct": 30.0,
+        "halt_armed": false,
+        "backstop_equity": 88000.0,
+        "current_equity": 92000.0
+      },
+      "panic": {
+        "panic": false
+      },
+      "prior_vix_state": "ON",
+      "sessions": [
+        {
+          "R": 0.85,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.85,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.85,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.85,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.85,
+          "available": true,
+          "hash_ok": true
+        }
+      ],
+      "transition": "ON\u2192OFF",
+      "expect": {
+        "vix_state": "OFF",
+        "restoration_mode": "min_base_30",
+        "breaker_state": "RESUMED_DISARMED",
+        "w_final": {
+          "AAA": 0.3
+        },
+        "max_long_gross": 0.3,
+        "halt_armed": false,
+        "backstop_equity": 88000.0,
+        "no_rearm": true
+      },
+      "name_cap": 0.5
+    },
+    {
+      "id": "V4",
+      "invariant": "missing day inside clean streak: streak breaks; no fabricated V1-valid day",
+      "w_base": {
+        "AAA": 0.1
+      },
+      "m": 1.0,
+      "breaker": {
+        "state": "NORMAL",
+        "new_trades_allowed": true,
+        "gross_cap_pct": 60.0,
+        "halt_armed": true
+      },
+      "panic": {
+        "panic": false
+      },
+      "prior_vix_state": "ON",
+      "prior_streak_valid_le1": 3,
+      "sessions": [
+        {
+          "R": 0.9,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": null,
+          "missing": true,
+          "available": false,
+          "hash_ok": false
+        }
+      ],
+      "expect": {
+        "vix_state": "FAILSAFE_REDUCED",
+        "block_new": true,
+        "streak_valid_le1": 4,
+        "streak_not_advanced_by_invalid": true
+      }
+    },
+    {
+      "id": "V5",
+      "invariant": "hash fail / stale VIX: reduced+block new; invalid != V1-valid; streak frozen",
+      "w_base": {
+        "AAA": 0.1
+      },
+      "m": 1.0,
+      "breaker": {
+        "state": "NORMAL",
+        "new_trades_allowed": true,
+        "gross_cap_pct": 60.0,
+        "halt_armed": true
+      },
+      "panic": {
+        "panic": false
+      },
+      "prior_vix_state": "ON",
+      "prior_streak_valid_le1": 4,
+      "session": {
+        "R": 0.5,
+        "available": true,
+        "hash_ok": false,
+        "hash_fail": true,
+        "stale": true
+      },
+      "expect": {
+        "vix_state": "FAILSAFE_REDUCED",
+        "block_new": true,
+        "streak_valid_le1": 4,
+        "breaker_state": "NORMAL",
+        "new_trades_allowed": true,
+        "w_final": {
+          "AAA": 0.04
+        },
+        "no_weight_increase": true
+      },
+      "prior_weights": {
+        "AAA": 0.04
+      }
+    },
+    {
+      "id": "V6",
+      "invariant": "availability lag: decision uses only vintages available_at<=asof; no premature ON/OFF",
+      "w_base": {
+        "AAA": 0.1
+      },
+      "m": 1.0,
+      "breaker": {
+        "state": "NORMAL",
+        "new_trades_allowed": true,
+        "gross_cap_pct": 60.0,
+        "halt_armed": true
+      },
+      "panic": {
+        "panic": false
+      },
+      "prior_vix_state": "OFF",
+      "session": {
+        "R": 1.5,
+        "available": false,
+        "availability_lag_unsatisfied": true,
+        "hash_ok": true
+      },
+      "expect": {
+        "vix_state": "FAILSAFE_REDUCED",
+        "block_new": true
+      }
+    },
+    {
+      "id": "E1_domain_long",
+      "invariant": "E1: long +0.10 ON => +0.05",
+      "w_base": {
+        "AAA": 0.1
+      },
+      "m": 1.0,
+      "breaker": {
+        "state": "NORMAL",
+        "new_trades_allowed": true,
+        "gross_cap_pct": 60.0,
+        "halt_armed": true
+      },
+      "panic": {
+        "panic": false
+      },
+      "prior_vix_state": "OFF",
+      "session": {
+        "R": 1.2,
+        "available": true,
+        "hash_ok": true
+      },
+      "expect": {
+        "w_vix": {
+          "AAA": 0.05
+        }
+      }
+    },
+    {
+      "id": "E1_domain_short",
+      "invariant": "E1: short -0.10 ON remains -0.10",
+      "w_base": {
+        "AAA": -0.1
+      },
+      "m": 1.0,
+      "breaker": {
+        "state": "NORMAL",
+        "new_trades_allowed": true,
+        "gross_cap_pct": 60.0,
+        "halt_armed": true
+      },
+      "panic": {
+        "panic": false
+      },
+      "prior_vix_state": "OFF",
+      "session": {
+        "R": 1.2,
+        "available": true,
+        "hash_ok": true
+      },
+      "expect": {
+        "w_vix": {
+          "AAA": -0.1
+        }
+      }
+    },
+    {
+      "id": "E1_domain_flat",
+      "invariant": "E1: flat 0 ON remains 0 (no short open)",
+      "w_base": {
+        "AAA": 0.0
+      },
+      "m": 1.0,
+      "breaker": {
+        "state": "NORMAL",
+        "new_trades_allowed": true,
+        "gross_cap_pct": 60.0,
+        "halt_armed": true
+      },
+      "panic": {
+        "panic": false
+      },
+      "prior_vix_state": "OFF",
+      "session": {
+        "R": 1.2,
+        "available": true,
+        "hash_ok": true
+      },
+      "expect": {
+        "w_vix": {
+          "AAA": 0.0
+        }
+      }
+    },
+    {
+      "id": "E1_no_redeploy",
+      "invariant": "Cash from halving not redeployed to another name",
+      "w_base": {
+        "AAA": 0.1,
+        "BBB": 0.05
+      },
+      "prior_weights": {
+        "AAA": 0.1,
+        "BBB": 0.05
+      },
+      "m": 1.0,
+      "breaker": {
+        "state": "NORMAL",
+        "new_trades_allowed": true,
+        "gross_cap_pct": 60.0,
+        "halt_armed": true
+      },
+      "panic": {
+        "panic": false
+      },
+      "prior_vix_state": "OFF",
+      "session": {
+        "R": 1.2,
+        "available": true,
+        "hash_ok": true
+      },
+      "expect": {
+        "w_vix": {
+          "AAA": 0.05,
+          "BBB": 0.025
+        },
+        "no_redeploy": true,
+        "cash_absorbs": true
+      }
+    },
+    {
+      "id": "BRK_FS_RESUMED_NO_BACKSTOP",
+      "invariant": "RESUMED_DISARMED missing/invalid backstop -> fail-safe HALVED 30% NTAtrue (live read_breaker)",
+      "w_base": {
+        "AAA": 0.4
+      },
+      "m": 1.0,
+      "breaker": {
+        "state": "RESUMED_DISARMED",
+        "new_trades_allowed": true,
+        "gross_cap_pct": 30.0,
+        "halt_armed": false,
+        "backstop_equity": null,
+        "current_equity": 95000.0
+      },
+      "panic": {
+        "panic": false
+      },
+      "prior_vix_state": "OFF",
+      "session": {
+        "R": 1.2,
+        "available": true,
+        "hash_ok": true
+      },
+      "expect": {
+        "breaker_state": "HALVED",
+        "fail_safe": true,
+        "new_trades_allowed": true,
+        "gross_cap_pct": 30.0,
+        "max_long_gross": 0.3,
+        "vix_state": "ON"
+      }
+    },
+    {
+      "id": "BRK_FS_HALT_ARMED_FALSE_NORMAL",
+      "invariant": "NORMAL with halt_armed=false -> fail-safe HALVED 30% NTAtrue (live read_breaker)",
+      "w_base": {
+        "AAA": 0.4
+      },
+      "m": 1.0,
+      "breaker": {
+        "state": "NORMAL",
+        "new_trades_allowed": true,
+        "gross_cap_pct": 60.0,
+        "halt_armed": false
+      },
+      "panic": {
+        "panic": false
+      },
+      "prior_vix_state": "OFF",
+      "session": {
+        "R": 1.2,
+        "available": true,
+        "hash_ok": true
+      },
+      "expect": {
+        "breaker_state": "HALVED",
+        "fail_safe": true,
+        "new_trades_allowed": true,
+        "gross_cap_pct": 30.0,
+        "max_long_gross": 0.3
+      }
+    },
+    {
+      "id": "P_BIND_BLOCKS_RESTORE",
+      "invariant": "\u00a75.6 binding panic independently blocks ON\u2192OFF restoration increase even if NORMAL NTAtrue",
+      "w_base": {
+        "AAA": 0.1
+      },
+      "prior_weights": {
+        "AAA": 0.05
+      },
+      "m": 1.0,
+      "breaker": {
+        "state": "NORMAL",
+        "new_trades_allowed": true,
+        "gross_cap_pct": 60.0,
+        "halt_armed": true
+      },
+      "panic": {
+        "panic": true,
+        "multiplier_momentum_trend": 0.5,
+        "momentum_short_notional_multiplier": 0.5,
+        "new_loser_shorts_allowed": false,
+        "net_beta_floor": -0.1
+      },
+      "prior_vix_state": "ON",
+      "sessions": [
+        {
+          "R": 0.9,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.9,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.9,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.9,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.9,
+          "available": true,
+          "hash_ok": true
+        }
+      ],
+      "transition": "ON\u2192OFF",
+      "expect": {
+        "vix_state": "OFF",
+        "panic_binding": true,
+        "restoration_mode": "none",
+        "w_final": {
+          "AAA": 0.05
+        },
+        "increase_blocker_binding_panic": true
+      }
+    },
+    {
+      "id": "P4_STATUS_PROVISIONAL",
+      "invariant": "status contains PROVISIONAL with panic=true -> provisional True, context-only unless forced",
+      "w_base": {
+        "AAA": 0.1
+      },
+      "prior_weights": {
+        "AAA": 0.05
+      },
+      "m": 1.0,
+      "breaker": {
+        "state": "NORMAL",
+        "new_trades_allowed": true,
+        "gross_cap_pct": 60.0,
+        "halt_armed": true
+      },
+      "panic": {
+        "panic": true,
+        "status": "COMPUTED PROVISIONAL"
+      },
+      "prior_vix_state": "OFF",
+      "transition": "OFF\u2192ON",
+      "session": {
+        "R": 1.2,
+        "available": true,
+        "hash_ok": true
+      },
+      "expect": {
+        "panic": true,
+        "provisional": true,
+        "panic_binding": false,
+        "multiplier_momentum_trend": 1.0,
+        "w_vix_max_vs_prior": true
+      }
+    },
+    {
+      "id": "V_REDUCED_BLOCK_NO_INCREASE",
+      "invariant": "\u00a75.6 V1 reduced/block-new with NORMAL NTAtrue independently cannot increase (prior below half-base)",
+      "w_base": {
+        "AAA": 0.1,
+        "BBB": 0.0
+      },
+      "prior_weights": {
+        "AAA": 0.03,
+        "BBB": 0.0
+      },
+      "m": 1.0,
+      "breaker": {
+        "state": "NORMAL",
+        "new_trades_allowed": true,
+        "gross_cap_pct": 60.0,
+        "halt_armed": true
+      },
+      "panic": {
+        "panic": false
+      },
+      "prior_vix_state": "OFF",
+      "transition": "OFF\u2192ON",
+      "session": {
+        "R": 1.5,
+        "available": true,
+        "hash_ok": true
+      },
+      "expect": {
+        "vix_state": "ON",
+        "breaker_state": "NORMAL",
+        "new_trades_allowed": true,
+        "w_final": {
+          "AAA": 0.03,
+          "BBB": 0.0
+        },
+        "no_weight_increase": true,
+        "increase_blocker_v1_reduced": true
+      }
+    },
+    {
+      "id": "M_PANIC_APPLY",
+      "invariant": "w_signal -> m=1 -> binding panic factor 0.5 once -> V1 ON halves",
+      "apply_m_to_signal": true,
+      "apply_panic_to_weights": true,
+      "w_signal": {
+        "AAA": 0.2
+      },
+      "m": 1.0,
+      "breaker": {
+        "state": "NORMAL",
+        "new_trades_allowed": true,
+        "gross_cap_pct": 60.0,
+        "halt_armed": true
+      },
+      "panic": {
+        "panic": true,
+        "multiplier_momentum_trend": 0.5,
+        "momentum_short_notional_multiplier": 0.5,
+        "new_loser_shorts_allowed": false,
+        "net_beta_floor": -0.1
+      },
+      "prior_vix_state": "OFF",
+      "prior_weights": {
+        "AAA": 0.1
+      },
+      "session": {
+        "R": 1.2,
+        "available": true,
+        "hash_ok": true
+      },
+      "expect": {
+        "vix_state": "ON",
+        "m_applied_once": true,
+        "panic_applied_once": true,
+        "panic_factor": 0.5,
+        "w_base": {
+          "AAA": 0.1
+        },
+        "w_vix": {
+          "AAA": 0.05
+        }
+      }
+    },
+    {
+      "id": "B1_R_NAN",
+      "invariant": "B1 invalid R (nan) -> FAILSAFE_REDUCED, block_new, streak frozen",
+      "w_base": {
+        "AAA": 0.1
+      },
+      "prior_weights": {
+        "AAA": 0.05
+      },
+      "m": 1.0,
+      "breaker": {
+        "state": "NORMAL",
+        "new_trades_allowed": true,
+        "gross_cap_pct": 60.0,
+        "halt_armed": true
+      },
+      "panic": {
+        "panic": false
+      },
+      "prior_vix_state": "ON",
+      "prior_streak_valid_le1": 2,
+      "session": {
+        "R_special": "nan",
+        "available": true,
+        "hash_ok": true
+      },
+      "expect": {
+        "vix_state": "FAILSAFE_REDUCED",
+        "block_new": true,
+        "streak_valid_le1": 2,
+        "w_final_max": {
+          "AAA": 0.05
+        }
+      }
+    },
+    {
+      "id": "B1_R_POSINF",
+      "invariant": "B1 invalid R (+inf) -> FAILSAFE_REDUCED, block_new, streak frozen",
+      "w_base": {
+        "AAA": 0.1
+      },
+      "prior_weights": {
+        "AAA": 0.05
+      },
+      "m": 1.0,
+      "breaker": {
+        "state": "NORMAL",
+        "new_trades_allowed": true,
+        "gross_cap_pct": 60.0,
+        "halt_armed": true
+      },
+      "panic": {
+        "panic": false
+      },
+      "prior_vix_state": "ON",
+      "prior_streak_valid_le1": 2,
+      "session": {
+        "R_special": "+inf",
+        "available": true,
+        "hash_ok": true
+      },
+      "expect": {
+        "vix_state": "FAILSAFE_REDUCED",
+        "block_new": true,
+        "streak_valid_le1": 2,
+        "w_final_max": {
+          "AAA": 0.05
+        }
+      }
+    },
+    {
+      "id": "B1_R_NEGINF",
+      "invariant": "B1 invalid R (-inf) -> FAILSAFE_REDUCED, block_new, streak frozen",
+      "w_base": {
+        "AAA": 0.1
+      },
+      "prior_weights": {
+        "AAA": 0.05
+      },
+      "m": 1.0,
+      "breaker": {
+        "state": "NORMAL",
+        "new_trades_allowed": true,
+        "gross_cap_pct": 60.0,
+        "halt_armed": true
+      },
+      "panic": {
+        "panic": false
+      },
+      "prior_vix_state": "ON",
+      "prior_streak_valid_le1": 2,
+      "session": {
+        "R_special": "-inf",
+        "available": true,
+        "hash_ok": true
+      },
+      "expect": {
+        "vix_state": "FAILSAFE_REDUCED",
+        "block_new": true,
+        "streak_valid_le1": 2,
+        "w_final_max": {
+          "AAA": 0.05
+        }
+      }
+    },
+    {
+      "id": "B1_R_NEG",
+      "invariant": "B1 invalid R (negative) -> FAILSAFE_REDUCED, block_new, streak frozen",
+      "w_base": {
+        "AAA": 0.1
+      },
+      "prior_weights": {
+        "AAA": 0.05
+      },
+      "m": 1.0,
+      "breaker": {
+        "state": "NORMAL",
+        "new_trades_allowed": true,
+        "gross_cap_pct": 60.0,
+        "halt_armed": true
+      },
+      "panic": {
+        "panic": false
+      },
+      "prior_vix_state": "ON",
+      "prior_streak_valid_le1": 2,
+      "session": {
+        "R": -0.1,
+        "available": true,
+        "hash_ok": true
+      },
+      "expect": {
+        "vix_state": "FAILSAFE_REDUCED",
+        "block_new": true,
+        "streak_valid_le1": 2,
+        "w_final_max": {
+          "AAA": 0.05
+        }
+      }
+    },
+    {
+      "id": "B1_R_NONNUM",
+      "invariant": "B1 invalid R (non-numeric) -> FAILSAFE_REDUCED, block_new, streak frozen",
+      "w_base": {
+        "AAA": 0.1
+      },
+      "prior_weights": {
+        "AAA": 0.05
+      },
+      "m": 1.0,
+      "breaker": {
+        "state": "NORMAL",
+        "new_trades_allowed": true,
+        "gross_cap_pct": 60.0,
+        "halt_armed": true
+      },
+      "panic": {
+        "panic": false
+      },
+      "prior_vix_state": "ON",
+      "prior_streak_valid_le1": 2,
+      "session": {
+        "R": "not-a-number",
+        "available": true,
+        "hash_ok": true
+      },
+      "expect": {
+        "vix_state": "FAILSAFE_REDUCED",
+        "block_new": true,
+        "streak_valid_le1": 2,
+        "w_final_max": {
+          "AAA": 0.05
+        }
+      }
+    },
+    {
+      "id": "V3d_PRIOR_ABOVE_PATH",
+      "invariant": "RESUMED ON\u2192OFF: prior 0.35 > path target 0.30 => preserve 0.35 (restoration must not cut)",
+      "w_base": {
+        "AAA": 0.5
+      },
+      "prior_weights": {
+        "AAA": 0.35
+      },
+      "m": 1.0,
+      "breaker": {
+        "state": "RESUMED_DISARMED",
+        "new_trades_allowed": true,
+        "gross_cap_pct": 30.0,
+        "halt_armed": false,
+        "backstop_equity": 88000.0,
+        "current_equity": 92000.0
+      },
+      "panic": {
+        "panic": false
+      },
+      "prior_vix_state": "ON",
+      "sessions": [
+        {
+          "R": 0.85,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.85,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.85,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.85,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.85,
+          "available": true,
+          "hash_ok": true
+        }
+      ],
+      "transition": "ON\u2192OFF",
+      "name_cap": 0.5,
+      "expect": {
+        "vix_state": "OFF",
+        "restoration_mode": "min_base_30",
+        "w_vix": {
+          "AAA": 0.35
+        },
+        "no_cut_below_prior_at_vix_stage": true
+      }
+    },
+    {
+      "id": "V3a_PRIOR_ABOVE_BASE",
+      "invariant": "NORMAL ON\u2192OFF: prior 0.12 > base 0.10 => preserve 0.12; restoration does not cut",
+      "w_base": {
+        "AAA": 0.1
+      },
+      "prior_weights": {
+        "AAA": 0.12
+      },
+      "m": 1.0,
+      "breaker": {
+        "state": "NORMAL",
+        "new_trades_allowed": true,
+        "gross_cap_pct": 60.0,
+        "halt_armed": true
+      },
+      "panic": {
+        "panic": false
+      },
+      "prior_vix_state": "ON",
+      "sessions": [
+        {
+          "R": 0.9,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.9,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.9,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.9,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.9,
+          "available": true,
+          "hash_ok": true
+        }
+      ],
+      "transition": "ON\u2192OFF",
+      "name_cap": 0.2,
+      "expect": {
+        "vix_state": "OFF",
+        "restoration_mode": "full_base",
+        "w_vix": {
+          "AAA": 0.12
+        },
+        "no_cut_below_prior": true
+      }
+    },
+    {
+      "id": "REST_SHORT_UNCHANGED",
+      "invariant": "ON\u2192OFF restoration does not change short (prior -0.08, base -0.10)",
+      "w_base": {
+        "AAA": 0.1,
+        "SSS": -0.1
+      },
+      "prior_weights": {
+        "AAA": 0.05,
+        "SSS": -0.08
+      },
+      "m": 1.0,
+      "breaker": {
+        "state": "NORMAL",
+        "new_trades_allowed": true,
+        "gross_cap_pct": 60.0,
+        "halt_armed": true
+      },
+      "panic": {
+        "panic": false
+      },
+      "prior_vix_state": "ON",
+      "sessions": [
+        {
+          "R": 0.9,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.9,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.9,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.9,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.9,
+          "available": true,
+          "hash_ok": true
+        }
+      ],
+      "transition": "ON\u2192OFF",
+      "expect": {
+        "vix_state": "OFF",
+        "w_vix": {
+          "AAA": 0.1,
+          "SSS": -0.08
+        }
+      },
+      "name_cap": 0.1
+    },
+    {
+      "id": "REST_FLAT_PRIOR_ONLY_NO_NEW",
+      "invariant": "restoration: flat stays 0; prior-only preserved; base-only new long NOT opened",
+      "w_base": {
+        "AAA": 0.1,
+        "FLAT": 0.0,
+        "NEW": 0.08
+      },
+      "prior_weights": {
+        "AAA": 0.05,
+        "FLAT": 0.0,
+        "ONLY": 0.04
+      },
+      "m": 1.0,
+      "breaker": {
+        "state": "NORMAL",
+        "new_trades_allowed": true,
+        "gross_cap_pct": 60.0,
+        "halt_armed": true
+      },
+      "panic": {
+        "panic": false
+      },
+      "prior_vix_state": "ON",
+      "sessions": [
+        {
+          "R": 0.9,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.9,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.9,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.9,
+          "available": true,
+          "hash_ok": true
+        },
+        {
+          "R": 0.9,
+          "available": true,
+          "hash_ok": true
+        }
+      ],
+      "transition": "ON\u2192OFF",
+      "expect": {
+        "vix_state": "OFF",
+        "w_vix": {
+          "AAA": 0.1,
+          "FLAT": 0.0,
+          "ONLY": 0.04,
+          "NEW": 0.0
+        }
+      },
+      "name_cap": 0.1
+    },
+    {
+      "id": "BASE_DERISK_SEPARATE",
+      "invariant": "apply_base_derisk (separate from restoration) cuts prior 0.12 to base 0.10",
+      "w_base": {
+        "AAA": 0.1
+      },
+      "prior_weights": {
+        "AAA": 0.12
+      },
+      "m": 1.0,
+      "breaker": {
+        "state": "NORMAL",
+        "new_trades_allowed": true,
+        "gross_cap_pct": 60.0,
+        "halt_armed": true
+      },
+      "panic": {
+        "panic": false
+      },
+      "prior_vix_state": "OFF",
+      "session": {
+        "R": 0.5,
+        "available": true,
+        "hash_ok": true
+      },
+      "apply_base_derisk": true,
+      "expect": {
+        "vix_state": "OFF",
+        "w_final": {
+          "AAA": 0.1
+        }
+      }
+    },
+    {
+      "id": "S1_NEG_UNDERCOVER",
+      "invariant": "stop_covers_shares < shares => stop_ok False (qty coverage only)",
+      "w_base": {
+        "AAA": 0.1
+      },
+      "m": 1.0,
+      "breaker": {
+        "state": "NORMAL",
+        "new_trades_allowed": true,
+        "gross_cap_pct": 60.0,
+        "halt_armed": true
+      },
+      "panic": {
+        "panic": false
+      },
+      "prior_vix_state": "OFF",
+      "session": {
+        "R": 0.9,
+        "available": true,
+        "hash_ok": true
+      },
+      "stop": {
+        "shares": 100.0,
+        "stop_covers_shares": 80.0,
+        "applicability": "negative_qty_coverage"
+      },
+      "expect": {
+        "stop_ok": false
+      }
+    }
+  ]
+}

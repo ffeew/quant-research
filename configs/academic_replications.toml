@@ -1,0 +1,13 @@
+# Trial config. Strategy parameters are frozen (pre-registered) constants in the code;
+# this file records the entry point, status and data needs.
+
+[trial]
+title = "Academic replications: residual momentum, BAB, industry momentum"
+status = "failed"
+verdict = "FAILED: all three replications net Sharpe <= 0.06"
+entry = "quant_research.strategies.academic_replications.run_all"
+findings = "research/academic_replications/FINDINGS.md"
+
+[data]
+root_env = "QR_DATA_DIR"
+requires = ["bars/daily", "universe (PIT S&P 500)"]

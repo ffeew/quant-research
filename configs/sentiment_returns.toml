@@ -1,0 +1,13 @@
+# Trial config. Strategy parameters are frozen (pre-registered) constants in the code;
+# this file records the entry point, status and data needs.
+
+[trial]
+title = "AV news sentiment -> returns (H1a/H1b/H2/H2C/H3)"
+status = "failed"
+verdict = "H1b FAILED OOS economic gate (IC 0.0207 significant, net < 0); H2C/H3 in progress"
+entry = "quant_research.strategies.sentiment_returns.oos_runner"
+findings = "research/sentiment_returns/FINDINGS.md"
+
+[data]
+root_env = "QR_DATA_DIR"
+requires = ["av news sentiment", "bars/daily"]

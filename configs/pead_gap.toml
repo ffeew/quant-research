@@ -1,0 +1,13 @@
+# Trial config. Strategy parameters are frozen (pre-registered) constants in the code;
+# this file records the entry point, status and data needs.
+
+[trial]
+title = "Post-earnings drift / earnings-gap"
+status = "failed"
+verdict = "FAILED: PIT OOS Sharpe 0.49 / 0.44 / 0.35 across three runs"
+entry = "quant_research.strategies.pead_gap.pit.run_all"
+findings = "research/pead_gap/FINDINGS.md"
+
+[data]
+root_env = "QR_DATA_DIR"
+requires = ["bars/daily", "earnings events", "universe (PIT)"]

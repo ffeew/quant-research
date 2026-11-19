@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "quant-research"
+version = "0.1.0"
+description = "Research code for a paper-trading quant research desk: data pipelines, backtest engine, strategy trials and findings."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "Proprietary research code; see README" }
+dependencies = [
+  "numpy>=2.0",
+  "pandas>=2.2",
+  "scipy>=1.11",
+  "pyarrow>=15",
+  "requests>=2.31",
+  "python-dateutil>=2.9",
+  "tabulate>=0.9",
+  "exchange_calendars>=4.5",
+  "statsmodels>=0.14",
+  "cvxpy>=1.4",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-timeout>=2.3", "ruff>=0.6"]
+plots = ["matplotlib>=3.8"]
+nlp = ["vaderSentiment>=3.3"]
+data = ["openpyxl>=3.1", "yfinance>=0.2", "lxml>=5"]
+all = ["quant-research[dev,plots,nlp,data]"]
+
+[project.scripts]
+qr = "quant_research.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"*" = ["*.json", "*.csv"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q --import-mode=importlib -p no:cacheprovider --timeout=300 -rfs"
+markers = ["data: needs the private research data store (QR_DATA_DIR); skipped in CI"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+extend-exclude = ["research"]
+
+[tool.ruff.lint]
+# Research code is frozen at its pre-registered versions; only fail on real errors.
+select = ["E9", "F63", "F7", "F82"]

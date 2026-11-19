@@ -1,0 +1,13 @@
+# Trial config. Strategy parameters are frozen (pre-registered) constants in the code;
+# this file records the entry point, status and data needs.
+
+[trial]
+title = "Macro exposure diffusion (MXD)"
+status = "in_progress"
+verdict = "Pre-registration draft; signal code only, no returns"
+entry = "quant_research.strategies.macro_exposure_diffusion.mxd_signal"
+findings = "research/macro_exposure_diffusion/FINDINGS.md"
+
+[data]
+root_env = "QR_DATA_DIR"
+requires = ["bars/daily"]

@@ -1,0 +1,13 @@
+# Trial config. Strategy parameters are frozen (pre-registered) constants in the code;
+# this file records the entry point, status and data needs.
+
+[trial]
+title = "Insider trading (Form 4)"
+status = "failed"
+verdict = "FAILED / parked: no significant opportunistic-buy effect; needs small-cap data"
+entry = "quant_research.strategies.insider.make_results"
+findings = "research/insider/FINDINGS.md"
+
+[data]
+root_env = "QR_DATA_DIR"
+requires = ["insider (SEC Form 345)", "bars/daily"]

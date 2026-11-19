@@ -1,0 +1,13 @@
+# Trial config. Strategy parameters are frozen (pre-registered) constants in the code;
+# this file records the entry point, status and data needs.
+
+[trial]
+title = "Macro event studies (oil shock, VIX backwardation, curve slope)"
+status = "failed"
+verdict = "Oil-shock and curve-slope FAILED episode gates; VIX backwardation reclassified as risk overlay"
+entry = "quant_research.strategies.macro_event_studies.count_episodes"
+findings = "research/macro_event_studies/FINDINGS.md"
+
+[data]
+root_env = "QR_DATA_DIR"
+requires = ["fred / alfred", "bars/daily"]

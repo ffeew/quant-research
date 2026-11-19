@@ -1,0 +1,158 @@
+"""Statistics required by Victor's STANDARD.md v1.0 (Dave, 2026-10-30). All on DAILY net returns unless noted.
+DSR: Bailey & Lopez de Prado (2014) eq. 1-2. PBO: Bailey, Borwein, Lopez de Prado & Zhu (2017) CSCV.
+Newey-West HAC with Bartlett kernel, lag = floor(4 (T/100)^(2/9))."""
+from __future__ import annotations
+import math, itertools
+from statistics import NormalDist
+import numpy as np, pandas as pd
+
+ND = NormalDist()
+EULER = 0.5772156649
+
+
+def nw_lag(T):
+    return int(math.floor(4 * (T / 100) ** (2 / 9)))
+
+
+def ols_nw(y: np.ndarray, X: np.ndarray, lag=None):
+    """OLS coefficients and Newey-West standard errors."""
+    T = len(y)
+    lag = nw_lag(T) if lag is None else lag
+    XtX_inv = np.linalg.inv(X.T @ X)
+    b = XtX_inv @ X.T @ y
+    u = y - X @ b
+    Xu = X * u[:, None]
+    S = Xu.T @ Xu
+    for l in range(1, lag + 1):
+        w = 1 - l / (lag + 1)
+        G = Xu[l:].T @ Xu[:-l]
+        S += w * (G + G.T)
+    V = XtX_inv @ S @ XtX_inv
+    return b, np.sqrt(np.diag(V))
+
+
+def basic(r: pd.Series, ppy=252) -> dict:
+    r = r.dropna()
+    T = len(r)
+    if T < 30 or r.std() == 0:
+        return {"T": T}
+    mu, sd = r.mean(), r.std(ddof=1)
+    b, se = ols_nw(r.values, np.ones((T, 1)))
+    eq = (1 + r).cumprod()
+    return {"start": str(r.index[0].date()), "end": str(r.index[-1].date()), "T": T, "ann_ret": mu * ppy,
+            "ann_vol": sd * math.sqrt(ppy), "sharpe": mu / sd * math.sqrt(ppy), "t_nw": b[0] / se[0],
+            "t_iid": mu / sd * math.sqrt(T), "max_dd": float((eq / eq.cummax() - 1).min()),
+            "skew": float(r.skew()), "kurt": float(r.kurt() + 3)}
+
+
+def dsr(r: pd.Series, trial_srs_daily: np.ndarray, N: int) -> dict:
+    """r: daily returns of the selected strategy; trial_srs_daily: non-annualised Sharpe of the logged trials;
+    N: trial count used for the expected-max benchmark."""
+    r = r.dropna()
+    T = len(r)
+    sr = r.mean() / r.std(ddof=1)
+    g3, g4 = r.skew(), r.kurt() + 3
+    V = float(np.var(trial_srs_daily, ddof=1)) if len(trial_srs_daily) > 1 else 0.0
+    if N < 2:
+        sr0 = 0.0
+    else:
+        sr0 = math.sqrt(V) * ((1 - EULER) * ND.inv_cdf(1 - 1 / N) + EULER * ND.inv_cdf(1 - 1 / (N * math.e)))
+    den = math.sqrt(max(1 - g3 * sr + (g4 - 1) / 4 * sr ** 2, 1e-12))
+    z = (sr - sr0) * math.sqrt(T - 1) / den
+    return {"DSR": ND.cdf(z), "SR_daily": sr, "SR_ann": sr * math.sqrt(252), "SR0_daily": sr0,
+            "SR0_ann": sr0 * math.sqrt(252), "N": N, "T": T, "skew": g3, "kurt": g4,
+            "V_trial_SR_daily": V, "n_trial_srs": len(trial_srs_daily)}
+
+
+def pbo_cscv(M: pd.DataFrame, S: int = 16) -> dict:
+    M = M.dropna()
+    T, N = M.shape
+    if N < 2 or T < S * 10:
+        return {"PBO": np.nan, "N": N, "T": T, "note": "insufficient"}
+    blocks = np.array_split(np.arange(T), S)
+    X = M.values
+    s1 = np.array([X[b].sum(0) for b in blocks]); s2 = np.array([(X[b] ** 2).sum(0) for b in blocks])
+    n = np.array([len(b) for b in blocks])
+    lam = []
+    for comb in itertools.combinations(range(S), S // 2):
+        isb = np.zeros(S, bool); isb[list(comb)] = True
+        def sr(mask):
+            nn = n[mask].sum(); m1 = s1[mask].sum(0) / nn; m2 = s2[mask].sum(0) / nn
+            return m1 / np.sqrt(np.maximum(m2 - m1 ** 2, 1e-18))
+        sr_is, sr_oos = sr(isb), sr(~isb)
+        best = int(np.argmax(sr_is))
+        rank = (sr_oos < sr_oos[best]).sum() + 1           # 1..N (N = best OOS)
+        w = rank / (N + 1)
+        lam.append(math.log(w / (1 - w)))
+    lam = np.array(lam)
+    return {"PBO": float((lam <= 0).mean()), "N": N, "T": T, "S": S, "n_combos": len(lam),
+            "median_logit": float(np.median(lam))}
+
+
+def alpha_beta(r: pd.Series, mkt_ex: pd.Series, factors: pd.DataFrame | None = None) -> dict:
+    d = pd.concat([r.rename("r"), mkt_ex.rename("mkt")], axis=1).dropna()
+    X = np.column_stack([np.ones(len(d)), d.mkt.values])
+    b, se = ols_nw(d.r.values, X)
+    out = {"alpha_ann_vs_spy": b[0] * 252, "alpha_t_nw_vs_spy": b[0] / se[0], "beta_spy": b[1], "beta_t_nw": b[1] / se[1],
+           "beta_neutral_test": "beta within +/-0.1 and |t|<2" if abs(b[1]) <= 0.1 and abs(b[1] / se[1]) < 2 else "NOT beta-neutral"}
+    resid = d.r - X @ b
+    out["alpha_sharpe_vs_spy"] = (b[0] + resid).mean() / (b[0] + resid).std() * math.sqrt(252) if resid.std() > 0 else np.nan
+    if factors is not None:
+        f = pd.concat([r.rename("r"), factors], axis=1).dropna()
+        Xf = np.column_stack([np.ones(len(f)), f.drop(columns="r").values])
+        bf, sef = ols_nw(f.r.values, Xf)
+        out["alpha_ann_ff4"] = bf[0] * 252; out["alpha_t_nw_ff4"] = bf[0] / sef[0]
+        for i, c in enumerate(factors.columns, start=1):
+            out[f"load_{c}"] = bf[i]
+    return out
+
+
+def regimes(r: pd.Series, spy_ret: pd.Series, vix: pd.Series) -> pd.DataFrame:
+    """Regime labels use information up to the previous close (no look-ahead)."""
+    spy_idx = (1 + spy_ret.fillna(0)).cumprod()
+    above = (spy_idx > spy_idx.rolling(200).mean()).shift(1)
+    v = vix.reindex(r.index).ffill().shift(1)
+    med = v.median()
+    lab = {"SPY>200dma": above == True, "SPY<200dma": above == False, "VIX>median": v > med, "VIX<=median": v <= med,
+           "VIX>25": v > 25, "VIX<=25": v <= 25}
+    rows = []
+    for k, m in lab.items():
+        x = r[m.reindex(r.index).fillna(False).astype(bool)]
+        rows.append({"regime": k, "days": len(x), "ann_ret": x.mean() * 252,
+                     "sharpe": x.mean() / x.std() * math.sqrt(252) if len(x) > 20 and x.std() > 0 else np.nan})
+    return pd.DataFrame(rows)
+
+
+def by_year(r: pd.Series) -> pd.DataFrame:
+    g = r.groupby(r.index.year)
+    df = pd.DataFrame({"ret": g.apply(lambda x: (1 + x).prod() - 1), "pnl_sum": g.sum(),
+                       "sharpe": g.apply(lambda x: x.mean() / x.std() * math.sqrt(252) if x.std() > 0 else np.nan),
+                       "days": g.size()})
+    tot = r.sum()
+    df["share_of_total_pnl"] = df.pnl_sum / tot if tot > 0 else np.nan
+    return df
+
+
+def walk_forward(cands: dict, first_test_year: int, last_year: int, embargo_days: int = 21, min_train_days=252):
+    """cands: name -> daily net return Series. Expanding train window; test = one calendar year; the selected
+    candidate = best train Sharpe; an embargo of `embargo_days` sessions (>= 1 monthly rebalance) is dropped at the
+    start of each test year. Returns the concatenated OOS series and the per-fold choices."""
+    M = pd.DataFrame(cands)
+    oos, folds = [], []
+    for y in range(first_test_year, last_year + 1):
+        tr = M[M.index < f"{y}-01-01"].dropna(how="all")
+        te = M[(M.index >= f"{y}-01-01") & (M.index <= f"{y}-12-31")]
+        if len(te) <= embargo_days or len(tr) < min_train_days:
+            continue
+        te = te.iloc[embargo_days:]
+        srs = tr.mean() / tr.std() * math.sqrt(252)
+        srs = srs[tr.notna().sum() >= min_train_days]
+        if srs.dropna().empty:
+            continue
+        pick = srs.idxmax()
+        x = te[pick].dropna()
+        oos.append(x)
+        folds.append({"test_year": y, "train_end": str(tr.index[-1].date()), "pick": pick, "train_sharpe": srs[pick],
+                      "test_sharpe": x.mean() / x.std() * math.sqrt(252) if x.std() > 0 else np.nan, "test_days": len(x)})
+    s = pd.concat(oos) if oos else pd.Series(dtype=float)
+    return s, pd.DataFrame(folds)

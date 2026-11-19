@@ -1,0 +1,13 @@
+# Trial config. Strategy parameters are frozen (pre-registered) constants in the code;
+# this file records the entry point, status and data needs.
+
+[trial]
+title = "News sentiment (Loughran-McDonald, 5-day)"
+status = "failed"
+verdict = "FAILED on seen data (2025-06..2026-10); 2016..2025-05 held out unused"
+entry = "quant_research.strategies.news_sentiment.prereg_run"
+findings = "research/news_sentiment/FINDINGS.md"
+
+[data]
+root_env = "QR_DATA_DIR"
+requires = ["news (AV / Alpaca)", "bars/daily"]
