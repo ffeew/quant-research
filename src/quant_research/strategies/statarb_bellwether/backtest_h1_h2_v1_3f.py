@@ -632,37 +632,67 @@ def load_universe_v13a(
     return mem, subind, sector, rec
 
 
-def h2_delisting_receipts(bars: dict[str, Any], positions: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Pre-registered base for H2 on raw prices: a position whose name
-    stops printing before its planned exit is closed at its last close (R is NaN after the
-    last bar, so apply_costs_and_returns adds 0; no exit cost at a NaN price; the ETF hedge
-    leg and short borrow run to the planned exit). Reporting only: this
-    function changes no weight and no return. Supplied delisting returns: none (raw prices)."""
-    out = []
+def has_print(px: float) -> bool:
+    """The one last-print definition: a price is a print when it is present (not NaN) and > 0."""
+    return bool(np.isfinite(px) and px > 0)
+
+
+def printed_mask(PX: pd.DataFrame) -> pd.DataFrame:
+    """Frame form of has_print: notna and price > 0."""
+    return PX.notna() & PX.gt(0)
+
+
+def last_print_index(PX: pd.DataFrame, s: str) -> int:
+    """Row of the last print of s (has_print), or -1 when it never printed."""
+    if s not in PX.columns:
+        return -1
+    idx = np.flatnonzero(printed_mask(PX[[s]])[s].to_numpy(dtype=bool))
+    return int(idx[-1]) if len(idx) else -1
+
+
+def h2_delisting_receipts(
+    bars: dict[str, Any], W: pd.DataFrame, positions: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """Pre-registered base for H2 on raw prices: a name still HELD past its last print (after
+    the fills at its last close) is closed at that last close (R is NaN after the last bar, so
+    apply_costs_and_returns adds 0; the ETF hedge leg and short borrow run to the planned exit).
+    Keyed on the position actually held (see _fills), not the planned window: a capped exit
+    remainder, or a last print at exit_i-1, still gets a receipt. One receipt per name.
+    Reporting only: this function changes no weight and no return. Supplied delisting returns:
+    none (raw prices)."""
+    out: list[dict[str, Any]] = []
     PX = bars["PX"]
-    dates = PX.index
-    for p in positions:
-        s = p["sym"]
-        if s not in PX.columns:
+    dates = W.index
+    held: pd.DataFrame | None = None
+    for s in dict.fromkeys(p["sym"] for p in positions):
+        last_i = last_print_index(PX, s)
+        if last_i < 0 or last_i + 1 >= len(dates) or s not in W.columns:
             continue
-        idx = np.flatnonzero(PX[s].notna().values)
-        if not len(idx):
+        if held is None:
+            held = held_positions(bars, W)
+        w = float(held[s].iloc[last_i + 1])  # after the last fill it can get (close last_i)
+        if abs(w) < 1e-15:
             continue
-        last_i = int(idx[-1])
-        if p["entry_i"] <= last_i < p["exit_i"] - 1:
-            out.append(
-                {
-                    "symbol": s,
-                    "side": "long" if p["w_sym"] > 0 else "short",
-                    "entry_session": str(dates[p["entry_i"]].date()),
-                    "last_close_session": str(dates[last_i].date()),
-                    "last_close": float(PX[s].iloc[last_i]),
-                    "planned_exit_session": str(dates[min(p["exit_i"], len(dates) - 1)].date()),
-                    "treatment": "base: closed at last close (null delisting return)",
-                    "hedge_leg": p["etf"],
-                    "hedge_held_to_planned_exit": True,
-                }
-            )
+        ps = [p for p in positions if p["sym"] == s and p["entry_i"] <= last_i]
+        if not ps:
+            continue
+        p = ps[-1]
+        exit_i = max(int(q["exit_i"]) for q in ps)
+        out.append(
+            {
+                "symbol": s,
+                "side": "long" if w > 0 else "short",
+                "held_weight": w,
+                "entry_session": str(dates[int(p["entry_i"])].date()),
+                "last_close_session": str(dates[last_i].date()),
+                "last_close": float(PX[s].iloc[last_i]),
+                "planned_exit_session": str(dates[min(exit_i, len(dates) - 1)].date()),
+                "held_past_planned_exit": bool(last_i >= exit_i - 1),
+                "treatment": "base: held remainder closed at last close (null delisting return)",
+                "hedge_leg": p["etf"],
+                "hedge_held_to_planned_exit": True,
+            }
+        )
     return out
 
 
@@ -1302,33 +1332,50 @@ def signal_h2(
 # ---- Returns path (gated; not invoked without acceptance hash) ----
 
 
+FORCED_CUT = "zero_adv_cut"  # cut toward 0 with no usable ADV (cap 0): allowed, never a grow
+FORCED_SETTLEMENT = "post_last_print_settlement"  # held remainder closed at the last close
+# Stress cost on forced trades: STRESS_COST_MULT x the one-way cost with no ADV (adv_shares None).
+STRESS_COST_MULT = 2.0
+
+
+def _cut_only(held: float, target: float) -> float:
+    """Position after a cut toward 0 that never grows it or flips its sign."""
+    if held > 0:
+        return min(held, max(target, 0.0))
+    if held < 0:
+        return max(held, min(target, 0.0))
+    return 0.0
+
+
 def _fills(bars: dict[str, Any], W: pd.DataFrame) -> Iterator[tuple[Any, Any, pd.Series, list[Any], bool]]:
     """Walk the book session by session from the position actually held.
 
     W row k is the weight filled at close k (signals put it at their fill session, never the
-    signal bar); it earns the next row's return, close k -> k+1. Participation cap: each session
+    signal bar); it earns the next row's return, close k -> k+1. A fill at close k is priced,
+    print-checked and ADV-capped on row k itself, never on the row whose return it then earns (so
+    an exit at a name's real last print pays its cost there, and nothing fills on a no-print day).
+    Participation cap: each session
     trades at most 1% of ADV20 shares toward the target, where ADV20 is the trailing 20-session
     mean dollar volume ending the session before the fill day (the fill day's own volume is never
-    in it); the unfilled remainder carries to later sessions. A name with no ADV history has cap 0
-    and can't trade until it has one (at least 10 sessions in the window). A name with no print can't trade, so it stays held. Once a name is past its last
-    print and its target is flat, the held position is settled at its last close at no cost (null
-    delisting return); the H1 terminal bound and the H2 delisting stress book their loss on that
-    held amount. Yields (session, previous session, held after the fills, trades, capped), each
-    trade as (symbol, side, px, shares, adv_shares)."""
+    in it); the unfilled remainder carries to later sessions. A name with no usable ADV (no
+    history, 0 or NaN) has cap 0: it can never grow, but it may always be cut toward 0 (a forced
+    cut, charged the stress cost). A name with no print can't trade, so it stays held. Once a name
+    is past its last print and its target is flat, the held position is settled at its last close
+    (null delisting return); that settlement is not free: it is charged the stress cost, and the
+    H1 terminal bound and the H2 delisting stress book their loss on that held amount. Yields
+    (session, previous session, held after the fills, trades, capped), each trade as (symbol,
+    side, px, shares, adv_shares, forced), forced being None, FORCED_CUT or FORCED_SETTLEMENT."""
     PX, VOL = bars["PX"], bars["VOL"]
     W_exec = W.shift(1).fillna(0.0)
     DV = PX * VOL
     ADV20 = DV.rolling(20, min_periods=10).mean().shift(1)  # row k: window ending k-1; read at the fill day
-    printed = (PX > 0).to_numpy()
-    last_print = {
-        str(c): (int(np.flatnonzero(printed[:, k])[-1]) if printed[:, k].any() else -1)
-        for k, c in enumerate(PX.columns)
-    }
+    last_print = {str(c): last_print_index(PX, str(c)) for c in PX.columns}
     pos = {d: i for i, d in enumerate(PX.index)}
     held = pd.Series(0.0, index=W_exec.columns)
     dates = W_exec.index
     for j in range(1, len(dates)):
         d = dates[j]
+        fill_day = dates[j - 1]  # W_exec row j is the weight filled at close j-1: price, print and cap there
         target = W_exec.iloc[j]
         want = target - held
         fill = want.copy()
@@ -1337,18 +1384,28 @@ def _fills(bars: dict[str, Any], W: pd.DataFrame) -> Iterator[tuple[Any, Any, pd
         for s, delta in want.items():
             if abs(delta) < 1e-15:
                 continue
-            px = float(PX.at[d, s]) if s in PX.columns and d in pos else float("nan")
-            if not (px > 0):
-                gone = pos.get(d, len(PX.index)) > last_print.get(str(s), -1)
-                if not (gone and abs(float(target.loc[str(s)])) < 1e-15):
+            px = float(PX.at[fill_day, s]) if s in PX.columns and fill_day in pos else float("nan")
+            if not has_print(px):
+                lp = last_print.get(str(s), -1)
+                gone = pos.get(fill_day, len(PX.index)) > lp
+                if not (gone and lp >= 0 and abs(float(target.loc[str(s)])) < 1e-15):
                     fill.loc[str(s)] = 0.0  # no print: can't trade, the position stays held
-                continue  # (or: past its last print with a flat target, settled at last close)
-            fill_day = dates[j - 1]  # W_exec row j is the weight filled at close j-1
+                    continue
+                px_last = float(PX[s].iloc[lp])  # past its last print, target flat: settle at last close
+                side = "buy" if delta > 0 else "sell"
+                trades.append((s, side, px_last, abs(delta) * AUM / px_last, None, FORCED_SETTLEMENT))
+                continue
             adv = ADV20.at[fill_day, s] if s in ADV20.columns and fill_day in pos else np.nan
             adv_sh = (adv / px) if (isinstance(adv, float) and adv > 0) else None
             if adv_sh is None:
-                fill.loc[str(s)] = 0.0  # no ADV history: cap 0, can't trade (never left uncapped)
-                capped = True
+                # no usable ADV: cap 0, never left uncapped. It may not grow, but may always be cut
+                # toward 0 (the fund manager's ruling), at the stress cost.
+                h = float(held.loc[str(s)])
+                cut = _cut_only(h, float(target.loc[str(s)])) - h
+                fill.loc[str(s)] = cut
+                capped = capped or abs(cut - delta) > 1e-15
+                if abs(cut) > 1e-15:
+                    trades.append((s, "buy" if cut > 0 else "sell", px, abs(cut) * AUM / px, None, FORCED_CUT))
                 continue
             sh = abs(delta) * AUM / px
             # 1% ADV cap on the trade itself; the remainder carries
@@ -1356,7 +1413,7 @@ def _fills(bars: dict[str, Any], W: pd.DataFrame) -> Iterator[tuple[Any, Any, pd
                 sh = PARTICIPATION_CAP * adv_sh
                 fill.loc[str(s)] = math.copysign(sh * px / AUM, delta)
                 capped = True
-            trades.append((s, "buy" if delta > 0 else "sell", px, sh, adv_sh))
+            trades.append((s, "buy" if delta > 0 else "sell", px, sh, adv_sh, None))
         held = held + fill
         yield d, dates[j - 1], held, trades, capped
 
@@ -1371,7 +1428,9 @@ def held_positions(bars: dict[str, Any], W: pd.DataFrame) -> pd.DataFrame:
 def apply_costs_and_returns(bars: dict[str, Any], W: pd.DataFrame, cfg: Any, *, idea: str) -> dict[str, Any]:
     """Apply one-session execution lag, participation cap, borrow, and daily net returns.
 
-    REQUIRED path must use cfg from build_cost_config('unknown_borrow_required').
+    REQUIRED path must use cfg from build_cost_config('unknown_borrow_required'). Forced trades
+    (cuts at zero ADV, settlements after the last print) pay the stress cost (STRESS_COST_MULT x
+    the one-way cost at no ADV) and are counted, with their traded notional, in the output.
     """
     if cfg.borrow_rate < BORROW_UNKNOWN_REQUIRED and cfg.is_pass_bar:
         raise RuntimeError("pass-bar config must have borrow_rate >= 10%/yr")
@@ -1381,12 +1440,17 @@ def apply_costs_and_returns(bars: dict[str, Any], W: pd.DataFrame, cfg: Any, *, 
     R = bars["R"]
     rets = []
     capped_sessions = 0
+    forced: dict[str, list[float]] = {FORCED_CUT: [], FORCED_SETTLEMENT: []}
     for d, prev, held, trades, capped in _fills(bars, W):
         trade_cost_frac = 0.0
-        for s, side, px, sh, adv_sh in trades:
+        for s, side, px, sh, adv_sh, kind in trades:
             sig = None
             c = one_way_bps(side, float(px), float(sh), adv_sh, sig, cfg=cfg, venue="close", symbol=s, etf_symbols=ETFS)
-            trade_cost_frac += (sh * px / AUM) * c["bps"] / 1e4
+            bps = float(c["bps"])
+            if kind is not None:  # forced trade: stress cost, counted with its notional
+                bps *= STRESS_COST_MULT
+                forced[kind].append(float(sh * px))
+            trade_cost_frac += (sh * px / AUM) * bps / 1e4
         capped_sessions += capped
         w = held
         # asset return contribution, on the held position only
@@ -1409,6 +1473,11 @@ def apply_costs_and_returns(bars: dict[str, Any], W: pd.DataFrame, cfg: Any, *, 
         "k_impact": cfg.k_impact,
         "n_sessions": int(len(df)),
         "n_sessions_adv_capped": int(capped_sessions),
+        "n_forced_cuts_zero_adv": len(forced[FORCED_CUT]),
+        "forced_cut_notional_usd": float(sum(forced[FORCED_CUT])),
+        "n_post_last_print_settlements": len(forced[FORCED_SETTLEMENT]),
+        "post_last_print_settlement_notional_usd": float(sum(forced[FORCED_SETTLEMENT])),
+        "forced_trade_cost": f"stress: {STRESS_COST_MULT} x one-way cost at no ADV",
         "daily": df,
     }
 
@@ -1427,14 +1496,19 @@ def load_h1_terminal_roster(path: str | None = None, expected_sha: str | None = 
         return cast(list[Any], json.load(f))
 
 
-def _trusted_tau(bars: dict[str, Any], s: str) -> int | None:
-    """tau = last trusted print (pinned bar file only): volume > 0, not forward-filled."""
-    if s not in bars["PX"].columns:
-        return None
-    tr = (bars["VOL"][s] > 0) & bars["PX"][s].notna()
+def _trusted(bars: dict[str, Any], s: str) -> pd.Series:
+    """Trusted print: a print (has_print), volume > 0, not forward-filled."""
+    tr: pd.Series = printed_mask(bars["PX"][[s]])[s] & (bars["VOL"][s] > 0)
     if "FFILL" in bars:
         tr &= ~bars["FFILL"][s].fillna(True).astype(bool)
-    idx = np.flatnonzero(tr.values)
+    return tr
+
+
+def _trusted_tau(bars: dict[str, Any], s: str) -> int | None:
+    """tau = last trusted print (pinned bar file only): a print (has_print), volume > 0, not forward-filled."""
+    if s not in bars["PX"].columns:
+        return None
+    idx = np.flatnonzero(_trusted(bars, s).to_numpy(dtype=bool))
     return int(idx[-1]) if len(idx) else None
 
 
@@ -1472,8 +1546,8 @@ def h1_terminal_bound(
 ) -> tuple[pd.DataFrame, pd.Series, list[dict[str, Any]]]:
     """Apply the H1 adverse terminal rule to positions stranded in unresolved terminal rows.
 
-    Returns (W_adj, overlay, receipts). W_adj zeroes the stranded leg from tau so the frozen
-    execution lag closes it at tau+1 with no exit-cost credit; overlay[d] is the fractional
+    Returns (W_adj, overlay, receipts). W_adj zeroes the stranded leg from tau+1 (no print there,
+    so it can't fill: no exit-cost credit); overlay[d] is the fractional
     equity charge booked at tau+1 (long: -100% of marked value; short: max(P_tau, V_max)
     liability) plus borrow from tau+1 to max(frozen exit, h). The bound applies to the position
     actually held into tau+1 (after the ADV cap), not the target: a capped exit still holding at
@@ -1504,20 +1578,20 @@ def h1_terminal_bound(
         if row.get("economic_event_date") and pd.Timestamp(row["economic_event_date"]) < tau_d:
             raise Blocked(f"BLOCK H1: source-bound economic date < tau for {s}.")
         # suspension gaps before tau: a held session without trusted print before tau
-        held_pre = W[s].iloc[:t].abs() > 0
-        trusted = (bars["VOL"][s] > 0) & bars["PX"][s].notna()
-        if "FFILL" in bars:
-            trusted &= ~bars["FFILL"][s].fillna(True).astype(bool)
+        assert held is not None
+        held_pre = held[s].iloc[:t].abs() > 0  # the position actually held over each session, not W
+        trusted = _trusted(bars, s)
         if (held_pre & ~trusted.iloc[:t]).any():
             raise Blocked(
                 f"BLOCK H1: suspension gap before tau for {s} (worse-of-prints "
                 "exit not representable in frozen weight path; fail closed)."
             )
-        assert held is not None
-        # held after close tau's session; no print after tau, so this is what reaches tau+1
-        w = float(held[s].iloc[t])
-        if abs(w) < 1e-15 or t + 1 >= len(dates):
+        if t + 1 >= len(dates):
             continue  # not open after tau within window
+        # held after the fills at close tau (the last fill it can get); this is what reaches tau+1
+        w = float(held[s].iloc[t + 1])
+        if abs(w) < 1e-15:
+            continue
         book_i = t + 1
         p_tau = float(bars["PX"][s].iloc[t])
         rec = {
@@ -1564,7 +1638,8 @@ def h1_terminal_bound(
                     "source_hashes": terms.get("source_hashes"),
                 }
             )
-        W_adj.iloc[t:, cast(int, W_adj.columns.get_loc(s))] = 0.0
+        # flat from tau+1: the stranded amount is never traded at tau (no exit-cost credit)
+        W_adj.iloc[t + 1 :, cast(int, W_adj.columns.get_loc(s))] = 0.0
         receipts.append(rec)
     # Path B: identical charge as an equity overlay; the runner has no stop / basket-stop / H8-H9 /
     # NAV-sizing code, so what the risk logic "sees" cannot differ: A and B coincide here.
@@ -1586,27 +1661,22 @@ def h2_delisting_stress(
     supplied_delist_returns: dict[str, Any] | None = None,
 ) -> tuple[pd.Series, list[dict[str, Any]]]:
     """Pre-registered counted stress for H2, pure computation: on any NULL delisting return,
-    -30% for longs and 0% for shorts. Applied to every position h2_delisting_receipts flags (name
-    stops printing before its planned exit). The charge is the position actually held over the
-    session after the last close (after the ADV cap, not the target) times the shock, booked at
+    -30% for longs and 0% for shorts. Applied to every nonzero position actually held past the
+    last print (h2_delisting_receipts; after the ADV cap, not the target or the planned window),
+    times the shock, booked at
     last+1 as an equity overlay added to daily net. A supplied (non-null) delisting return gets no stress.
     Returns (overlay indexed like W, receipts)."""
     sup = supplied_delist_returns or {}
     dates = W.index
     overlay = pd.Series(0.0, index=dates)
     out = []
-    held: pd.DataFrame | None = None
-    for r in h2_delisting_receipts(bars, positions):
+    for r in h2_delisting_receipts(bars, W, positions):
         s = r["symbol"]
         if sup.get(s) is not None:
             out.append(dict(r, stress="not applied: supplied (non-null) delisting return"))
             continue
         li = int(cast(int, dates.get_loc(pd.Timestamp(r["last_close_session"]))))
-        if li + 1 >= len(dates):
-            continue
-        if held is None:
-            held = held_positions(bars, W)
-        w = float(held[s].iloc[li]) if s in held.columns else 0.0  # no print after li: carried into li+1
+        w = float(r["held_weight"])
         shock = H2_DELISTING_STRESS_LONG if w > 0 else H2_DELISTING_STRESS_SHORT
         charge = w * shock if w > 0 else 0.0
         overlay.iloc[li + 1] += charge
@@ -1819,7 +1889,7 @@ def main(argv: list[str] | None = None) -> int:
                 eval_end=eval_end,
                 last_exit_i=last_exit_i,
             )
-            results["H2_delisting_receipts"] = h2_delisting_receipts(bars, h2_positions)
+            results["H2_delisting_receipts"] = h2_delisting_receipts(bars, W, h2_positions)
             if args.delisting_stress:
                 stress_overlay, results["H2_delisting_stress_receipts"] = h2_delisting_stress(bars, W, h2_positions)
         h1_paths: list[Any] = [None]

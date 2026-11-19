@@ -13,6 +13,7 @@ import ast
 import contextlib
 import hashlib
 import importlib.util
+import inspect
 import io
 import json
 import os
@@ -530,7 +531,7 @@ def run_all(mod: Any, tmp: Path) -> dict[str, Any]:
         r1=r1,
         r2=r2,
         tb=tb,
-        rec2=mod.h2_delisting_receipts(B, pos),
+        rec2=_receipts(mod, B, W2, pos),
         stress=mod.h2_delisting_stress(B, W2, pos),
         sharpe=(mod.sharpe_ann(r1["daily"]["net"]), mod.sharpe_ann(r2["daily"]["net"])),
         bounds=[mod.stage_date_bounds(s) for s in ("dev", "holdout")],
@@ -550,7 +551,27 @@ def run_all(mod: Any, tmp: Path) -> dict[str, Any]:
 # including every pin and config value, must still match the pre-cleanup module exactly.
 # h2_delisting_stress now prices the position actually held (review round 2); on these fixtures
 # that equals the target, so it stays in the comparison.
-FIXED = {"W1": "B1", "r1": "B1 B2 B3", "r2": "B2 B3", "tb": "B1 B3", "sharpe": "B1 B2 B3"}
+# Review round 3: R3-fill (a fill at close j-1 is priced, print-checked and capped on row j-1)
+# changes the priced paths r1, r2, sharpe and the H1 bound tb. R3-held: H2 delisting receipts and
+# stress are keyed on the position held past the last print (receipts gain held_weight and
+# held_past_planned_exit, one per name), so rec2 and stress are excluded too; their behaviour is
+# pinned in test_v1_3f_fixes.py.
+FIXED = {
+    "W1": "B1",
+    "r1": "B1 B2 B3 R3-fill",
+    "r2": "B2 B3 R3-fill",
+    "tb": "B1 B3 R3-fill",
+    "sharpe": "B1 B2 B3 R3-fill",
+    "rec2": "R3-held",
+    "stress": "R3-held",
+}
+
+
+def _receipts(mod: Any, B: Any, W: Any, pos: Any) -> Any:
+    """Old h2_delisting_receipts(bars, positions); new (bars, W, positions), keyed on the held position."""
+    if len(inspect.signature(mod.h2_delisting_receipts).parameters) == 2:
+        return mod.h2_delisting_receipts(B, pos)
+    return mod.h2_delisting_receipts(B, W, pos)
 
 
 def test_computations_identical_on_synthetic_fixtures(old_src, tmp_path):
