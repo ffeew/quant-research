@@ -1355,9 +1355,11 @@ def apply_costs_and_returns(bars: dict[str, Any], W: pd.DataFrame, cfg: Any, *, 
         # asset return contribution, on the held position only
         rrow = R.loc[d].reindex(w.index).fillna(0.0) if d in R.index else 0.0
         gross = float((w * rrow).sum()) if not isinstance(rrow, float) else 0.0
-        # borrow on short notional for 1 session (~1 calendar day approx; 360-day convention)
+        # borrow on short notional over the calendar days since the last close (weekends and
+        # holidays accrue; 360-day convention)
         short_mv = float((-w.clip(upper=0)).sum() * AUM)
-        b = borrow_usd(short_mv, days=1.0, cfg=cfg)["usd"] / AUM
+        days = float((d - dates[j - 1]).days)
+        b = borrow_usd(short_mv, days=days, cfg=cfg)["usd"] / AUM
         net = gross - trade_cost_frac - b
         rets.append((d, net, gross, trade_cost_frac, b))
     df = pd.DataFrame(rets, columns=["session_date", "net", "gross", "tc", "borrow"]).set_index("session_date")
@@ -1506,10 +1508,10 @@ def h1_terminal_bound(
             h_i = int(np.searchsorted(dates.values, h_d.to_datetime64(), side="right")) - 1
             end_i = min(max(frozen_exit_i, h_i), len(dates) - 1)
             rate = max(cfg.borrow_rate, float(terms.get("borrow_rate_source", 0.0)))
-            per = borrow_usd(abs(w) * AUM, days=1.0, cfg=cfg)["usd"] / AUM
-            per *= rate / cfg.borrow_rate if cfg.borrow_rate > 0 else 1.0
+            per_day = borrow_usd(abs(w) * AUM, days=1.0, cfg=cfg)["usd"] / AUM
+            per_day *= rate / cfg.borrow_rate if cfg.borrow_rate > 0 else 1.0
             for j in range(book_i, end_i + 1):
-                overlay.iloc[j] -= per
+                overlay.iloc[j] -= per_day * (dates[j] - dates[j - 1]).days  # calendar days, weekends accrue
             rec.update(
                 {
                     "h": str(h_d.date()),
