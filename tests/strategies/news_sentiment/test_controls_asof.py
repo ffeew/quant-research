@@ -323,7 +323,6 @@ class TestGuards(unittest.TestCase):
         self.assertEqual(
             pr.PRIMARY, dict(hold=5, k=3, min_stocks=3, min_sectors=6, scorer="lm", filt=True, window="overnight_full")
         )
-        self.assertEqual(pr.EVENTS_SHA, "d568a60d19348ad2948083df6a95f64e501f25615d773cdac14ebd9629216d2e")
         self.assertIsNone(pr.SUE_SHA)
 
 

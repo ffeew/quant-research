@@ -318,7 +318,7 @@ def main() -> None:
         mc = mc.assign(sd=pd.to_datetime(mc.session_date)).merge(f2, on=["symbol", "sd"], how="left").drop(columns="sd")
         mc["shares_jump_flag"] = mc.flag.fillna(False).astype(bool)
         mc = mc.drop(columns="flag")
-    # own-median outlier QA (Sofia): market cap > 3x or < 1/3 of the symbol's own median in the quarter
+    # own-median outlier QA (the stat-arb researcher): market cap > 3x or < 1/3 of the symbol's own median in the quarter
     _medq = mc.groupby([mc.symbol, pd.to_datetime(mc.session_date).dt.to_period("Q")]).shares.transform("median")
     medall = mc.groupby("symbol").shares.transform("median")
     mc["shares_vs_own_median"] = mc.shares / medall

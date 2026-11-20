@@ -240,7 +240,7 @@ def correction_record(
     corrects: list[dict[str, Any]],
     fields: dict[str, Any],
     note: str,
-    author: str = "Hana (Portfolio Construction)",
+    author: str = "the portfolio-construction lead (Portfolio Construction)",
     requested_by: str | None = None,
     now: dt.datetime | None = None,
 ) -> dict[str, Any]:

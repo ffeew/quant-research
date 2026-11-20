@@ -1,7 +1,7 @@
 # Issuer-document distribution & split ledger: 9 ETFs (gate G6), built 2026-11-07 SGT
 
 - **Scope:** XLP, XLV, XLU, XLY, XLI, XLK (SSGA / Select Sector SPDR Trust) and IEF, SHY, TLT (iShares / BlackRock). The split question additionally covers all 11 Select Sector SPDRs.
-- **Authority:** a bounded build approved via Jeremy under Daniel's 18:45 SGT delegation. It is internal research data only, with no trades, returns, signals or outbound messages.
+- **Authority:** a bounded build. It is internal research data only, with no trades, returns, signals or outbound messages.
 - **Sources:** only public issuer documents and one archived copy of an issuer document.
   - No performance or return pages were fetched, no Yahoo and no vendor price data.
   - The v1.3 corporate_actions files were read only and verified unchanged against the v1.3 MANIFEST.

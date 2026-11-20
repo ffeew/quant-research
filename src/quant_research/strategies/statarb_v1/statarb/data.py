@@ -3,7 +3,7 @@
 load_panel(source="cio_data") -> Panel with wide DataFrames (index = session date, columns = symbol):
   open, close (split+div adjusted), dollar_vol (raw close*raw volume, SIP consolidated), member (PIT S&P 500 bool),
   sector (Series symbol->GICS sector; former members imputed, see impute_sectors), etf_close (sector ETFs + SPY).
-Only source="cio_data" (Dmitri's store) is allowed (desk rule #5, 2026-10-30). The old IEX fallbacks
+Only source="cio_data" (the shared store) is allowed (data-provenance rule, 2026-10-30). The old IEX fallbacks
 (statarb/data/daily_bars.json, $QR_DESK_DIR/data.json) are retired; live data only via data/lib/desk_data_client.py.
 """
 
@@ -172,7 +172,7 @@ def load_panel(
         ]  # current GICS snapshot
     else:
         raise ValueError(
-            f"source={source!r} is retired (desk rule #5, 2026-10-30): history must come from Dmitri's store "
+            f"source={source!r} is retired (data-provenance rule, 2026-10-30): history must come from the shared store "
             f"(source='cio_data'); statarb/data/daily_bars.json and {_QR.DESK_DIR}/data.json are deprecated for research."
         )
     c = c.loc[start:end]

@@ -1,13 +1,13 @@
-"""Desk data loader (read-only on Dmitri's store). Dave, 2026-10-30 (v2).
+"""Shared-store data loader (read-only on the data owner's store). The derivatives researcher, 2026-10-30 (v2).
 
-Primary source (Dmitri, SIP, landed 2026-10-30 ~01:15 SGT):
+Primary source (the data owner, SIP, landed 2026-10-30):
   data/bars/daily/total_return/daily_total_return.parquet  -> ret_total_best (recommended research return),
                                                               close_raw / volume_raw (for cost buckets)
   data/universe/sp500_membership.parquet                    -> point-in-time S&P 500 intervals [start, end)
   data/universe/universe.parquet                            -> roles (sp500_current / former / etf), GICS (current only)
   data/factors/ken_french/ff3_daily.parquet                 -> FF3 + RF daily
-No fallback: history comes only from Dmitri's store; live Alpaca calls only via data/lib/desk_data_client.py (client()).
-We never write into $QR_DATA_DIR; caches go to research/replication/_cache (Dave's).
+No fallback: history comes only from the data owner's store; live Alpaca calls only via data/lib/desk_data_client.py (client).
+We never write into $QR_DATA_DIR; caches go to research/replication/_cache (the derivatives researcher's).
 """
 
 from __future__ import annotations
@@ -60,7 +60,7 @@ def data_status() -> dict[str, int | bool | float | str | list[str]]:
 
 def _clean(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Suspect returns: |r| > 40% on a day with a split, a flagged spin-off/other action, or a >50bp mismatch between
-    Dmitri's two total-return constructions. These are corporate-action artefacts far more often than real moves
+    The data owner's two total-return constructions. These are corporate-action artefacts far more often than real moves
     (QA report 2026-10-30 lists 166 |r|>40% days, e.g. CTVA 2026-10-01 -83.8%). Base case sets them to 0
     (value-neutral corporate action); run_all reports a no-clean sensitivity."""
     sus = (df.ret_total_best.abs() > SUSPECT_ABS_RET) & (
@@ -76,7 +76,7 @@ def _clean(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
 
 
 def load_panel(clean: bool = True, use_cache: bool = True) -> dict[str, pd.DataFrame | str]:
-    """Wide daily panels from Dmitri's total-return file. Keys: ret, close_raw, vol_raw, suspect_log, source."""
+    """Wide daily panels from the data owner's total-return file. Keys: ret, close_raw, vol_raw, suspect_log, source."""
     CACHE.mkdir(parents=True, exist_ok=True)
     ck = CACHE / f"panel_{'clean' if clean else 'raw'}_{int(TR_FILE.stat().st_mtime)}.pkl"
     if use_cache and ck.exists():
@@ -209,7 +209,7 @@ def pit_mask(
     intervals: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """Boolean (dates x symbols): S&P 500 member on that date, intervals [start, end), null start = member since
-    before the change log, null end = still a member. Same rule as Dmitri's universe.py members_on().
+    before the change log, null end = still a member. Same rule as the data owner's universe.py members_on.
     If `intervals` (from validate_intervals) is given, only kept intervals are used (ticker-reuse guard)."""
     m = load_membership()
     if intervals is not None:
@@ -249,7 +249,7 @@ def ff3_daily() -> pd.DataFrame:
 
 
 # ---------------- live data: ONLY via the desk's shared client (DESK_RULES.md rule #5) ----------------
-# History is read from Dmitri's store above. The old fallback to statarb/data/daily_bars.json (Sofia's IEX file) was
+# History is read from the data owner's store above. The old fallback to statarb/data/daily_bars.json (the stat-arb researcher's IEX file) was
 # removed on 2026-10-30; there is no silent fallback any more: if the store is not ready, run_all.py stops.
 class _BarsClient(Protocol):
     def get_daily_bars(
@@ -284,7 +284,7 @@ def load_closes(prefer: str = "store") -> tuple[pd.DataFrame, str]:
     """Legacy (turn-1 backtest.py scripts). Store only; new pipelines use load_panel()."""
     files = list(ADJ_DIR.glob("*.parquet")) if ADJ_DIR.exists() else []
     if not files:
-        raise RuntimeError(f"Dmitri's store not found at {ADJ_DIR}; no fallback (DESK_RULES.md rule #5).")
+        raise RuntimeError(f"The shared data store was not found at {ADJ_DIR}; no fallback (data-provenance rule).")
     df = pd.concat([pd.read_parquet(f, columns=["symbol", "session_date", "close"]) for f in files])
     df["session_date"] = pd.to_datetime(df["session_date"])
     return df.pivot(index="session_date", columns="symbol", values="close").sort_index(), "dmitri_store_adjusted_sip"

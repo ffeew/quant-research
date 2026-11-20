@@ -1,4 +1,4 @@
-"""Industry momentum (Moskowitz & Grinblatt 1999). Dave, 2026-10-30.
+"""Industry momentum (Moskowitz & Grinblatt 1999). The derivatives researcher, 2026-10-30.
 Paper: 20 value-weighted industries; long top-3 / short bottom-3 by past 6-month return, hold 6 months (overlapping
 portfolios), no skip month in the headline spec.
 Desk versions (same engine / costs / reporting as the other two replications):
@@ -8,10 +8,10 @@ Desk versions (same engine / costs / reporting as the other two replications):
      imom_etf_ls_1m : same ranking, rebalanced monthly (K=1)
      imom_etf_long  : long-only top-3, rebalanced fully every month (1-month hold, no cohorts; excess of rf)
   B) Stock level (GICS sector portfolios of PIT S&P 500 members, EW within sector; trade the member stocks).
-     Requires point-in-time industry codes for former members; gated by coverage (see run_all.py). Dmitri's
+     Requires point-in-time industry codes for former members; gated by coverage (see run_all.py). The data owner's
      universe.parquet has GICS only for current members (as of 2026-10-30) -> blocked unless forced as a diagnostic.
   C) Public pre/post-2016 check: FF 49 industries (VW), J=6/K=6, top-5/bottom-5 (~10% each side), monthly from
-     1926 -> splits pre-2016 vs 2016+ (Dmitri's data starts 2016)."""
+     1926 -> splits pre-2016 vs 2016+ (the data owner's data starts 2016)."""
 
 from __future__ import annotations
 

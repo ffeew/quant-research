@@ -24,6 +24,12 @@ from quant_research.strategies.trend_tsmom.tsmom.data import ASSET_CLASS, EXT_EX
 from quant_research.strategies.trend_tsmom.tsmom.engine import Config, run
 from quant_research.strategies.trend_tsmom.tsmom.stats import corr_to, monthly, perf, sharpe_se
 from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DATA_DIR, ...)
+from quant_research.utils.pins import require_pins
+
+# recorded in meta.json only, so refuse up front on a PENDING / missing pin (before any work)
+PINS = require_pins(
+    "strategies.trend_tsmom.run_v2", "meta.data_build.prereg_tr_sha256", "meta.cost_model.prereg_sha256"
+)
 
 OUT = "outputs_v2"
 os.makedirs(OUT, exist_ok=True)
@@ -343,7 +349,7 @@ mech = bool(cut(v1o["daily"]).gross_lev.max() <= 1.0 + 1e-9 and (v1o["weights"][
 crit = [
     ("1 net Sharpe >= 0.40", f"{v1row.net_sharpe:.3f}", v1row.net_sharpe >= 0.40),
     (
-        "2 Tomas flag = PASS (net>0 at 2x costs AND cost <= 50% gross)",
+        "2 TCA owner flag = PASS (net>0 at 2x costs AND cost <= 50% gross)",
         f"{v1row.tomas_flag} (net@2x {v1row.net_at_2x_cost * 100:.2f}%, cost/gross {v1row.cost_drag / v1row.gross_ret * 100 if v1row.gross_ret > 0 else float('nan'):.0f}%)",
         v1row.tomas_flag == "PASS",
     ),
@@ -408,13 +414,13 @@ meta = {
             "sha256": sha(f"{_QR.DATA_DIR}/factors/ken_french/ff3_daily.parquet"),
             "rf_last_date": panel["rf_last"],
         },
-        "prereg_tr_sha256": "87d09bb90625cb220bc28073740b5f4d04f4d0f1f45cdd3bc5d7a7bbe95a5ead",
+        "prereg_tr_sha256": PINS["meta.data_build.prereg_tr_sha256"],
     },
     "cost_model": {
-        "name": "Tomas v1.1",
+        "name": "TCA owner v1.1",
         "path": f"{_QR.COSTS_DIR}/cost_model.py",
         "sha256": sha(f"{_QR.COSTS_DIR}/cost_model.py"),
-        "prereg_sha256": "df67d604489583d36bb1a16dc7ed30c5568b9a17526f450e4c1a335f9fe8eebf",
+        "prereg_sha256": PINS["meta.cost_model.prereg_sha256"],
     },
     "code_version": {
         "vcs": "none (not a git repo); per-file sha256",

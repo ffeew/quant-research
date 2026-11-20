@@ -1,6 +1,6 @@
 # Cross-asset trend sleeve (TSMOM, ETFs only) replication: RESULTS
 
-**Owner:** Maya (Macro Strategist) · **Run:** Fri 30 Oct 2026, ~01:50 SGT · **Status:** replicated, awaiting validation (Victor). Research only: no orders and no broker calls.
+**Owner:** the macro strategist · **Run:** Fri 30 Oct 2026 · **Status:** replicated, awaiting validation (the review). Research only: no orders and no broker calls.
 **Papers:**
 - `tsmom-moskowitz-ooi-pedersen-2012`: 12m sign, 40% vol per asset
 - `trend-century-hurst-ooi-pedersen-2017`: 1/3/12 blend, 10% book vol
@@ -16,17 +16,17 @@
   - Correlation to SPY is about zero: +0.04 daily, −0.16 monthly.
   - Monthly skew is positive (+0.94), and 2022 was strong (+25.7%).
   - This is weaker than the >1.0 Sharpe MOP report for 1985–2009, but consistent with the post-2010 decay in the literature: Hurst et al. report a net Sharpe of 0.41 for 2010–16, and the SG Trend index had a Sharpe of 0.05 for 2010–18.
-- **Net of Tomas's cost model (base case): 2.3%/yr, vol 11.3%, Sharpe 0.20, t = 0.63, max drawdown −25.6%.**
+- **Net of the TCA owner's cost model (base case): 2.3%/yr, vol 11.3%, Sharpe 0.20, t = 0.63, max drawdown −25.6%.**
   - Costs plus borrow come to **4.5%/yr**, on **15.5× annual one-way turnover** at an average of 26 bps one-way.
-  - The net result is **not statistically different from zero**. Tomas's flag is **WARN**: costs exceed 50% of gross, and the result turns negative at 2× costs.
-- **Implementable variant** (gross ≤ 2×, long/flat in ETFs that are not shortable/ETB today): net **1.8%/yr, vol 7.5%, Sharpe 0.24, t = 0.75, max drawdown −18.2%**. Tomas flag: WARN.
+  - The net result is **not statistically different from zero**. The TCA owner's flag is **WARN**: costs exceed 50% of gross, and the result turns negative at 2× costs.
+- **Implementable variant** (gross ≤ 2×, long/flat in ETFs that are not shortable/ETB today): net **1.8%/yr, vol 7.5%, Sharpe 0.24, t = 0.75, max drawdown −18.2%**. TCA owner flag: WARN.
 - **Robustness verdict: NOT robust net of costs.**
   - Only the 12m/monthly specs stay positive at base costs (baseline, sizing variants, implementable).
   - Every 1/3/6m lookback, the Hurst 1/3/12 blend and every weekly-rebalance variant **FAIL** net, at −2% to −30%/yr.
   - Gross, all 19 variants are positive (Sharpe 0.11–0.66). So the trend is there; the problem is costs and turnover.
   - Against 19 trials, the deflated Sharpe of the *gross* baseline is 0.82, below the 0.95 bar. The net DSR is about 0.
 - **The cost assumptions drive the conclusion.**
-  - With Tomas's MOC venue (fill at the official close, which our timing allows), net rises to 4.8%, Sharpe 0.43 (PASS).
+  - With the TCA owner's MOC venue (fill at the official close, which our timing allows), net rises to 4.8%, Sharpe 0.43 (PASS).
   - The gap comes from **default L3/L4 spread assumptions** of about 45–65 bps one-way for the FX ETFs (FXE/FXB/FXC/FXA/UUP/FXY) and DBA/DBC.
   - It also comes from **SHY**: its vol is about 1.5%, so its average |weight| is about 1.0× NAV and it churns 4.8× a year.
   - Measured spreads for these names are the most valuable next input.
@@ -40,22 +40,22 @@
 | Extended universe (robustness) | adds EWZ FXI INDA EWY EWT EWA EWC AGG BND TIP LQD HYG |
 | Risk-free | Ken French daily RF (`data/factors/ken_french/ff3_daily.parquet`). Last date is 2026-09-30, **forward-filled through 28 Oct**. KF daily RF is rounded to 0.01%/day. |
 | Shortability | `data/assets/snapshots/assets_2026-10-29.parquet`. This is today's snapshot only, not point-in-time. **Not shortable/ETB today: USO, FXE, FXB** (also BWX and EWA). |
-| Liquidity inputs | Raw close × 20-day average raw volume, lagged 1 day, sets Tomas's bucket. Realised σ is 20-day, also lagged. |
+| Liquidity inputs | Raw close × 20-day average raw volume, lagged 1 day, sets the TCA owner's bucket. Realised σ is 20-day, also lagged. |
 
 **Data caveats:**
 - The desk corporate-actions file has **no dividend or split records for the 20 newly added ETFs**.
   - Their total return therefore relies only on Alpaca's adjustment, with no independent desk check.
-  - Dmitri's TR validation flags unrecorded splits on 2016-11-07 (EWJ/EWU/EWT) and 2020-04-29 (USO).
+  - The data owner's TR validation flags unrecorded splits on 2016-11-07 (EWJ/EWU/EWT) and 2020-04-29 (USO).
 - USO, UNG, DBC and DBA embed futures roll. That roll is real, tradable P&L.
 
 ## 2. Cost model used
-- **Tomas's v1.1 model:** `src/quant_research/backtest/costs/cost_model.py`, `trade_cost()`.
+- **The TCA owner's v1.1 model:** `src/quant_research/backtest/costs/cost_model.py`, `trade_cost`.
   - Fees: SEC, TAF and CAT.
   - Half-spread: no measured per-name spreads, so **bucket defaults** are used.
   - Impact: square-root model with k = 1.0, using lagged σ and ADV.
   - A paper-to-live buffer.
 - Base venue is `continuous`. Book size is **$1M NAV** (my assumption).
-- **Borrow: 25 bps/yr** on short market value (Tomas's `BORROW_RATE_ETB_DEFAULT`), 360-day basis, accrued over calendar days.
+- **Borrow: 25 bps/yr** on short market value (the TCA owner's `BORROW_RATE_ETB_DEFAULT`), 360-day basis, accrued over calendar days.
 - **Not modelled:**
   - Margin interest above RF when gross leverage exceeds 1. The baseline averages 3.2× gross, so this is material on Alpaca.
   - Interest on short proceeds.
@@ -128,7 +128,7 @@ Against the same risk-parity book held long-only, the trend timing adds about **
 - `pvt` = 10% book-vol target.
 - `implementable` = gross cap of 2× plus long/flat for ETFs that are not shortable.
 - `lag0` = fill at the signal close. This only works if the signal is computed before the 15:50 ET MOC cutoff on near-close prices, so it is optimistic.
-- Flags follow Tomas's §6 rule: PASS = net > 0 at 2× costs and costs ≤ 50% of gross.
+- Flags follow the TCA owner's §6 rule: PASS = net > 0 at 2× costs and costs ≤ 50% of gross.
 
 **Reading of the grid:**
 1. **Gross:** all 19 variants are positive.
@@ -205,22 +205,22 @@ Against the same risk-parity book held long-only, the trend timing adds about **
   - The probabilistic Sharpe of the net baseline vs 0 is 0.74.
 - **Avoiding cherry-picking:**
   - The headline is the paper's own spec, and all grid and cost rows are reported.
-  - The best-looking net result (MOC venue) depends on a cost and venue assumption, not on the signal. It is a hypothesis for Tomas to verify, not a result.
+  - The best-looking net result (MOC venue) depends on a cost and venue assumption, not on the signal. It is a hypothesis for the TCA owner to verify, not a result.
   - The long-history evidence (MOP 1985–2009, HOP 1880–2016) remains the real prior. Our sample can only test consistency with it, and it is consistent on a gross basis.
 
 ## 9. Gaps / blockers
-1. **History (Dmitri):** the ETF store starts in 2016.
+1. **History (the data owner):** the ETF store starts in 2016.
    - Most of these ETFs listed in 2002–2008 (SPY in 1993). A 2005+ backfill would roughly double the sample and include 2008.
    - An index or futures backfill is needed for a HOP-style long test.
    - BWX and CPER are missing (and FXF, if we want it).
-2. **ETF corporate actions (Dmitri):** there are no dividend or split records for the 20 new ETFs, so the desk cannot validate their total returns. We rely on Alpaca's adjusted closes.
-3. **Costs (Tomas):**
+2. **ETF corporate actions (the data owner):** there are no dividend or split records for the 20 new ETFs, so we cannot validate their total returns. We rely on Alpaca's adjusted closes.
+3. **Costs (the TCA owner):**
    - Measured spreads for the L3/L4 ETFs: FXE, FXB, FXC, FXA, FXY, UUP, DBA, DBC, EWG, EWU and UNG. The conclusion flips between WARN/FAIL and PASS on this.
    - Validation of paper MOC fills.
    - The margin interest rate for gross leverage above 1×.
 4. **Shortability:** the flags are today-only. USO, FXE and FXB are not shortable today, and historical borrow is unknown.
 5. **Leverage:** the paper-faithful book runs about 3.2× gross (max 5.9×), because of the low-vol SHY and FX ETFs. On Alpaca's Reg T, a 2× cap binds, so the implementable version targets about 7.5% vol.
-6. **Design questions for validation.** I did not tune these, to avoid in-sample fitting, and each would add trials that should be pre-registered with Victor:
+6. **Design questions for validation.** I did not tune these, to avoid in-sample fitting, and each would add trials that should be pre-registered with 
    - no-trade bands or smoothing of the vol updates to cut turnover
    - a per-asset notional cap (for SHY)
    - dropping the FX ETFs, or using FX futures (not available on Alpaca)
@@ -233,7 +233,7 @@ Against the same risk-parity book held long-only, the trend timing adds about **
 ## 10. Files
 - **Code:**
   - `tsmom/data.py`: loaders. Source priority is TR → adjusted → raw, and the source used is recorded per symbol.
-  - `tsmom/engine.py`: the backtest (signal, EWMA vol, sizing, drift, lag, Tomas cost hook, borrow).
+  - `tsmom/engine.py`: the backtest (signal, EWMA vol, sizing, drift, lag, TCA owner cost hook, borrow).
   - `tsmom/stats.py`: performance stats, Sharpe SE and deflated Sharpe.
   - `run.py`: runs the pre-listed grid and writes to `outputs/`.
 - **Outputs (`outputs/`):**

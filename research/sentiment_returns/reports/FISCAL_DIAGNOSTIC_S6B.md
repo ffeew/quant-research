@@ -1,14 +1,14 @@
-# FISCAL_DIAGNOSTIC_S6B: prereg v5 §2 step 4 rerun under Victor ruling 2495e0cd plus Erratum 1 (7584b5b5…099b), DEV metadata only
+# FISCAL_DIAGNOSTIC_S6B: prereg v5 §2 step 4 rerun under validation decision plus Erratum 1, DEV metadata only
 Run 2026-11-11 ~14:58 SGT with `python3 -I -B fiscal_diag_s6b.py` (EDGE defaults to 2024-12-31; log: fiscal_diag_s6b.log).
 No transcript file was opened. No returns, sentiment, holdout/, raw/, news, staging, verdicts-log or network were touched.
-The S6 folder sentiment_returns_fiscal_diag_s6_20261111/ was read only (SUMS 3a19e165, -c 6/6 OK) and not modified.
+The S6 output folder was read only (hash check 6/6 OK) and not modified.
 
 Inputs:
-- annual_fye_dev.csv c6b8a950…f351 (SUMS b881366f OK)
-- partitioned/dev/earnings_dev.csv cb6a4e6f…3982 (dev SUMS b835e488 OK)
-- coverage_transcripts.tsv c53135f6…fca6 (labels and status only, same use as S6)
-- FYE_MONTH_FROZEN.tsv 67d7eab8…c326, a byte-for-byte copy of the S6 table that Victor accepted
-- Erratum 7584b5b5…099b and ruling 2495e0cd…488e (sha verified)
+- annual_fye_dev.csv (checksum OK)
+- partitioned/dev/earnings_dev.csv (dev checksum OK)
+- coverage_transcripts.tsv (labels and status only, same use as S6)
+- FYE_MONTH_FROZEN.tsv, a byte-for-byte copy of the S6 table that the review accepted
+- Erratum and decision (sha verified)
 
 Files: fiscal_diag_s6b.py, FYE_MONTH_FROZEN.tsv (S2 input), FISCAL_DIAGNOSTIC_S6B.tsv (per symbol), FISCAL_DIAGNOSTIC_S6B_labels.tsv (per due label), NOT_YET_DUE.tsv, fiscal_diag_s6b.log, this file and SHA256SUMS.
 
@@ -30,7 +30,7 @@ Files: fiscal_diag_s6b.py, FYE_MONTH_FROZEN.tsv (S2 input), FISCAL_DIAGNOSTIC_S6
   - A match needs the FY-level S3 check to pass, the quarter's unique row, and a lag of 0 to 100 d.
   - Off-by-one test (4b, m≠12): the label year is shifted by −1 and +1. A shifted quarter that is not yet due returns not_due.
 - Not-yet-due labels are listed in NOT_YET_DUE.tsv: symbol, label, quarter_end, due_date, quarter_end_le_edge, row_present (y/n), and that row's dates. They are excluded from DEV H2 and are NEVER filled.
-- EDGE is a parameter (argv[1]). The same rule applies at the OOS edge 2026-10-31, with the frozen months from FYE_MONTH_FROZEN.tsv 67d7eab8.
+- EDGE is a parameter (argv[1]). The same rule applies at the OOS edge 2026-10-31, with the frozen months from FYE_MONTH_FROZEN.tsv.
   - At 2026-10-31 a quarter is due if its quarter-end is on or before 2026-07-23.
   - The script refuses any edge after 2024-12-31, because the OOS edge needs released HOLDOUT inputs.
   - It was NOT run at the OOS edge.
@@ -45,7 +45,7 @@ Files: fiscal_diag_s6b.py, FYE_MONTH_FROZEN.tsv (S2 input), FISCAL_DIAGNOSTIC_S6
 - Step 4: PASS 50 / FAIL 0. 587/587 due labels matched (100% for every symbol). Off-by-one findings: 0.
 - H2-eligible, all 50: AAPL ABBV ADBE AMD AMZN AVGO BA BAC C CAT CMCSA COST CRM CSCO CVX DIS GE GOOGL GS HD HON INTC JNJ JPM KO LLY
   MA MCD META MRK MS MSFT NFLX NKE NVDA ORCL PEP PFE PG QCOM SBUX T TSLA TXN UNH V VZ WFC WMT XOM.
-  - This covers due-quarter labels only. H2 still waits for Victor's readback.
+  - This covers due-quarter labels only. H2 still waits for the review's readback.
 - NOT_YET_DUE.tsv has 213 labels.
   - 90 have a quarter-end on or before 2024-12-31, which makes them new exclusions relative to S6. Of these, 50 have a DEV row present (all map uniquely) and 40 have none.
   - 123 have a quarter-end after the edge (these were already outside the S6 denominator).
@@ -80,11 +80,11 @@ Files: fiscal_diag_s6b.py, FYE_MONTH_FROZEN.tsv (S2 input), FISCAL_DIAGNOSTIC_S6
    - Row-to-quarter assignment in open FYs uses date windows instead of position.
 2. S4 denominator: due-quarter labels only (587 labels), replacing "quarter-end <= 2024-12-31" (677 in S6). 90 labels moved into NOT_YET_DUE.
 3. A new NOT_YET_DUE.tsv lists all 213 not-yet-due labels in the window.
-4. S2 months are read from the copied FYE_MONTH_FROZEN.tsv (67d7eab8) and checked against the recomputation, instead of being rewritten.
+4. S2 months are read from the copied FYE_MONTH_FROZEN.tsv and checked against the recomputation, instead of being rewritten.
 5. EDGE is now a parameter, with a guard that refuses any edge after the DEV edge. The shift test returns not_due for not-yet-due shifted quarters.
 6. Results: S3 went from 10 PASS / 40 FAIL to 50/0. Step 4 went from 10/40 to 50/0. H2-eligible went from 10 to 50.
 
-## Points for Victor (nothing re-mapped or filled)
+## Points for review (nothing re-mapped or filled)
 - Because of the 100 d bound, the m=12 2024Q3 labels (quarter-end 2024-09-30, calls reported Oct–Nov 2024 inside DEV, row present) are not yet due and excluded from DEV H2. That is 33 labels, plus similar ones for other months (50 present-row labels in total).
   - This follows the rule as written and is conservative, not a data problem.
 - "Quarter-end" is taken as the nominal month-end, so the due test depends on dates only.

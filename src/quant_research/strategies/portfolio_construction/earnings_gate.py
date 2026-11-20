@@ -1,11 +1,11 @@
-"""Earnings gate for construct.py (LIMITS.md H7; current LIMITS header, v0.3.7 at 02:28 SGT; Risk ruling 2026-10-30 02:27). Read-only use of Dmitri's calendar + next_earnings sidecar.
+"""Earnings gate for construct.py (LIMITS.md H7; current LIMITS header, v0.3.7; Risk decision 2026-10-30 02:27). Read-only use of the data owner's calendar + next_earnings sidecar.
 
 DEFAULT POLICY = "risk_ruling_20261030_0227" (Risk, risk/decisions-log.md row 2026-10-30 02:27, "H7 earnings gate:
 estimated dates and recently reported names: RULING: ACCEPTED WITH CONDITIONS"):
   (1) CONFIRMED next dates (sidecar status 'confirmed' with company/source evidence ONLY): standard H7 - flag within 10
       trading days; no hold through the release (shorts no exceptions); no new/added risk if release <= horizon end.
       Main-calendar nasdaq_scheduled / other forecasts are NEVER confirmed. edgar_8k_2.02 is a realised release
-      record (last 8-K for ruling 3), not advance confirmation of a future next date.
+      record (last 8-K for decision 3), not advance confirmation of a future next date.
   (2) ESTIMATED dates: flag window opens 15 sessions before the EARLIEST candidate (= earliest - 5-session buffer - 10).
       Shorts must be closed BEFORE the window opens (close_by_short = session before window_open); nothing new opened or
       increased once the window opens within the holding horizon (window_open <= horizon end -> in_window). Longs: no
@@ -19,17 +19,17 @@ estimated dates and recently reported names: RULING: ACCEPTED WITH CONDITIONS"):
   (5) EARLIEST date seen across the CURRENT (newest) sidecar file applies: min over duplicate rows and, for estimated
       rows, over every candidate date listed in `notes`; also min with the main calendar's next unreleased event. An
       estimate that moves earlier on a refresh therefore applies at once (newest file auto-selected).
-Optional policy "strict" (CLI --earnings_policy strict; the pre-ruling behaviour): main calendar + sidecar CONFIRMED rows
+Optional policy "strict" (CLI --earnings_policy strict; the pre-decision behaviour): main calendar + sidecar CONFIRMED rows
 are known; estimated rows and names without a date are UNKNOWN (tradable no new/increased short; shadow flag); a stale
 or missing calendar makes all single stocks UNKNOWN (not full fail-safe).
 
---- pre-ruling (strict) documentation follows ---
+--- pre-decision (strict) documentation follows ---
 
-Source (read-only, Dmitri, $QR_DATA_DIR/README.md §6):
+Source (read-only, the data owner, $QR_DATA_DIR/README.md §6):
   $QR_DATA_DIR/earnings/earnings_events.parquet  - one row per event: symbol, announce_date_et, timing (BMO/AMC/
       INTRADAY/UNKNOWN), source (edgar_8k_2.02 | nasdaq_reported_or_past | nasdaq_scheduled), knowledge_time_utc
   $QR_DATA_DIR/earnings/nasdaq_calendar.parquet  - Nasdaq calendar pull; fetched_at_utc = calendar freshness
-We use announce_date_et + timing only (NOT first_tradable_session: Victor found the DURING_MKT alignment defect).
+We use announce_date_et + timing only (NOT first_tradable_session: the review found the DURING_MKT alignment defect).
 
 Rules (LIMITS H7 + CIO 2026-10-30 01:58):
   * SHORTS are never held through their own release: if the next release falls before the end of the holding horizon
@@ -63,6 +63,7 @@ import pandas as pd
 
 from quant_research.strategies.portfolio_construction.risk_state import is_session, us_trading_days_between
 from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DATA_DIR, ...)
+from quant_research.utils.pins import desk_pin
 
 ET = ZoneInfo("America/New_York")
 EARN_DIR = f"{_QR.DATA_DIR}/earnings"
@@ -72,14 +73,18 @@ POLICY_STRICT = "strict"
 POLICIES = (POLICY_RULING, POLICY_STRICT)
 # sha256 pins of sidecar files verified by Risk / the CIO brief.
 # Require an EXACT accepted hash for the basename; missing/unknown basename OR mismatch -> FULL FAIL-SAFE.
-# next_earnings_20261105.parquet exact hash 8c9cfe2d…54cbe approved by Rachel signed ruling 2026-11-06 (ruling sha256 36444f8c6d0b517481c44a90ee42b9e2aa5e1a70df9322bec17058fddd7753e9); any other file/hash remains unauthorized -> fail-closed.
+# next_earnings_20261105.parquet accepted by the signed risk decision of 2026-11-06; any other file/hash remains unauthorized -> fail-closed.
 PINNED_SHA256 = {
-    "next_earnings_20261030.parquet": "4189dd77b4cf1b39e5e9be7c8f99fc279a0fdb7b4d4313c1537363c8948d26b2",
-    "next_earnings_20261105.parquet": "8c9cfe2d07d397bbc89d172b7b6548d492f522a4ad3a7d13135c4b7775454cbe",  # Rachel AUTHORIZED 2026-11-06
+    "next_earnings_20261030.parquet": desk_pin(
+        "strategies.portfolio_construction.earnings_gate", "PINNED_SHA256.next_earnings_20261030.parquet"
+    ),
+    "next_earnings_20261105.parquet": desk_pin(
+        "strategies.portfolio_construction.earnings_gate", "PINNED_SHA256.next_earnings_20261105.parquet"
+    ),  # Risk manager AUTHORIZED 2026-11-06
 }
 # Main-calendar next-date status: forecasts and realised EDGAR rows are NEVER "confirmed" next dates.
 # Confirmed next dates come only from sidecar status=confirmed (company/IR evidence).
-# edgar_8k_2.02 feeds last_8k_202 (ruling 3), not advance confirmation of a future next date.
+# edgar_8k_2.02 feeds last_8k_202, not advance confirmation of a future next date.
 FORECAST_OR_REALISED_SOURCES = frozenset(
     {
         "nasdaq_scheduled",
@@ -89,12 +94,12 @@ FORECAST_OR_REALISED_SOURCES = frozenset(
     }
 )
 CONFIRMED_FLAG_SESSIONS = 10  # H7 flag
-EST_BUFFER_SESSIONS = 5  # ruling (2)
-RECENT_8K_DAYS = 45  # ruling (3)
+EST_BUFFER_SESSIONS = 5  # decision (2)
+RECENT_8K_DAYS = 45  # decision (3)
 
 
 def calendar_next_status(source: str | None) -> str:
-    """Status for a main-calendar row used as a *next-date* candidate (ruling 2026-10-30 02:27).
+    """Status for a main-calendar row used as a *next-date* candidate (decision 2026-10-30 02:27).
     nasdaq_* forecasts and edgar realised releases are estimated for next-date purposes; never confirmed."""
     src = str(source or "")
     if src in FORECAST_OR_REALISED_SOURCES or src.startswith("nasdaq_"):
@@ -262,7 +267,7 @@ def gate(
 
 
 # =====================================================================================================================
-# Risk ruling 2026-10-30 02:27 (default policy)
+# Risk decision 2026-10-30 02:27 (default policy)
 # =====================================================================================================================
 def sessions_before(d: dt.date, n: int) -> dt.date:
     """The session n sessions strictly before d (n >= 1)."""
@@ -296,7 +301,7 @@ _CAND = re.compile(r"(\d{4}-\d{2}-\d{2})\s+[A-Za-z_/-]+\s*\[")  # 'YYYY-MM-DD <t
 
 
 def _candidates(row: Any) -> list[dt.date]:
-    """Earliest-date set for a sidecar row (ruling 5): next_earnings_date plus, for ESTIMATED rows only, every
+    """Earliest-date set for a sidecar row: next_earnings_date plus, for ESTIMATED rows only, every
     'YYYY-MM-DD <timing> [source]' entry in the 'Candidates:' list of notes (up to 'Spread'/end of sentence list).
     Free-text dates (e.g. 'CAT reported Q3 2026 on 2026-10-29') are NOT candidates, and any candidate on/before the
     row's last_earnings_date (already released) is dropped. Confirmed rows: the company date only."""
@@ -388,7 +393,7 @@ def load_next(
         )
         if cur is None:
             rec[s] = new
-        else:  # duplicate rows: earliest date wins (ruling 5); estimated status if either is estimated (conservative)
+        else:  # duplicate rows: earliest date wins; estimated status if either is estimated (conservative)
             earliest_dt = min(cur["earliest"], new["earliest"])
             rec[s] = dict(
                 cur if cur["earliest"] <= new["earliest"] else new,
@@ -462,7 +467,7 @@ def gate_policy(
             **kw,
         )
 
-    def failsafe(kind: str, rule: str) -> dict[str, Any]:  # ruling (4): treated as reporting inside the window
+    def failsafe(kind: str, rule: str) -> dict[str, Any]:  # decision (4): treated as reporting inside the window
         return dict(
             kind=kind,
             next=None,
@@ -509,12 +514,12 @@ def gate_policy(
         if events is None:  # main calendar stale/missing
             if policy == POLICY_RULING:
                 out[s] = failsafe(
-                    "failsafe_calendar_stale_or_missing", "ruling(4): main calendar stale/missing -> full fail-safe"
+                    "failsafe_calendar_stale_or_missing", "decision(4): main calendar stale/missing -> full fail-safe"
                 )
                 continue
             out[s] = unknown("unknown_calendar", "strict: calendar stale/missing -> unknown")
             continue
-        # candidate dates (ruling 5: earliest across sources)
+        # candidate dates (decision 5: earliest across sources)
         cand = []
         if m is not None:
             # Stored announce_date_et is unbuffered; buffer applies only in estimated branch below.
@@ -526,11 +531,12 @@ def gate_policy(
                 if nxt is None and ninfo is not None:
                     out[s] = failsafe(
                         "failsafe_next_file_unusable",
-                        f"ruling(4): no main-calendar date and next_earnings file unusable ({ninfo.get('reason')})",
+                        f"decision(4): no main-calendar date and next_earnings file unusable ({ninfo.get('reason')})",
                     )
                 else:
                     out[s] = failsafe(
-                        "failsafe_no_row", "ruling(4): no date row in main calendar or next_earnings -> full fail-safe"
+                        "failsafe_no_row",
+                        "decision(4): no date row in main calendar or next_earnings -> full fail-safe",
                     )
                 continue
             kind = "unknown_estimated_only" if (nxt or {}).get(s) else "unknown_no_upcoming_date"
@@ -540,7 +546,7 @@ def gate_policy(
                 estimated_next=str(nxt[s]["earliest"]) if (nxt or {}).get(s) else None,
             )
             continue
-        # Earliest date wins (ruling 5). Prefer confirmed only on the *same* date when true company evidence exists.
+        # Earliest date wins. Prefer confirmed only on the *same* date when true company evidence exists.
         # Do NOT let a later main-calendar forecast override an earlier sidecar estimate.
         src, d, timing, status, source = min(cand, key=lambda c: (c[1], 0 if c[3] == "confirmed" else 1, c[0]))
         # Same-date estimated→confirmed promotion ONLY if a confirmed candidate shares that exact date
@@ -569,10 +575,10 @@ def gate_policy(
                 long_exception=s in exc,
                 h7_flag=bool(sessions_before(d, CONFIRMED_FLAG_SESSIONS) <= exe),
                 last_8k_202=str(last8) if last8 else None,
-                rule="ruling(1)/H7 confirmed date" if policy == POLICY_RULING else "strict: confirmed date",
+                rule="decision(1)/H7 confirmed date" if policy == POLICY_RULING else "strict: confirmed date",
             )
             continue
-        # ESTIMATED (ruling policy only)
+        # ESTIMATED (decision policy only)
         wopen = sessions_before(d, CONFIRMED_FLAG_SESSIONS + EST_BUFFER_SESSIONS)
         buffered = sessions_before(d, EST_BUFFER_SESSIONS)
         cbs, cbl = prev_session(wopen), prev_session(buffered)
@@ -602,7 +608,7 @@ def gate_policy(
                 no_short=True,
                 no_long_add=s not in exc,
                 close_long=bool(buffered <= end and s not in exc),
-                rule="ruling(2): estimated; buffered window opens within horizon -> shorts closed before window_open, no new/added risk",
+                rule="decision(2): estimated; buffered window opens within horizon -> shorts closed before window_open, no new/added risk",
             )
         elif recent:
             out[s] = dict(
@@ -613,7 +619,7 @@ def gate_policy(
                 no_short=False,
                 no_long_add=False,
                 close_long=False,
-                rule="ruling(3): 8-K 2.02 <= 45d and window_open after horizon -> known, not in window",
+                rule="decision(3): 8-K 2.02 <= 45d and window_open after horizon -> known, not in window",
             )
         else:
             out[s] = dict(
@@ -624,7 +630,7 @@ def gate_policy(
                 no_short=False,
                 no_long_add=False,
                 close_long=False,
-                rule="ruling(3) not met (8-K 2.02 missing or > 45d) -> unknown",
+                rule="decision(3) not met (8-K 2.02 missing or > 45d) -> unknown",
             )
     return out, info
 

@@ -1,17 +1,17 @@
 """(b) XBRL fallback (PREREG v0.4, COMMON C9): GAAP diluted quarterly EPS, as originally filed, with ET knowledge time.
 
-Inputs (Dmitri's store, read-only):
+Inputs (the data owner's store, read-only):
   fundamentals/xbrl_facts.parquet  (companyfacts long table; accn, filed, period_start/end, available_session)
   earnings/edgar_10q10k.parquet    (10-Q/10-K acceptance_datetime_et per accession)
 Rules (v0.4):
   - tag us-gaap:EarningsPerShareDiluted (else EarningsPerShareBasicAndDiluted), unit USD/shares, forms 10-Q / 10-K
     (amendments ignored -> values as originally filed).
   - 3-month duration values only (80-100 days). NO Q4 = FY - 9M (or FY - Q1..Q3) derivation: invalid for diluted EPS
-    (Victor review §5). A Q4 with no reported 3-month value is missing here.
+    (validation review §5). A Q4 with no reported 3-month value is missing here.
   - Earliest accession: for each (cik, period_start, period_end) the value from the FIRST-accepted filing is kept
     (later filings' comparatives and restatements are ignored).
   - knowledge time: join accn = edgar_10q10k.accession -> acceptance_datetime_et; knowledge_session per the 09:30 ET rule.
-    Unmatched accn -> Dmitri's `available_session` (flag knowledge_src = 'available_session_fallback'); share logged.
+    Unmatched accn -> the data owner's `available_session` (flag knowledge_src = 'available_session_fallback'); share logged.
 Output: out/xbrl_eps_quarterly.parquet ; log: out/xbrl_eps_quarterly.log.json
 """
 
@@ -24,11 +24,13 @@ import numpy as np
 import pandas as pd
 
 from quant_research.data.sec_edgar import common
+from quant_research.utils.pins import require_pins
 
 TAGS = ["EarningsPerShareDiluted", "EarningsPerShareBasicAndDiluted"]
 
 
 def build(save: bool = True) -> tuple[pd.DataFrame, dict[str, Any]]:
+    require_pins("data.sec_edgar.common", "RELEASE_TOP_HASH")  # only recorded in the log: refuse if PENDING
     x = pd.read_parquet(common.STORE / "fundamentals/xbrl_facts.parquet", filters=[("tag", "in", TAGS)])
     x = x[(x.unit == "USD/shares") & x.form.isin(["10-Q", "10-K"])].copy()
     x["period_start"] = pd.to_datetime(x.period_start)
@@ -57,7 +59,7 @@ def build(save: bool = True) -> tuple[pd.DataFrame, dict[str, Any]]:
     q = q.sort_values(["cik", "period_end", "_ord"]).drop_duplicates(["cik", "period_end"], keep="first")
     q = q.rename(columns={"value": "eps_diluted_xbrl", "accn": "accession_10q10k", "symbol": "ticker"})
     q["derivation"] = "reported_3m"
-    # Effective knowledge time used by SUE as-of lookups: 10-Q/10-K acceptance, else Dmitri available_session at 09:29 ET
+    # Effective knowledge time used by SUE as-of lookups: 10-Q/10-K acceptance, else data owner available_session at 09:29 ET
     # (i.e. usable from that session's open, never earlier). Flagged by knowledge_src.
     q["knowledge_et_eff"] = q.knowledge_et.fillna(
         pd.to_datetime(q.knowledge_session) + pd.Timedelta(hours=9, minutes=29)

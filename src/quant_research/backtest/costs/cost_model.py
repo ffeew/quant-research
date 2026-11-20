@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Plug-in per-trade cost model for backtests (US equities/ETFs, Alpaca).  v1.1
 
-Owner: Tomas (Execution & TCA). Spec, sources and assumptions: $QR_DESK_DIR/tca/cost_model.md
+Owner: the TCA owner (Execution & TCA). Spec, sources and assumptions: $QR_DESK_DIR/tca/cost_model.md
 Pure functions: no network, no broker calls, no orders.
 
 one-way cost_bps = fees + half_spread*venue_mult + impact*venue_mult + paper_buffer

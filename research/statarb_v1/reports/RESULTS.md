@@ -1,6 +1,6 @@
 # Stat-arb research — v1, research only
 
-Owner: Sofia (Stat Arb). Last run: 2026-10-30, about 02:10 SGT. **Paper/research only. Nothing here places or changes orders or positions.**
+Owner: the stat-arb researcher (Stat Arb). Last run: 2026-10-30. **Paper/research only. Nothing here places or changes orders or positions.**
 Judged against `$QR_DESK_DIR/validation/STANDARD.md` v1.0, not against "holdout t > 2".
 
 ## Bottom line
@@ -8,7 +8,7 @@ Judged against `$QR_DESK_DIR/validation/STANDARD.md` v1.0, not against "holdout 
 
 The best result is AL sector-ETF s-score with wider bands plus a no-trade buffer (`AL_ETF_B2_1.75/0.00/0.00_buf0.5`).
 - Gross edge is about 5.5 bps per $ traded, against about 10.6 bps of cost.
-- Holdout gross Sharpe is 0.46; holdout net Sharpe is −0.56 on the desk floor and −0.35 on Tomas's base.
+- Holdout gross Sharpe is 0.46; holdout net Sharpe is −0.56 on the validation cost floor and −0.35 on the TCA owner's base.
 - It is research-only: it still has to clear t-stat and costs.
 
 ## One command to regenerate everything
@@ -23,7 +23,7 @@ cd code
 Runtime is about 6 minutes per mode with an empty cache. Weights and AL s-scores are cached in `results/<mode>/cache/`; delete them to rebuild.
 
 ## Data (every v1 result uses it)
-- **Source:** `$QR_DATA_DIR/` (DE final build), read-only, read from Dmitri's local store.
+- **Source:** `$QR_DATA_DIR/` (DE final build), read-only, read from the data owner's local store.
   - Bars: Alpaca SIP daily `bars/daily/adjusted`, split and dividend adjusted, 2016-01-04 to 2026-10-28.
   - $ADV uses raw close × raw SIP volume (point-in-time).
   - Universe: PIT S&P 500 from `sp500_membership.parquet` [start, end), 723 symbols including 220 former members, about 503 members per day.
@@ -49,7 +49,7 @@ Runtime is about 6 minutes per mode with an empty cache. Weights and AL s-scores
 - **Execution.** Signal at close t; trade at open t+1 (`open_t1`, primary, meets the standard's "next-bar open or worse"), or at close t+1 (`close_t1`).
 - **Book.** Gross book = 1; returns are on gross. Costs are modelled at $10M gross.
 - **Cost scenarios** (`config.SCENARIOS`):
-  - `tca_base`: Tomas `cost_model` with k = 0.75 and 25 bp/yr borrow.
+  - `tca_base`: the TCA owner `cost_model` with k = 0.75 and 25 bp/yr borrow.
   - `tca_stress`: k = 1.0 and 50 bp borrow.
   - `tca_2x`: 2× tca_base.
   - **`std`**: STANDARD §5 floor, per side max(TCA, floor + full half-spread). The floor is 5 bps for S&P 500 names (large-cap by index), 20 bps for thin names (ADV < $50M), and 2 bps for SPDRs. Borrow is 1%/yr.
@@ -132,7 +132,7 @@ Source: `$QR_DESK_DIR/validation/backtests/pead_long_pit/data_issues.json` (read
 - **Bug found and fixed by this audit.** AL kept positions open after a name delisted or left the index ("zombie" positions with 0 return). AL now force-exits names that are no longer members or have no bar. The tables above use the fixed code. Blitz still holds delisted names flat until the next monthly rebalance (5 cases), which is realistic, and they are covered by the delisting stress.
 
 ## Other caveats
-- **Costs.** Spreads are bucket defaults, not measured quotes. Impact is at $10M gross. Borrow is flat general collateral; there is no hard-to-borrow list. Even Tomas's cheaper model leaves every pick net-negative in the holdout.
+- **Costs.** Spreads are bucket defaults, not measured quotes. Impact is at $10M gross. Borrow is flat general collateral; there is no hard-to-borrow list. Even the TCA owner's cheaper model leaves every pick net-negative in the holdout.
 - **Sectors.** GICS is today's snapshot; former members' sectors are imputed.
 - **Factors.** Ken French factors are used ex post. In live trading they publish with a lag; this matters only for Blitz betas.
 - **Pairs.** A simplified GGR/EG variant (252-day formation, 126-day trading, top 20, at most 2 pairs per stock). It is not a faithful GGR replication.
@@ -152,6 +152,6 @@ Source: `$QR_DESK_DIR/validation/backtests/pead_long_pit/data_issues.json` (read
 - **Sensitivity runs:** `results/v1_complete/`, `results/v1_delist_stress/`. Logs: `results/logs/`.
 - **Superseded v0 / preliminary outputs:** `results/_v0_superseded/`. These were run before the DE's final build and before the standard was adopted; do not cite them.
 
-## Correction (30 Oct 2026, 02:15 SGT, after Victor's review)
+## Correction (30 Oct 2026, after review)
 - The best holdout net Sharpe (standard cost floor) across all 48 v1 trials is **-0.475**, from `AL_ETF_B2_1.75/0.00/0.00_buf0.5__close_t1`. That is the same AL sector-ETF setting, executed at the next close instead of the next open. The pre-registered pick (next open) scored -0.56. Both FAIL.
 - The DSR used the gross-trial variance (SR0 0.74, the less strict option). Future runs will use the net-trial variance. Cumulative stat-arb family N = 80, so new ideas pre-register at N >= 81.

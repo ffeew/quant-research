@@ -1,4 +1,4 @@
-"""Fill missing EX-99.1 URLs for accessions not in Ethan's header cache.
+"""Fill missing EX-99.1 URLs for accessions not in the sentiment researcher's header cache.
 Uses sec_http (cached, <=8 req/s). Resume-safe: rewrites out/exhibits.parquet periodically.
 """
 

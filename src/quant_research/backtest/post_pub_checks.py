@@ -1,4 +1,4 @@
-"""Post-publication sanity checks on PUBLIC long-short factor series (not our desk data). Dave, 2026-10-30.
+"""Post-publication sanity checks on PUBLIC long-short factor series (not our own data). The derivatives researcher, 2026-10-30.
 Splits each factor into the original paper's in-sample window and the post-publication window.
 Factors are close proxies, NOT exact paper constructions (see notes column).
 Output: post_pub_checks.csv

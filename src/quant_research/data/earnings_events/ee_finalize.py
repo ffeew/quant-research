@@ -30,7 +30,7 @@ e["acceptance_et"] = e.acceptance_et.dt.tz_localize("America/New_York")
 for c in ["filing_date", "session_date", "session_date_0925"]:
     e[c] = pd.to_datetime(e[c]).dt.date
 e["exhibit_count"] = e.exhibit_count.astype("Int64")
-e["dataset_version"] = "earnings_events_8k202 v1 (Ethan, 2026-11-06)"
+e["dataset_version"] = "earnings_events_8k202 v1 (the sentiment researcher, 2026-11-06)"
 cols = [
     "cik",
     "ticker_at_event",

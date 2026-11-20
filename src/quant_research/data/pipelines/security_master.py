@@ -356,7 +356,7 @@ CIK_FIX: dict[str, tuple[int, str]] = {
     "XL": (875159, "XL Group"),
     "BHI": (808362, "Baker Hughes Inc"),
     "ARNC": (4281, "Arconic Inc. (ex-Alcoa Inc., now Howmet)"),
-    # v1.2 (Ethan gap list): EFTS name search had matched subsidiaries/unrelated filers; verified on data.sec.gov/submissions 2026-10-30
+    # v1.2 (sentiment researcher gap list): EFTS name search had matched subsidiaries/unrelated filers; verified on data.sec.gov/submissions 2026-10-30
     "CDAY": (1725057, "Ceridian HCM Holding (now Dayforce)"),
     "AGN": (1578845, "Allergan plc (fka Actavis plc)"),
     "BCR": (9892, "C. R. Bard"),

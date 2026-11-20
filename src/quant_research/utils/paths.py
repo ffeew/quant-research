@@ -18,6 +18,18 @@ SCRATCH_DIR = os.environ.get("QR_SCRATCH_DIR", os.path.join(tempfile.gettempdir(
 HOME_DIR = os.path.expanduser("~").rstrip("/")
 
 
+class MissingInput(RuntimeError):
+    """A required input location was not supplied (there is no default, so the run fails closed)."""
+
+
+def required_env(name: str, what: str) -> str:
+    """The value of env var ``name``; raise MissingInput if it is unset or empty (no default)."""
+    value = os.environ.get(name, "").strip()
+    if not value:
+        raise MissingInput(f"missing required input: set ${name} to {what} (no default; refusing to run)")
+    return value
+
+
 def data_path(*parts: str) -> str:
     """Join parts under QR_DATA_DIR."""
     return os.path.join(DATA_DIR, *parts)

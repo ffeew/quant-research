@@ -1,5 +1,5 @@
-"""Uniform reporting for all desk replications (Dave). Gross/net Sharpe, t, maxDD, turnover, break-even,
-Tomas section-6 flag, avg cost bps by liquidity bucket, sub-period splits."""
+"""Uniform reporting for all replications (the derivatives researcher). Gross/net Sharpe, t, maxDD, turnover, break-even,
+TCA owner section-6 flag, avg cost bps by liquidity bucket, sub-period splits."""
 
 from __future__ import annotations
 

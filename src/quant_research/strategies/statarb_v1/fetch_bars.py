@@ -1,5 +1,5 @@
 """Replacement for the retired fetch_alpaca.py (desk rule #5, 2026-10-30).
-History is read from Dmitri's store ($QR_DATA_DIR) via the shared client; live Alpaca market-data calls, if any,
+History is read from the data owner's store ($QR_DATA_DIR) via the shared client; live Alpaca market-data calls, if any,
 go ONLY through $QR_DATA_DIR/lib/desk_data_client.py (shared 150/min throttle, cache, no credential handling here).
 Usage: python fetch_bars.py SYM1,SYM2 2020-01-01 [2026-10-29] [all|raw]  -> prints a coverage summary (writes nothing).
 Note: statarb/.venv has no `requests`, so only local-store reads work from it; the research code never needs live data."""

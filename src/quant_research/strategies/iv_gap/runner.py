@@ -1,9 +1,9 @@
-"""IV-gap v2 runner (FROZEN CANDIDATE; Ethan desk; built 2026-11-13 SGT).
+"""IV-gap v2 runner (FROZEN CANDIDATE; built 2026-11-13).
 
-Spec: PREREG_IV_GAP_v2_DRAFT_r3.md sha 333bccad2e2823a44c88aeb0839ee2fe55a548e4a6dcc97d9d2c8695cc072b46.
-Stdlib only. Run (ONE run, after Victor confirmation + LOCK only):
+Spec: PREREG_IV_GAP_v2_DRAFT_r3.md.
+Stdlib only. Run (ONE run, after validation confirmation + LOCK only):
   env -u ALPHAVANTAGE_API_KEY $QR_DATA_DIR/.venv/bin/python -I -B runner.py <NEW_RUN_DIR>
-Reads ONLY through Dmitri's sealed reader ivgap_av_reader_v2.api (W1d). No mapping, no direct file reads of
+Reads ONLY through the data owner's sealed reader ivgap_av_reader_v2.api (W1d). No mapping, no direct file reads of
 chains/underlyings, no greeks, no IV levels or per-date rows in outputs (reader_calls.tsv date list excepted).
 """
 
@@ -25,60 +25,65 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Any, Literal, NoReturn, Protocol, TypedDict, cast
 
 from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DATA_DIR, ...)
+from quant_research.utils.pins import desk_pin
 
 sys.dont_write_bytecode = True
 
 # ---------------------------------------------------------------- pins
 PREREG_PATH = f"{_QR.DESK_DIR}/research/original/iv_gap_prereg_v2r3_20261113/PREREG_IV_GAP_v2_DRAFT_r3.md"
-PREREG_SHA256 = (
-    "333bccad2e2823a44c88aeb0839ee2fe55a548e4a6dcc97d9d2c8695cc072b46"  # gitleaks:allow (sha256 digest, not a secret)
-)
+PREREG_SHA256 = desk_pin("strategies.iv_gap.runner", "PREREG_SHA256")
 W1D_CP_DIR = f"{_QR.DESK_DIR}/validation/dmitri/ivgap_v2_reader_w1e_r2_20261113"
-W1D_CP_SUMS_SHA256 = (
-    "8559e211f39e6b4483668e3eec1d927f63466027debbd870616989255db7c172"  # gitleaks:allow (sha256 digest, not a secret)
-)
+W1D_CP_SUMS_SHA256 = desk_pin("strategies.iv_gap.runner", "W1D_CP_SUMS_SHA256")
 W1D_CP_ROWS = 74
 W1_ROOT = f"{_QR.SCRATCH_DIR}/scratch/ivgap_v2_reader_20261113_w1e_r2"
 W1_SCRATCH_SUMS_REL = f"{_QR.DESK_DIR}/validation/dmitri/ivgap_v2_reader_w1e_r2_relsums_20261113/W1e_SHA256SUMS_REL"
-W1_SCRATCH_SUMS_SHA256 = (
-    "1adbaa7387e8a9d330816dacd5c835948ed82d16c7943fac211e848df50b2681"  # gitleaks:allow (sha256 digest, not a secret)
-)
+W1_SCRATCH_SUMS_SHA256 = desk_pin("strategies.iv_gap.runner", "W1_SCRATCH_SUMS_SHA256")
 W1_SCRATCH_ROWS = 71
 API_REL = "ivgap_av_reader_v2/api.py"
-API_SHA256 = (
-    "d501f4893cad8649f30f940827308c11c9b4fa7c4142eb27d7eef0615a004dbd"  # gitleaks:allow (sha256 digest, not a secret)
-)
-DEV_DATES_SHA256 = (
-    "21c8c9bd8881b0bfba8578361735e682b526ea12ee62ca6048d874f6d30a0a54"  # gitleaks:allow (sha256 digest, not a secret)
-)
+API_SHA256 = desk_pin("strategies.iv_gap.runner", "API_SHA256")
+DEV_DATES_SHA256 = desk_pin("strategies.iv_gap.runner", "DEV_DATES_SHA256")
 DEV_DATES_COUNT = 2118
 EXPECTED_PINS = {
     "W1_ROOT": W1_ROOT,
     "SPY_DEV": [
         f"{_QR.SCRATCH_DIR}/scratch/open10_dev_reader_20261110_r8/partitions/SPY_DEV.json",
-        "bb7c12e9b0558708867eaa5384f137cfcaecde3ad1d7be109a2ca8a2ae906d59",
+        desk_pin("strategies.iv_gap.runner", "EXPECTED_PINS.SPY_DEV[1]"),
     ],
     "OPT_INDEX": [
         f"{_QR.SCRATCH_DIR}/scratch/open10_dev_reader_20261110_r8/partitions/options/OPTIONS_DEV_INDEX.json",
-        "51af99ac149ae17d96d64f6d0e15031c70259faf1f5400a62a0f0a84cd012248",
+        desk_pin("strategies.iv_gap.runner", "EXPECTED_PINS.OPT_INDEX[1]"),
     ],
     "QQQ_SRC": [
         f"{_QR.DATA_DIR}/alphavantage/equity/qqq_daily_adjusted_full_20261110/QQQ.json",
-        "b3ba7a7fe12c3e010efeeb27abd38d29c54b50af03bb103f664b18c0414fec30",
+        desk_pin("strategies.iv_gap.runner", "EXPECTED_PINS.QQQ_SRC[1]"),
     ],
     "BARRED": [
-        "b14e6908e830ffe0935abace7bc8cb973fc467b4a67793904e71afeac78a9aad",
-        "9b24db2cade471f53572ecc02465bb09de24694d92d4078a05fa0a4b9df5db0b",
+        desk_pin("strategies.iv_gap.runner", "EXPECTED_PINS.BARRED[0]"),
+        desk_pin("strategies.iv_gap.runner", "EXPECTED_PINS.BARRED[1]"),
     ],
-    "DESK_CLIENT_SHA256_NEVER_OPENED": "64c83245e840cee84413aea8802d46de20de9ccdc45997330b1cce3294bcdc82",
+    "DESK_CLIENT_SHA256_NEVER_OPENED": desk_pin(
+        "strategies.iv_gap.runner", "EXPECTED_PINS.DESK_CLIENT_SHA256_NEVER_OPENED"
+    ),
     "VENDORED": {
-        "open10_dev_reader/__init__.py": "07ef3d79514329bfc6b758de159b3d7f34604daef4ed57888bd0fa1945898e0e",
-        "open10_dev_reader/constants.py": "c06befa8040fd1a7b28504615ffe595e307640509969cefa5b15a2c7a3dca50d",
-        "open10_dev_reader/errors.py": "dabb20dfae8c414491f1ceb8fe6317f75cd036db656814ad256007ae91b320cf",
-        "open10_dev_reader/r7_dev_read.py": "b53bbc633da9cc561aa501ad315fd643580d3a8bd1b9507fc0175f35b1f11941",
-        "open10_dev_reader/r7_pins.py": "3be1ace004f3fd7c6c7abbef523eb60ed7cf04606c975c552d62433dc2943c1f",
-        "open10_dev_reader/reader.py": "da134f0917abaf3c967be0f5bb0959d3842db6819c6aeedf20c459658e5503f6",
-        "bin/qqq_source_dev.py": "a241f63daf0bd00809c15230e4a9fc0be3be75c554a327787ff5c57d84704be2",
+        "open10_dev_reader/__init__.py": desk_pin(
+            "strategies.iv_gap.runner", "EXPECTED_PINS.VENDORED.open10_dev_reader/__init__.py"
+        ),
+        "open10_dev_reader/constants.py": desk_pin(
+            "strategies.iv_gap.runner", "EXPECTED_PINS.VENDORED.open10_dev_reader/constants.py"
+        ),
+        "open10_dev_reader/errors.py": desk_pin(
+            "strategies.iv_gap.runner", "EXPECTED_PINS.VENDORED.open10_dev_reader/errors.py"
+        ),
+        "open10_dev_reader/r7_dev_read.py": desk_pin(
+            "strategies.iv_gap.runner", "EXPECTED_PINS.VENDORED.open10_dev_reader/r7_dev_read.py"
+        ),
+        "open10_dev_reader/r7_pins.py": desk_pin(
+            "strategies.iv_gap.runner", "EXPECTED_PINS.VENDORED.open10_dev_reader/r7_pins.py"
+        ),
+        "open10_dev_reader/reader.py": desk_pin(
+            "strategies.iv_gap.runner", "EXPECTED_PINS.VENDORED.open10_dev_reader/reader.py"
+        ),
+        "bin/qqq_source_dev.py": desk_pin("strategies.iv_gap.runner", "EXPECTED_PINS.VENDORED.bin/qqq_source_dev.py"),
     },
     "DEV_BOUND": "2016-06-01",
     "CHANGEOVER": "2011-03-23",
@@ -132,7 +137,7 @@ SGT = timezone(timedelta(hours=8))
 
 
 class RunStop(Exception):
-    """In-run STOP (prereg s6): end the run, no retry, report to Victor."""
+    """In-run STOP (prereg s6): end the run, no retry, report for review."""
 
 
 class _OptionReader(Protocol):

@@ -112,7 +112,7 @@ def fee_bps(
     return total / q * 10000  # no additional independent fee stress; stress the final c once
 
 
-# Exact one-way basis-point inputs from signed schedule 27a77d7d...94263, not new TCA.
+# Exact one-way basis-point inputs from signed schedule, not new TCA.
 DEFAULT = tuple(map(D, ("2.75", "5", "12", "30")))
 FIXED = tuple(map(D, ("5", "5", "10", "20")))
 PAPER = tuple(map(D, ("2", "4", "8", "15")))
