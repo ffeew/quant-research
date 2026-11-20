@@ -1,11 +1,11 @@
 # Insider prototype: results (run 30 Oct 2026, SGT)
 
-Filings 2016-01 to 2026-09. Portfolios are equal-weighted and gross of costs. A round trip is about 8–15 bp a month under Tomas v1.1 for L1/L2 names, which is immaterial next to these means. Research only.
+Filings 2016-01 to 2026-09. Portfolios are equal-weighted and gross of costs. A round trip is about 8–15 bp a month under TCA owner v1.1 for L1/L2 names, which is immaterial next to these means. Research only.
 xr = excess vs SPY. xe = excess vs the equal-weighted PIT S&P 500. Suffix 1 or 3 = months held.
 
 ## A. Point-in-time S&P 500 universe (PROVISIONAL)
 
-**Provisional.** This depends on former members and delisting returns, which have known issues in Dmitri's store (validation `data_issues.json`): 59 members have days without bars; terminal returns were matched for only 47 of 120 delisted names, and the rest use the last close; SNDK ticker reuse is dropped (old SanDisk interval removed; new Sandisk is mapped by CIK).
+**Provisional.** This depends on former members and delisting returns, which have known issues in the data owner's store (validation `data_issues.json`): 59 members have days without bars; terminal returns were matched for only 47 of 120 delisted names, and the rest use the last close; SNDK ticker reuse is dropped (old SanDisk interval removed; new Sandisk is mapped by CIK).
 
 Trade rows: {"('P', 'opportunistic')": 1310, "('P', 'routine')": 2445, "('P', 'unclassified')": 11738, "('S', 'opportunistic')": 41885, "('S', 'routine')": 75849, "('S', 'unclassified')": 109789}. Symbols: 689. Mapping: {'dmitri_ticker_cik_map': 238616, 'issuer_ticker_fallback': 4400}. Statistics reported: 38.
 

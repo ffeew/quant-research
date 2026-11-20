@@ -17,7 +17,7 @@ import pandas as pd
 from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DATA_DIR, ...)
 
 sys.path.insert(0, f"{_QR.COSTS_DIR}")
-from quant_research.backtest.costs.cost_model import trade_cost  # Tomas v1.1
+from quant_research.backtest.costs.cost_model import trade_cost  # TCA owner v1.1
 
 D = f"{_QR.DATA_DIR}/"
 SPLIT = pd.Timestamp("2021-12-31")
@@ -256,7 +256,7 @@ def sim(s: str, i_sig: int, atrk: float = 2.0, delist_mode: str = "table") -> di
 
 
 def costs(t: dict[str, Any]) -> dict[str, Any]:
-    """Tomas v1.1 one-way costs in bps: entry MOO (venue open) at t+1; exit venue per exit type.
+    """TCA owner v1.1 one-way costs in bps: entry MOO (venue open) at t+1; exit venue per exit type.
     $10k clip at raw price; ADV/sigma lagged to the signal close; bucket-default spread (no quotes in store).
     Also flat 5 bps/side (prior study) for comparability."""
     _s, c_, isg = t["sym"], col[t["sym"]], t["i_sig"]

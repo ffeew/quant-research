@@ -4,7 +4,7 @@ Weights W_t (index = signal date t) use information up to close(t) only. Executi
   exec="close_t1": trade at close(t+1) (MOC, order sent before 15:50 ET), earn close(t+1)->close(t+2)
 Forward returns spanning a flagged jump day (panel.bad) or |r|>40% are set to 0 (position treated as flat).
 Book: gross = 1 (sum|w| <= 1), returns are on gross capital, NOT levered 2x.
-Costs: Tomas's cost model (costs.py) per name-day, size-dependent impact at a given gross AUM, plus borrow on
+Costs: the TCA owner's cost model (costs.py) per name-day, size-dependent impact at a given gross AUM, plus borrow on
 short market value (calendar-day accrual / 360)."""
 
 from __future__ import annotations

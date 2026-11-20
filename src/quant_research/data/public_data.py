@@ -1,4 +1,4 @@
-"""Loaders for public factor data saved in ../_public_data (Ken French library, AQR BAB). Dave."""
+"""Loaders for public factor data saved in../_public_data (Ken French library, AQR BAB). The derivatives researcher."""
 
 from __future__ import annotations
 

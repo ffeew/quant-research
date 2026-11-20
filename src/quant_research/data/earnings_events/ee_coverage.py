@@ -45,7 +45,7 @@ cov.to_csv("coverage_by_year.csv", index=False)
 with open("COVERAGE.md", "w") as f:
     f.write("# Coverage by year: earnings_events_8k202 v1\n\n")
     f.write(
-        "Members = PIT S&P 500 tickers (Dmitri's `sp500_membership.parquet`) with any membership day in the year; "
+        "Members = PIT S&P 500 tickers (the data owner's `sp500_membership.parquet`) with any membership day in the year; "
         "events = deduped 8-K/8-K/A Item 2.02 events accepted while a member. 2026 is year-to-date (to 2026-10-30), "
         "so ≥ 3 is the comparable bar. Multi-class issuers (GOOG/GOOGL, FOX/FOXA, NWS/NWSA) count once per ticker.\n\n"
     )

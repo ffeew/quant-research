@@ -15,10 +15,10 @@
       "R7"
     ],
     "note": "Dates/labels in fixtures are synthetic tags only; not performance claims.",
-    "live_label_notes": "Breaker/panic fixtures mirror risk_state.read_breaker/read_panic L101-178: FAILSAFE_BREAKER HALVED/30/NTAtrue; RESUMED_DISARMED invalid backstop -> fail-safe; NORMAL/HALVED halt_armed=false -> fail-safe; backstop breach -> HALTED NTAfalse; stale/fail_closed -> FAILSAFE_PANIC; provisional/status PROVISIONAL returned as file with provisional=True, construct context-only unless forced.",
+    "live_label_notes": "Breaker/panic fixtures mirror risk_state.read_breaker/read_panic: FAILSAFE_BREAKER HALVED/30/NTAtrue; RESUMED_DISARMED invalid backstop -> fail-safe; NORMAL/HALVED halt_armed=false -> fail-safe; backstop breach -> HALTED NTAfalse; stale/fail_closed -> FAILSAFE_PANIC; provisional/status PROVISIONAL returned as file with provisional=True, construct context-only unless forced.",
     "preflight": {
-      "ruling": "validation/prereg_rulings/2026-11-06-maya-vix-mechanics-preflight.md",
-      "sha256": "3bed621e668f8d42e7eae33f6a99efe5341c986e98c351b8d3d7f48ddb9e3f56",
+      "ruling": "PENDING",
+      "sha256": "PENDING",
       "verdict": "RETURN FOR AMENDMENT \u2014 suite NOT authorised to run"
     },
     "planned_outputs": [

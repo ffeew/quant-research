@@ -10,6 +10,7 @@ hold-out cutoff is always passed as a parameter. No files are read.
 
 import itertools
 import math
+import sys
 from typing import Any
 
 import numpy as np
@@ -287,6 +288,10 @@ def _golden_inputs(rs: int, ts: int, T: int, mu: float, sd: float, nt: int) -> t
     return r, np.random.default_rng(ts).normal(0.0, 0.03, nt)
 
 
+@pytest.mark.skipif(
+    sys.platform != "linux",
+    reason="bit-identical pins are glibc-specific; tolerance test covers other platforms",
+)
 @pytest.mark.parametrize("case,expected", DSR_GOLDEN, ids=[f"case{i}" for i in range(len(DSR_GOLDEN))])
 def test_dsr_valid_outputs_are_bit_identical_to_pre_check_version(
     case: tuple[Any, ...], expected: dict[str, Any]
@@ -297,6 +302,21 @@ def test_dsr_valid_outputs_are_bit_identical_to_pre_check_version(
     assert set(out) == set(expected)
     got = {k: (v if isinstance(v, int) else float(v).hex()) for k, v in out.items()}
     assert got == expected
+
+
+@pytest.mark.parametrize("case,expected", DSR_GOLDEN, ids=[f"case{i}" for i in range(len(DSR_GOLDEN))])
+def test_dsr_valid_outputs_match_pins_within_tolerance(case: tuple[Any, ...], expected: dict[str, Any]) -> None:
+    """Same seven pins, checked on every platform. macOS libm drifts by a few ulps from glibc."""
+    rs, ts, T, mu, sd, nt, N = case
+    r, trials = _golden_inputs(rs, ts, T, mu, sd, nt)
+    out = V.dsr(r, trials, N)
+    assert set(out) == set(expected)
+    for key, exp in expected.items():
+        got = out[key]
+        if isinstance(exp, str):
+            assert math.isclose(float(got), float.fromhex(exp), rel_tol=1e-12, abs_tol=0)
+        else:
+            assert got == exp
 
 
 # ------------------------------------------------------------------------------------------------ purged K-fold

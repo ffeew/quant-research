@@ -17,7 +17,7 @@ Data snapshot: `$QR_DATA_DIR` with bars `updated_at_utc` 2026-10-29T17:20Z (01:2
   - A position still open at a name's last bar exits at the last close × (1 + `terminal_return`) from `delisting_returns`.
   - When the terminal return is null, it is taken as the last close. Sensitivity: SIVB/FRC/SBNY or a last close under $5 is set to -100%.
   - 11 R1 trades hit a delisting: 7 matched deals, 4 null (WFM, CSRA, COL, ABMD). None was a failure, so the -100% sensitivity leaves the results unchanged.
-- **Costs** (Tomas v1.1, `trade_cost`):
+- **Costs** (TCA owner v1.1, `trade_cost`):
   - $10k clip at the raw price. 20-day SIP ADV and sigma are lagged to the signal close. Spreads are the bucket defaults, because the store has no quotes.
   - Entry = `venue="open"` (MOO). Stop/TP exits = `continuous` (crossing, conservative for TP). Gap exits = `open`. Time and delisting exits = `close`.
   - 2x = 2 × total. The flat 5 bp/side of the prior study is also reported (`summary.csv`, costs=flat5).
@@ -41,7 +41,7 @@ Data snapshot: `$QR_DATA_DIR` with bars `updated_at_utc` 2026-10-29T17:20Z (01:2
 - **R2s ("strict")** uses the store's session only. I logged it as a trial.
 - **Run 3 (non-earnings).** No event's announce day or first tradable session within ±2 sessions. The symbol must also have PIT earnings coverage (an event in the prior 135 calendar days).
 
-## Main table (Tomas costs 1x unless stated)
+## Main table (TCA owner costs 1x unless stated)
 | Run | Period | Trades | Hit | Exp R (1x) | Sharpe 1x | Sharpe 2x | MaxDD R (1x) | Beta (R per 1% SPY) | FF4 alpha t (NW) |
 |---|---|---|---|---|---|---|---|---|---|
 | 1 Prior rule, PIT S&P 500 | IS | 1165 | 0.472 | +0.262 | 0.78 | 0.64 | -65.0 | 1.749 | 1.49 |

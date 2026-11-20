@@ -1,12 +1,12 @@
 # Validation submission: Residual momentum (Blitz, Huij & Martens 2011)
 
-> **Status: FAILED** (Victor, 2026-10-30; validation/replication_checks/2026-10-30-dave-replications.md). Corrections applied 2026-10-30 02:26 SGT after his check.
+> **Status: FAILED** (the validator, 2026-10-30). Corrections applied 2026-10-30 02:26 SGT after his check.
 
-Submitted by Dave (Quant Research) to Victor, 2026-10-30 01:47 SGT. Built against validation/STANDARD.md v1.0. Self-assessment only; the verdict is Victor's.
+Submitted for validation, 2026-10-30 01:47 SGT. Built against validation/STANDARD.md v1.0. Self-assessment only; the verdict is recorded separately.
 
 ## CORRECTION 2026-10-30 02:26 SGT: warm-up bug fixed (read this first; supersedes the 01:47 resmom_ls / resmom_long numbers)
 
-**Verdict: FAIL** (self-assessed, and confirmed by Victor in validation/replication_checks/2026-10-30-dave-replications.md). The fix does not change it.
+**Verdict: FAIL** (self-assessed, and confirmed by the validator). The fix does not change it.
 
 **The bug.** In `pipeline.py::_scores`, the 36-month FF3 fit window and the 12-month formation window were silently clipped at the first session of the data (2016-01-04). The rule "at least 24 of 36 months" was not enforced: `min_obs` was 2/3 of the *clipped* window, and names with complete (clipped) data skipped the check entirely.
 - For signals 2016-02 to 2016-12, the fit window equalled the formation window. OLS with an intercept then forces the residuals to sum to zero, so every score was floating-point noise (~1e-12). Trades from 2016-03 to 2017-01 held an effectively random book.
@@ -20,22 +20,22 @@ Submitted by Dave (Quant Research) to Victor, 2026-10-30 01:47 SGT. Built agains
 
 With the fix, the first signal with scores is 2018-02-28 (trading 2018-03-01). That window is still shorter than 36 months, so the result is restated from the first *fully warmed-up* month.
 - **The correct first month is 2019-01, not 2019-02.** The 2018-12-31 signal's 36-month window starts 2015-12-31. The first session after that is 2016-01-04 (Jan 1 is a holiday, Jan 2-3 a weekend), which is the data start, so no session is missing (733 sessions vs 735 for 2019-01-31).
-- 2019-02 is shown alongside for comparison with Victor's check. The one-month difference moves the L/S Sharpe from 0.11 to 0.06, which shows how noisy this estimate is.
+- 2019-02 is shown alongside for comparison with the validator's check. The one-month difference moves the L/S Sharpe from 0.11 to 0.06, which shows how noisy this estimate is.
 
 **What was rerun.** Only the primary L/S (`resmom_ls`) and the long-only (`resmom_long`), at base parameters, next-open fills, the same data snapshot and the same costs (`bugfix_warmup_rerun.py`). From 2019-02 on, the corrected daily series matches the 01:47 series to within 0.09% per day (the difference is the starting book). This confirms the bug only affected the warm-up.
 
-**Corrected numbers.** Net is net of max(Tomas, Victor floor) costs and 1%/yr borrow; DSR uses the 75-trial family N and the family trial-Sharpe variance as before.
+**Corrected numbers.** Net is net of max(the TCA owner, validator floor) costs and 1%/yr borrow; DSR uses the 75-trial family N and the family trial-Sharpe variance as before.
 
 | book | sample | start | net SR | gross SR | net SR 2x | net ann | t (NW) | maxDD | alpha vs SPY (ann, t) | beta SPY | FF3+UMD alpha (ann, t) | DSR (N) |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | resmom_ls | 2019-01 on (first fully warmed-up month) **[headline]** | 2019-01-02 | 0.06 | 0.30 | -0.17 | 0.8% | 0.19 | -34.3% | 1.9% (0.44) | -0.07 | -1.0% (-0.31) | 0.017 (75) |
-| resmom_ls | 2019-02 on (Victor's window) | 2019-02-01 | 0.11 | 0.35 | -0.12 | 1.6% | 0.35 | -31.1% | 2.6% (0.58) | -0.07 | -0.8% (-0.25) | 0.026 (75) |
+| resmom_ls | 2019-02 on (the validator's window) | 2019-02-01 | 0.11 | 0.35 | -0.12 | 1.6% | 0.35 | -31.1% | 2.6% (0.58) | -0.07 | -0.8% (-0.25) | 0.026 (75) |
 | resmom_ls | 2018-04 on (all trades allowed by the 24-of-36 rule) | 2018-04-02 | 0.02 | 0.26 | -0.22 | 0.2% | 0.05 | -40.9% | 0.9% (0.23) | -0.06 | -1.8% (-0.61) | 0.010 (75) |
 | resmom_long | 2019-01 on (first fully warmed-up month) **[headline]** | 2019-01-02 | 0.69 | 0.74 | 0.64 | 13.7% | 2.11 | -38.5% | -0.3% (-0.12) | 0.95 | -1.0% (-0.47) | 0.364 (75) |
-| resmom_long | 2019-02 on (Victor's window) | 2019-02-01 | 0.65 | 0.71 | 0.60 | 13.0% | 1.99 | -38.5% | -0.3% (-0.10) | 0.95 | -1.0% (-0.47) | 0.327 (75) |
+| resmom_long | 2019-02 on (the validator's window) | 2019-02-01 | 0.65 | 0.71 | 0.60 | 13.0% | 1.99 | -38.5% | -0.3% (-0.10) | 0.95 | -1.0% (-0.47) | 0.327 (75) |
 | resmom_long | 2018-04 on (all trades allowed by the 24-of-36 rule) | 2018-04-02 | 0.57 | 0.63 | 0.52 | 11.3% | 1.82 | -40.3% | -1.1% (-0.38) | 0.95 | -1.4% (-0.68) | 0.241 (75) |
 
-Victor's rough check, trimming the bugged series at 2019-02, gave net SR 0.11 and DSR 0.025. Our rerun gives 0.114 and 0.026 (0.108 and 0.025 on the trimmed old series): **they match.**
+The validator's rough check, trimming the bugged series at 2019-02, gave net SR 0.11 and DSR 0.025. Our rerun gives 0.114 and 0.026 (0.108 and 0.025 on the trimmed old series): **they match.**
 
 **Against STANDARD.md (resmom_ls, headline 2019-01 on):**
 
@@ -64,12 +64,12 @@ Files: `daily_resmom_ls_bugfix.csv`, `daily_resmom_long_bugfix.csv`, `trades_*_b
 $QR_DESK_DIR/research/replication/.venv/bin/python $QR_DESK_DIR/research/replication/run_all.py --only resmom
 ```
 Code: `research/replication/blitz-huij-martens-2011-residual-momentum/pipeline.py`, `_common/engine.py` (fills, costs, borrow), `_common/validation.py` (DSR, PBO, NW, walk-forward), `run_all.py`. Env: `research/replication/.venv` (`requirements.lock.txt`).
-Data snapshot: Dmitri SIP total_return ret_total_best (clean), fingerprint c50abc068669d327; file mtimes {"daily_total_return.parquet": "2026-10-30 01:32:38 SGT", "sp500_membership.parquet": "2026-10-30 01:31:38 SGT", "ff3_daily.parquet": "2026-10-30 01:10:57 SGT"}. Trial log: `research/replication/TRIAL_LOG.csv`; T x N daily net matrix: `research/replication/results/trials_daily_net_*.parquet`.
+Data snapshot: data owner SIP total_return ret_total_best (clean), fingerprint; file mtimes {"daily_total_return.parquet": "2026-10-30 01:32:38 SGT", "sp500_membership.parquet": "2026-10-30 01:31:38 SGT", "ff3_daily.parquet": "2026-10-30 01:10:57 SGT"}. Trial log: `research/replication/TRIAL_LOG.csv`; T x N daily net matrix: `research/replication/results/trials_daily_net_*.parquet`.
 
 ## Codified rules
 See the docstring of `pipeline.py` (copied below). No discretion, no overrides.
 ```
-Residual momentum (Blitz, Huij & Martens 2011) on Dmitri's SIP total returns, PIT S&P 500. Dave, 2026-10-30 (v2).
+Residual momentum (Blitz, Huij & Martens 2011) on the data owner's SIP total returns, PIT S&P 500. The derivatives researcher, 2026-10-30 (v2).
 Codified rules (base params; every number below is a parameter perturbed +/-20% in the sensitivity grid):
   Universe at month-end t: PIT S&P 500 members (membership interval contains t) with a bar on t.
   Fit: OLS with intercept of daily excess returns on FF3 (Mkt-RF, SMB, HML) over (t - fit_months, t - skip_days],
@@ -79,7 +79,7 @@ Codified rules (base params; every number below is a parameter perturbed +/-20% 
   Books: EW quantile `q` (0.20): L/S top-minus-bottom ($1 per leg) and long-only top (excess of rf).
   Rebalance: monthly (last session of month); fill next session's open (engine).
 ```
-Execution: signal at the close of the last session of each month; market-on-open fill at the next session's open; costs Tomas v1.1 max Victor floor; borrow 1.00%/yr; book $100,000; 2x stress doubles costs and borrow. Primary (pre-specified, paper-faithful) book: **resmom_ls**; secondary books: resmom_long, totmom_ls.
+Execution: signal at the close of the last session of each month; market-on-open fill at the next session's open; costs TCA owner v1.1 max validator floor; borrow 1.00%/yr; book $100,000; 2x stress doubles costs and borrow. Primary (pre-specified, paper-faithful) book: **resmom_ls**; secondary books: resmom_long, totmom_ls.
 
 ## SUPERSEDED: 01:47 run headline (contains the warm-up bug; resmom_ls / resmom_long rows withdrawn, do not quote; see CORRECTION above)
 
@@ -104,15 +104,15 @@ Execution: signal at the close of the last session of each month; market-on-open
 | §3 >= 30 independent OOS rebalance periods | MET | 86 OOS months |
 | §4 OOS Sharpe net > 0.5 | NOT MET | corrected 2019-01+ net SR 0.06 (2019-02+ 0.11); WF-OOS 0.18 from the bugged 01:47 grid |
 | §4/§5 Sharpe > 0 at 2x costs | NOT MET | full -0.34, WF-OOS -0.05 |
-| §4 DSR >= 0.95 | NOT MET | family N=75: DSR 0.002, SR0 0.82 ann; all-Dave N=184: DSR 0.000, SR0 1.06; T=2661, skew -0.49, kurt 6.77 |
+| §4 DSR >= 0.95 | NOT MET | family N=75: DSR 0.002, SR0 0.82 ann; all-derivatives-researcher N=184: DSR 0.000, SR0 1.06; T=2661, skew -0.49, kurt 6.77 |
 | §4 t-stat >= 2.8 (replication of published anomaly; NW) | NOT MET | t_NW -0.25 (iid -0.22) |
 | §4 PBO < 0.20 (<= 0.05 for PASS) | MET | book grid PBO 0.20 (N=11); whole family PBO 0.25 (N=44). N~11 per grid -> weakly informative |
-| §5 costs >= Victor minimums; borrow >= 1%/yr; exclude unborrowable | MET (borrow caveat) | avg 15.7 bps/side (Tomas-only 10.7); borrow 1%/yr; no PIT borrow history exists, so unborrowable names cannot be excluded at signal time |
+| §5 costs >= validator minimums; borrow >= 1%/yr; exclude unborrowable | MET (borrow caveat) | avg 15.7 bps/side (TCA-owner-only 10.7); borrow 1%/yr; no PIT borrow history exists, so unborrowable names cannot be excluded at signal time |
 | §6 post-publication haircut | computed | expected SR for sizing = min(WF-OOS 0.18, 0.40 x 0.80) = 0.18 (Ken French UMD 1965-01..1989-12 (JT93 in-sample window), proxy; resmom paper Sharpe not used) |
 | §7 no year > 40% of PnL | NOT MET | max year share n/a (n/a if total PnL <= 0) |
 | §7 no regime Sharpe < -0.5 | MET | worst regime SR -0.45 |
 | §7 +/-20% neighbourhood: SR > 0 and >= 50% of base | NOT MET | 0/11 configs pass on full-sample net SR; 10/11 on 2022+ net SR |
-| §7 legs reported; correlation to book | MET (book history 1 day) | long leg gross SR 0.69, short leg gross SR -0.49; desk book has 1 day of history, so correlations are vs SPY/FF factors and Victor's validation backtests |
+| §7 legs reported; correlation to book | MET (book history 1 day) | long leg gross SR 0.69, short leg gross SR -0.49; desk book has 1 day of history, so correlations are vs SPY/FF factors and the validator's validation backtests |
 | §8 trade size <= 1% of 20d ADV | MET | max 0.0235% at $100,000; at 10x book max 0.235% |
 | §8 break-even cost >= 2x assumed | NOT MET | break-even 16.7 bps/side vs assumed 15.7 |
 
@@ -129,7 +129,7 @@ Execution: signal at the close of the last session of each month; market-on-open
 - Turnover/costs: {"traded_per_yr_x_nav": 15.448, "avg_gross_exposure": 2.01, "oneway_turnover_per_yr_of_gross": 3.842, "avg_holding_months": 3.123, "gross_ret_per_unit_traded_bps": 16.665, "breakeven_cost_bps_per_side": 16.665, "assumed_avg_cost_bps_per_side": 15.739, "tomas_only_avg_cost_bps": 10.749, "breakeven_over_assumed": 1.059, "cost_drag_ann": 0.024, "borrow_drag_ann": 0.01, "avg_long_mv": 1.005, "avg_short_mv": 1.005}
 - Capacity: {"book_usd": 100000.0, "max_participation": 0.00023, "p99_participation": 2e-05, "share_trades_over_1pct_adv": 0.0, "max_participation_at_10x_book": 0.00235, "share_over_1pct_at_10x": 0.0}
 - Walk-forward: SR 0.18, t_NW 0.56, folds 8, picks ['form_months_m20', 'form_months_m20', 'form_months_m20', 'form_months_m20', 'form_months_m20', 'form_months_m20', 'form_months_m20', 'form_months_m20'], 2x SR -0.05
-- DSR (family N=75): 0.002; DSR (all Dave trials N=184): 0.000
+- DSR (family N=75): 0.002; DSR (all derivatives researcher trials N=184): 0.000
 - PBO grid 0.20 (N=11), family 0.25 (N=44)
 - Alt trials: next-close fill SR -0.10; no-clean data SR -0.08; delisting returns table/conservative/adverse SR -0.07 / -0.08 / -0.12
 - Delisting exits while held: 38 (ADT, TE, GAS, TYC, STJ, SE, SPLS, TWX, XL, ANDV, CA, COL...)
@@ -187,7 +187,7 @@ Regimes (labels lagged 1 day):
 - Turnover/costs: {"traded_per_yr_x_nav": 7.423, "avg_gross_exposure": 1.0, "oneway_turnover_per_yr_of_gross": 3.712, "avg_holding_months": 3.233, "gross_ret_per_unit_traded_bps": 166.248, "breakeven_cost_bps_per_side": 166.248, "assumed_avg_cost_bps_per_side": 15.566, "tomas_only_avg_cost_bps": 10.614, "breakeven_over_assumed": 10.68, "cost_drag_ann": 0.012, "borrow_drag_ann": 0.0, "avg_long_mv": 1.0, "avg_short_mv": 0.0}
 - Capacity: {"book_usd": 100000.0, "max_participation": 0.00025, "p99_participation": 2e-05, "share_trades_over_1pct_adv": 0.0, "max_participation_at_10x_book": 0.00248, "share_over_1pct_at_10x": 0.0}
 - Walk-forward: SR 0.61, t_NW 1.81, folds 8, picks ['form_months_m20', 'form_months_m20', 'form_months_m20', 'form_months_m20', 'form_months_m20', 'form_months_m20', 'form_months_m20', 'form_months_m20'], 2x SR 0.55
-- DSR (family N=75): 0.249; DSR (all Dave trials N=184): 0.075
+- DSR (family N=75): 0.249; DSR (all derivatives researcher trials N=184): 0.075
 - PBO grid 0.41 (N=11), family 0.25 (N=44)
 - Alt trials: next-close fill SR 0.60; no-clean data SR 0.60; delisting returns table/conservative/adverse SR 0.61 / 0.58 / 0.58
 - Delisting exits while held: 25 (ADT, TE, GAS, TYC, STJ, SPLS, XL, ANDV, CA, ESRX, SCG, CELG...)
@@ -245,7 +245,7 @@ Regimes (labels lagged 1 day):
 - Turnover/costs: {"traded_per_yr_x_nav": 12.977, "avg_gross_exposure": 2.018, "oneway_turnover_per_yr_of_gross": 3.215, "avg_holding_months": 3.732, "gross_ret_per_unit_traded_bps": 12.225, "breakeven_cost_bps_per_side": 12.225, "assumed_avg_cost_bps_per_side": 15.491, "tomas_only_avg_cost_bps": 10.641, "breakeven_over_assumed": 0.789, "cost_drag_ann": 0.02, "borrow_drag_ann": 0.01, "avg_long_mv": 1.007, "avg_short_mv": 1.011}
 - Capacity: {"book_usd": 100000.0, "max_participation": 0.00028, "p99_participation": 2e-05, "share_trades_over_1pct_adv": 0.0, "max_participation_at_10x_book": 0.00282, "share_over_1pct_at_10x": 0.0}
 - Walk-forward: SR 0.03, t_NW 0.09, folds 8, picks ['all_m20', 'all_m20', 'all_m20', 'all_m20', 'all_m20', 'all_m20', 'all_m20', 'all_m20'], 2x SR -0.08
-- DSR (family N=75): 0.002; DSR (all Dave trials N=184): 0.000
+- DSR (family N=75): 0.002; DSR (all derivatives researcher trials N=184): 0.000
 - PBO grid 0.45 (N=11), family 0.25 (N=44)
 - Alt trials: next-close fill SR -0.08; no-clean data SR -0.07; delisting returns table/conservative/adverse SR -0.07 / -0.08 / -0.10
 - Delisting exits while held: 43 (POM, ADT, CPGX, TYC, STJ, SE, HAR, LLTC, WFM, BCR, CSRA, GGP...)
@@ -300,9 +300,9 @@ Regimes (labels lagged 1 day):
 
 ### 1. Missing delisting returns (material for long books). Table below is from the bugged 01:47 run; base-column resmom figures are withdrawn
 
-Dmitri's `data/universe/delisting_returns.parquet` has terminal returns only for deals matched in Alpaca's corporate-action feed (which starts 2020-04). Of the 120 stocks whose bars end before the sample end, 47 have a terminal return and 73 do not (they cannot be told apart as merger vs performance delisting from the data available, so they are treated as performance-related in the stress). Base runs treat a held position whose bars stop as cash at the last close (0%). Sensitivity (base params, next-open fills, each logged as a data_alt trial):
+The data owner's `data/universe/delisting_returns.parquet` has terminal returns only for deals matched in Alpaca's corporate-action feed (which starts 2020-04). Of the 120 stocks whose bars end before the sample end, 47 have a terminal return and 73 do not (they cannot be told apart as merger vs performance delisting from the data available, so they are treated as performance-related in the stress). Base runs treat a held position whose bars stop as cash at the last close (0%). Sensitivity (base params, next-open fills, each logged as a data_alt trial):
 - **table**: matched terminal return where known, else 0%;
-- **conservative**: matched terminal return where known, else **-30% on both legs** (Victor's suggested assumption; shorts gain);
+- **conservative**: matched terminal return where known, else **-30% on both legs** (the validator's suggested assumption; shorts gain);
 - **adverse**: matched where known, else -30% on longs and **+30% on shorts** (takeover-premium case; worst for every book).
 
 | book | delisting events while held (long / short) | net SR base | table | conservative | adverse | net ann base | ann conservative | ann adverse |
@@ -311,7 +311,7 @@ Dmitri's `data/universe/delisting_returns.parquet` has terminal returns only for
 | resmom_long | 25 (25 / 0) | 0.61 | 0.61 | 0.58 | 0.58 | 11.19% | 10.80% | 10.80% |
 | totmom_ls | 43 (30 / 13) | -0.07 | -0.07 | -0.08 | -0.10 | -1.45% | -1.77% | -2.17% |
 
-Per-event detail (symbol, weight held, last bar, return applied in the base run = 0): `delisting_exits_<book>.csv`. Victor's file lists 120 delisting rows (47 matched, 70 no deal, 3 acquirer price missing); pre-2020 delistings have no terminal return at all, so the 2016-2019 part of every book is the most exposed.
+Per-event detail (symbol, weight held, last bar, return applied in the base run = 0): `delisting_exits_<book>.csv`. The validator's file lists 120 delisting rows (47 matched, 70 no deal, 3 acquirer price missing); pre-2020 delistings have no terminal return at all, so the 2016-2019 part of every book is the most exposed.
 
 ### 2. Ticker reuse (SNDK and others)
 
@@ -319,13 +319,13 @@ Per-event detail (symbol, weight held, last bar, return applied in the base run 
 - FOSL membership interval 2016-01-04 to 2016-01-05: excluded. no bars for this interval
 - Q membership interval 2017-08-29 to 2017-11-15: excluded. member 2017-08..11 was Quintiles IMS; the Q bars (from 2025-11) are a different company. Interval excluded.
 - SNDK membership interval 2016-01-04 to 2016-05-13: excluded. old SanDisk (member until 2016-05-13) has no bars; SNDK bars are the new Sandisk (listed 2025-02, member from 2025-11-28). Old interval excluded, new interval kept.
-- Every membership interval is mapped to the symbol's bars (`_common/desk_data.validate_intervals`, output `results/membership_intervals_coverage.csv`); a name is eligible at a signal date only if it is a PIT member in a kept interval AND has a bar on that date. The SNDK interval from 2025-11-28 maps to the new Sandisk bars and is kept. Dmitri's fixes for POM, SPLS, NFX, APC, CA, CSRA, DNB, TE (former members cut at the first gap > 10 sessions) are inherited.
+- Every membership interval is mapped to the symbol's bars (`_common/desk_data.validate_intervals`, output `results/membership_intervals_coverage.csv`); a name is eligible at a signal date only if it is a PIT member in a kept interval AND has a bar on that date. The SNDK interval from 2025-11-28 maps to the new Sandisk bars and is kept. The data owner's fixes for POM, SPLS, NFX, APC, CA, CSRA, DNB, TE (former members cut at the first gap > 10 sessions) are inherited.
 
 ### 3. Former / renamed members missing price history while in the index (verified 2026-10-30 02:26 SGT)
 
 Source: `results/membership_intervals_coverage.csv` (return basis) and `results/membership_intervals_coverage_bars.csv` (bar basis).
 
-**Membership source.** PIT membership is Dmitri's rebuild from Wikipedia's crowd-sourced "Historical components of the S&P 500" change log (plus the current-constituents snapshot). It has **not** been checked against S&P DJI's official constituent history, which is paid. Dmitri logs 26 internal inconsistencies, mostly unrecorded ticker renames (`universe/sp500_membership_anomalies.parquet`).
+**Membership source.** PIT membership is the data owner's rebuild from Wikipedia's crowd-sourced "Historical components of the S&P 500" change log (plus the current-constituents snapshot). It has **not** been checked against S&P DJI's official constituent history, which is paid. Data owner logs 26 internal inconsistencies, mostly unrecorded ticker renames (`universe/sp500_membership_anomalies.parquet`).
 
 **Member-days without data (return basis, which is what the strategies see).**
 - 7,186 of 1,375,021 PIT member-sessions are missing (0.52%), spread over **538** kept membership intervals (538 different symbols).

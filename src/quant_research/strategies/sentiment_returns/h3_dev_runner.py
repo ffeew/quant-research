@@ -3,16 +3,18 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING, Any, TypedDict, cast
 
+from quant_research.utils.pins import PENDING, desk_pin
+
 if TYPE_CHECKING:
     from collections.abc import Callable
 
     import numpy.typing as npt
 
-# h3_dev_runner.py v3 (re-freeze 2026-11-13; v2 716e370f, v1 550211dc; v3 adds DV-25 stale terminal bar, Victor L561) - H3 DEV runner for sealed PREREG_H3_DRAFT_v2 (ecce2bbf...) + seal S1-S6 (40ddcc9c...).
-# DEV ONLY (closes/events <= 2024-12-31). ONE run, guarded by an atomic LOCK. Raw output goes to Victor first (S6).
-# Helper conventions COPIED (not imported) from dev_run.py (80f4bb71...): XNYS sessions, adjusted_close ratios,
+# h3_dev_runner.py v3 (re-freeze 2026-11-13; v2, v1; v3 adds DV-25 stale terminal bar, the review) - H3 DEV runner for sealed PREREG_H3_DRAFT_v2 + seal S1-S6.
+# DEV ONLY (closes/events <= 2024-12-31). ONE run, guarded by an atomic LOCK. Raw output goes to validation first (S6).
+# Helper conventions COPIED (not imported) from dev_run.py: XNYS sessions, adjusted_close ratios,
 # 252-return OLS beta ending t-1, (ws, we] 15:30 ET cutoffs, UTC/ET readings of naive time_published, relevance-weighted
-# mean, Bartlett NW t, one-sided Student-t p (df = T-1), +/-1 day month padding; H1b-style entry from flat (h2_dev.py dba0e8fb
+# mean, Bartlett NW t, one-sided Student-t p (df = T-1), +/-1 day month padding; H1b-style entry from flat (h2_dev.py
 # for the guard/pin/exclusive-write pattern). v2 order: env_pin(5) -> config(6) -> S3 calendar(4) -> LOCK-exists(7) -> path guard(3)
 # -> PRE-LOCK preflight: every sha(2) + header lines + manifests + F1 universe x-check (8) -> atomic LOCK -> parse; any STOP after LOCK
 # exits nonzero BEFORE H3_DEV_RAW.json is written. --dry-check stops after the preflight (no data rows, no LOCK, no output).
@@ -22,7 +24,7 @@ from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DA
 
 EXIT_ENV, EXIT_CFG, EXIT_LOCK, EXIT_SHA, EXIT_PATH, EXIT_CAL, EXIT_PRE, EXIT_DATA = 5, 6, 7, 2, 3, 4, 8, 9
 DECL_D = (
-    "Design informed by H1b OOS (L306); HOLDOUT period not regime-blind. "
+    "Design informed by H1b OOS; HOLDOUT period not regime-blind. "
     'Any H3 PASS = "conditional evidence (period not regime-blind)". Research only; no trading (S1). '
     "MSTR research-only, never paper traded, excluded from every trade list (S2)."
 )
@@ -41,10 +43,10 @@ class _Pin(TypedDict):
 PIN: _Pin = dict(
     exe=f"{_QR.DATA_DIR}/.venv/bin/python",
     exe_real="/usr/bin/python3.13",
-    exe_sha="889c603f0d17cb54060951bcf4c4f9b8c9ebd9e52b392c70209bbb9755d797d9",
+    exe_sha=desk_pin("strategies.sentiment_returns.h3_dev_runner", "PIN.exe_sha"),
     py="3.13.5",
     freeze=f"{_QR.DESK_DIR}/validation/marcus/inc99_venv/PIP_FREEZE.txt",
-    freeze_sha="8cb1e190f4a53410d2106bca88be83668d865f20dd474a0e67329ca3e5879768",
+    freeze_sha=desk_pin("strategies.sentiment_returns.h3_dev_runner", "PIN.freeze_sha"),
     core={"pandas": "3.1.0", "numpy": "2.5.4", "scipy": "1.18.1", "exchange_calendars": "4.13.2"},
 )
 
@@ -60,7 +62,7 @@ def _sha_file(p: str) -> str:
 
 
 def env_check() -> dict[str, str]:
-    """Exit 5 on ANY mismatch with ENV_PIN_ADDENDUM_H3.md (2bb14197...). Runs before any third-party import."""
+    """Exit 5 on ANY mismatch with ENV_PIN_ADDENDUM_H3.md. Runs before any third-party import."""
     import platform
     from importlib import metadata
 
@@ -164,37 +166,39 @@ REAL = dict(
     root=ROOT,
     n_universe=100,
     p2sums=f"{ROOT}/partition_2/SHA256SUMS",
-    p2sums_sha="9ed2d8cf3e61a77a5de2e748ba6d3b8835cf332f402d1a0e8ce966f65cea7546",
+    p2sums_sha=desk_pin("strategies.sentiment_returns.h3_dev_runner", "REAL.p2sums_sha"),
     news_index=f"{ROOT}/partition_2/NEWS_DEV_INDEX.tsv",
-    news_index_sha="373e49bcf93a0f8d58135310fb85204719d8412d95b06ed65654a6c6d13fd8f6",
+    news_index_sha=desk_pin("strategies.sentiment_returns.h3_dev_runner", "REAL.news_index_sha"),
     rsector=f"{ROOT}/meta/RSECTOR_H3.tsv",
-    rsector_sha="696631a10a13b6bd7fd5dc12b079086db601fef98e4bf906f9592c9a984dced6",  # F2 full sha
+    rsector_sha=desk_pin("strategies.sentiment_returns.h3_dev_runner", "REAL.rsector_sha"),  # F2 full sha
     final100=f"{ROOT}/stage1c/FINAL_100_H3.txt",
-    final100_sha="f82830d8e11d984e4d05aef6afd97bfe95828f7601731ef2dce0721d50125d1c",  # F1
+    final100_sha=desk_pin("strategies.sentiment_returns.h3_dev_runner", "REAL.final100_sha"),  # F1
     universe_tsv=f"{ROOT}/stage1c/UNIVERSE_H3.tsv",
-    universe_tsv_sha="a5a52c5381e2fb9c12d02bc6e78fe0c42f32b18f1d0a70d4a13eadd976da128d",  # F1 pin (not parsed)
+    universe_tsv_sha=desk_pin(
+        "strategies.sentiment_returns.h3_dev_runner", "REAL.universe_tsv_sha"
+    ),  # F1 pin (not parsed)
     s1c_sums=f"{ROOT}/stage1c/SHA256SUMS",
-    s1c_sums_sha="4eb2970ee938eb95e38319379bb3ab47abdd1476cb69b57aaa5f07896de4ab33",
+    s1c_sums_sha=desk_pin("strategies.sentiment_returns.h3_dev_runner", "REAL.s1c_sums_sha"),
     price_csv=f"{ROOT}/partitioned_prices/dev/prices_dev.csv",
-    price_csv_sha="11bd5504f0b887023f3f4281e0a71db707eee1980f88a89b1871469924b2be43",
+    price_csv_sha=desk_pin("strategies.sentiment_returns.h3_dev_runner", "REAL.price_csv_sha"),
     dev_meta=f"{ROOT}/partitioned_prices/dev/DEV_META.csv",
-    dev_meta_sha="7d5866f0a2c2a0e1800205392716fe9a2cd4a53a8a582065ad567d0b5e6d27ea",
+    dev_meta_sha=desk_pin("strategies.sentiment_returns.h3_dev_runner", "REAL.dev_meta_sha"),
     price_dev_sums=f"{ROOT}/partitioned_prices/dev/SHA256SUMS",
-    price_dev_sums_sha="4bbf92bf551674fe220c202df143f2d167b96162ed28eeee9c404ce2e54dc199",
+    price_dev_sums_sha=desk_pin("strategies.sentiment_returns.h3_dev_runner", "REAL.price_dev_sums_sha"),
     price_top_sums=f"{ROOT}/partitioned_prices/SHA256SUMS",
-    price_top_sums_sha="f436c94230ed638e8f2b787b334f5e89e809ab215db7466f2d32e2314de1e723",
+    price_top_sums_sha=desk_pin("strategies.sentiment_returns.h3_dev_runner", "REAL.price_top_sums_sha"),
     coverage=[
         [f"{ROOT}/COVERAGE_2_DEV_news_{t}.tsv", h]
         for t, h in zip(
             COV_TAGS,
             (
-                "09a4ae0129e3607185bbe2a9753cd2db263160e6c0be5374a62a26cfaa0dc291",
-                "6195b1d623bd55f100b144ec2de731d03f5825af90930fe4abc1d368328b43a5",
-                "ce5ada1462e0616fcc8d3a628ea9f9c3d88f368e0a70379d5aa93f7581a04dc0",
-                "81af1764b517faa18dda89e700c50fa4f3a2b26e78f0eac35b4924ca27f23afe",
-                "a4eaa8d864f3156f07ec1e14b1f1c9eec21f64a54df0bb3c62db8767d3f9431e",
-                "403fc46a3dc3d4c30cfccabc20830ae393c738df81c85079ddddc11eabd46d13",
-                "1af77136ee0762b88a36cdaba86161414f3ffab50509ad5dbdb85f0c719ff9de",
+                desk_pin("strategies.sentiment_returns.h3_dev_runner", "REAL.coverage[0]"),
+                desk_pin("strategies.sentiment_returns.h3_dev_runner", "REAL.coverage[1]"),
+                desk_pin("strategies.sentiment_returns.h3_dev_runner", "REAL.coverage[2]"),
+                desk_pin("strategies.sentiment_returns.h3_dev_runner", "REAL.coverage[3]"),
+                desk_pin("strategies.sentiment_returns.h3_dev_runner", "REAL.coverage[4]"),
+                desk_pin("strategies.sentiment_returns.h3_dev_runner", "REAL.coverage[5]"),
+                desk_pin("strategies.sentiment_returns.h3_dev_runner", "REAL.coverage[6]"),
             ),
         )
     ],
@@ -252,7 +256,7 @@ EXPECT = dict(
     returns_before_first=276,
 )
 TICK = re.compile(r"^[A-Z][A-Z0-9.\-]{0,9}$")
-STALE_EXPECT_N = 2  # DV-25 (Victor L561): expected drops on real data (TWTR 2022-10-28, ATVI 2023-10-13); a different count is REPORTED, not a STOP
+STALE_EXPECT_N = 2  # DV-25 (the review): expected drops on real data (TWTR 2022-10-28, ATVI 2023-10-13); a different count is REPORTED, not a STOP
 
 
 # ---------------- path guard ----------------
@@ -408,12 +412,12 @@ def target_weights(state: dict[str, int]) -> tuple[dict[str, float], bool]:
 
 def traded_weight(
     w_new: dict[str, float], w_drift: dict[str, float]
-) -> float:  # sum |w_new - w_drifted| over both legs (L307 A3)
+) -> float:  # sum |w_new - w_drifted| over both legs ( A3)
     return float(sum(abs(w_new.get(s, 0.0) - w_drift.get(s, 0.0)) for s in set(w_new) | set(w_drift)))
 
 
 def drift(w: dict[str, float], r: dict[str, float]) -> dict[str, float]:
-    """weights drift with returns within each leg (leg renormalised to +1/-1; OQ-5/DV-3, ACCEPTED L557)."""
+    """weights drift with returns within each leg (leg renormalised to +1/-1; OQ-5/DV-3, ACCEPTED)."""
     out: dict[str, float] = {}
     for sign in (1, -1):
         leg = {s: abs(x) for s, x in w.items() if np.sign(x) == sign}
@@ -434,7 +438,7 @@ def leg_return(w: dict[str, float], r: dict[str, float]) -> float:
 def run_book(weeks: list[dict[str, Any]], mode: str = "band") -> tuple[list[dict[str, Any]], float]:
     """weeks: list of dict(dec, qual={sym:(S,u)} = BOOK POOL (valid signal + finite beta), scored, r={sym:ret to t+1 or to last bar},
     y={sym:beta-adj}, closed=set(syms whose last AV bar falls before t+1)). Enters from flat.
-    OQ-3/DV-2 (ACCEPTED L557): a held name in `closed` earns r up to its last bar and is closed there; exit cost C x |drifted w| is
+    OQ-3/DV-2 (ACCEPTED): a held name in `closed` earns r up to its last bar and is closed there; exit cost C x |drifted w| is
     charged in that week and the closure is counted. Its weight leaves the book (leg not re-normalised; the next rebalance tops up, charged)."""
     state: dict[str, int] = {}
     w_d: dict[str, float] = {}
@@ -459,7 +463,7 @@ def run_book(weeks: list[dict[str, Any]], mode: str = "band") -> tuple[list[dict
                 state.update(dict.fromkeys(o[len(o) - k :], 1))
         w, flat = target_weights(state)
         if flat:
-            state = {}  # OQ-4/DV-4: band memory cleared when the book is held flat (ACCEPTED L557)
+            state = {}  # OQ-4/DV-4: band memory cleared when the book is held flat (ACCEPTED)
         tw = traded_weight(w, w_d)
         g = leg_return(w, wk["r"]) if w else 0.0
         b = leg_return(w, wk["y"]) if w else 0.0
@@ -645,7 +649,7 @@ def av_daily(b: bytes) -> dict[str, float]:
 
 
 def drop_stale_terminal(df: pd.DataFrame) -> tuple[pd.DataFrame, list[list[object]]]:
-    """DV-25 (Victor L561): for EVERY symbol, look at its single FINAL bar only (once, not iterated). If volume <= 1 AND adjusted_close ==
+    """DV-25 (the review): for EVERY symbol, look at its single FINAL bar only (once, not iterated). If volume <= 1 AND adjusted_close ==
     the previous bar's adjusted_close, drop that final bar; the previous bar becomes the symbol's effective last bar. Returns (df, [[sym, date], ...])."""
     vol = pd.to_numeric(df["volume"], errors="coerce")
     d = df.assign(_v=vol).sort_values(["symbol", "date"])
@@ -820,7 +824,9 @@ def main() -> None:
             sys.exit(EXIT_CFG)
     else:
         C = cast(dict[str, Any], dict(REAL))
-    missing = [k for k in CFG_KEYS if not C.get(k)]
+    # a PENDING desk pin counts as unset (fail closed before any lock or data read)
+    missing = [k for k in CFG_KEYS if not C.get(k) or C.get(k) == PENDING]
+    missing += ["coverage sha"] if any(h == PENDING for _, h in C.get("coverage") or []) else []
     if missing or len(C["coverage"]) != 7:
         sys.stderr.write(
             f"CONFIG BLOCKED (exit 6): unset {missing} / coverage files {len(C.get('coverage') or [])}. No lock taken, no data read.\n"
@@ -919,7 +925,7 @@ def main() -> None:
         LOG.close()
         sys.stderr.write(f"DATA STOP {e} (exit 9)\n")
         sys.exit(EXIT_DATA)
-    except Exception as e:  # any other failure after LOCK = incident to Jeremy, no retry (PREREG v2 sec.0)
+    except Exception as e:  # any other failure after LOCK = reported incident, no retry (PREREG v2 sec.0)
         log("ABORT", type(e).__name__, str(e))
         LOG.close()
         sys.stderr.write(f"ABORT {type(e).__name__} {e} (exit 9)\n")
@@ -927,7 +933,7 @@ def main() -> None:
     res["path_guard_denials"] = G.denials
     with open(f"{C['out']}/H3_DEV_RAW.json", "x") as f:
         json.dump(res, f, indent=1, default=float)
-    log("done; raw output to Victor first (S6)")
+    log("done; raw output to validator first (S6)")
     LOG.close()
 
 
@@ -1109,13 +1115,13 @@ def compute(
                 if not (np.isfinite(bt) and np.isfinite(Pv[i0, col[s]])):
                     ex["no_beta_or_price"] += 1
                     continue
-                Sv[s] = float(np.average(A[m_, 2], weights=A[m_, 3]))  # BOOK POOL: valid signal + finite beta (L557)
+                Sv[s] = float(np.average(A[m_, 2], weights=A[m_, 3]))  # BOOK POOL: valid signal + finite beta
                 ret, full, li = week_ret(s, i0, i1)
                 spy_r = Pv[li, col["SPY"]] / Pv[i0, col["SPY"]] - 1.0
                 rv[s] = float(ret)
                 yv[s] = float(ret - bt * spy_r)
                 if full:
-                    icset.append(s)  # IC SAMPLE: + valid next-week return (L127, L139)
+                    icset.append(s)  # IC SAMPLE: + valid next-week return
                 else:
                     closed.add(s)
                     ex["ic_no_return"] += 1
@@ -1153,7 +1159,7 @@ def compute(
         header=DECL_D,
         prereg="PREREG_H3_DRAFT_v2.md ecce2bbf",
         seal="40ddcc9c (S1-S6)",
-        rulings="Victor L557 (51c8ca77), L560 (c37eedb2), L561 (1eb03efe)",
+        rulings="the validation decisions",
         env=ENV,
         calendar=facts,
         inputs=inputs,

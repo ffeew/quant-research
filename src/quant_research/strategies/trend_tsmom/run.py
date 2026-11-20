@@ -284,7 +284,7 @@ meta = {
 }
 json.dump(meta, open(f"{OUT}/meta.json", "w"), indent=2, default=float)
 with open(f"{OUT}/tables.md", "w") as fh:
-    fh.write("## Grid (net = after Tomas cost model + 25bps borrow; ETFs only, crypto excluded)\n\n")
+    fh.write("## Grid (net = after TCA owner cost model + 25bps borrow; ETFs only, crypto excluded)\n\n")
     fh.write(fmt(grid, PCT, F2, F1) + "\n\n## Cost variants on baseline\n\n" + fmt(cgrid, PCT, F2, F1))
     fh.write("\n\n## Benchmarks\n\n" + fmt(bgrid, PCT, F2, F1))
     fh.write(

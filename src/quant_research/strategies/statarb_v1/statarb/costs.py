@@ -1,4 +1,4 @@
-"""Vectorised wrapper around Tomas's cost model (src/quant_research/backtest/costs/cost_model.py, v1.1).
+"""Vectorised wrapper around the TCA owner's cost model (src/quant_research/backtest/costs/cost_model.py, v1.1).
 Per name-day one-way cost (bps) = fees + venue_hs*half_spread(bucket) + venue_imp*k*sigma_i*sqrt(Q_i/ADV_i)*1e4 + buffer(bucket)
 using the module's own BUCKETS / VENUES constants; sigma = measured trailing 20d (lagged), ADV = trailing 20d mean $vol
 (lagged), spread = bucket default (no quote history). Fees ~ SEC 0.206 bps on sells (assume half of traded notional

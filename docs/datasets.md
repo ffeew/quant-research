@@ -1,10 +1,10 @@
-# $QR_DATA_DIR: desk research data store (owner: Dmitri, Data Engineer)
+# $QR_DATA_DIR: research data store (owner: the data owner, Data Engineer)
 
 Point-in-time (PIT), source-traceable research data. **No number here is invented.** Every value comes from the named API or page and carries a fetch time. Gaps are listed below instead of being filled in.
 Status snapshot for the CIO: `STATUS.md`. Machine-readable run summary (counts, coverage, failures): `manifest.json`. Logs: `logs/`.
 
 - Python env: `$QR_DATA_DIR/.venv` (pandas, pyarrow, exchange_calendars, requests, lxml, tabulate). Lock file: `pipelines/requirements.lock.txt`.
-  Desk members should keep their own venvs (e.g. Dave: $QR_SCRATCH_DIR/dave_venv) and only *read* these files.
+  Users should keep their own venvs (e.g. under $QR_SCRATCH_DIR) and only *read* these files.
 - All writes are atomic: `<file>.tmp.parquet` is written first, then `os.replace` swaps it in. A reader never sees a half-written file.
 - Credentials come only from env vars `ALPACA_API_KEY_ID` / `ALPACA_API_SECRET_KEY`. They are never logged or stored.
   SEC requests send `SEC_USER_AGENT`. Set it to "<org> <real contact email>" per SEC fair-access policy. The default placeholder works but is not compliant long-term.
@@ -13,8 +13,8 @@ Status snapshot for the CIO: `STATUS.md`. Machine-readable run summary (counts, 
 | path | what it is | note |
 |---|---|---|
 | `$QR_DESK_DIR/data.json` (CIO, quant.py) | Alpaca **IEX** daily bars, `adjustment=all` (split+div adjusted), ~420 calendar days, ~120 symbols, plus snapshots and BTC/ETH/SOL | Prices are adjusted. **Volume is IEX-only (~2-4% of consolidated)**. Survivor-only universe. |
-| `$QR_DESK_DIR/statarb/data/daily_bars.json` (Sofia/statarb) | IEX daily bars (2020-07+) | Same IEX volume issue, survivor universe. Use `bars/daily/adjusted` instead. |
-| `research/replication/_public_data/` (Dave) | Ken French CSV/zip copies, AQR BAB | Superseded by `factors/ken_french/` (parsed, decimal). |
+| `statarb/data/daily_bars.json` (legacy statarb pull) | IEX daily bars (2020-07+) | Same IEX volume issue, survivor universe. Use `bars/daily/adjusted` instead. |
+| `research/replication/_public_data/` (the derivatives researcher) | Ken French CSV/zip copies, AQR BAB | Superseded by `factors/ken_french/` (parsed, decimal). |
 
 "Bars look unadjusted": `bars/daily/raw/` is **intentionally** unadjusted (as traded). The adjusted set is `bars/daily/adjusted/`, and total returns are in `bars/daily/total_return/`.
 
@@ -211,7 +211,7 @@ ff = pd.read_parquet("$QR_DATA_DIR/factors/ken_french/ff5_daily.parquet").merge(
 - **History starts 2026-10-29 ET and cannot be backfilled.** Run daily (pre-open, e.g. 08:00 ET = 20:00/21:00 SGT, or with the 07:30 SGT job). Alpaca exposes no borrow fees.
 - Update: `pipelines/assets_snapshot.py`.
 
-### 11. Reference: ticker-CIK map with history (for Ethan): `reference/`
+### 11. Reference: ticker-CIK map with history (for the sentiment researcher): `reference/`
 - `ticker_cik_map.parquet`: ticker, cik, entity_name, valid_from, valid_to, source, match_method, confidence, in_universe. 12,048 rows / 10,593 tickers. Sources, in order of preference:
   - `wikipedia_sp500_cik`
   - `sec_company_tickers` (current only)
@@ -224,7 +224,7 @@ ff = pd.read_parquet("$QR_DATA_DIR/factors/ken_french/ff5_daily.parquet").merge(
 - `sp400_current.parquet`, `sp600_current.parquet`: current lists only (not PIT).
 
 ```python
-# for Ethan: ticker -> CIK valid on a date (prefer high confidence)
+# for the sentiment researcher: ticker -> CIK valid on a date (prefer high confidence)
 ref = pd.read_parquet("$QR_DATA_DIR/reference/ticker_cik_map.parquet").dropna(subset=["cik"])
 
 
@@ -279,7 +279,7 @@ Sample of 22 liquid stocks/ETFs, 2016-2026:
 | `crypto_bars.py` | DEPRECATED | - | - |
 | `alfred_store.py` | macro/treasury, macro/carry/g10_3m, sentiment/credit (frozen dated ALFRED vintages; `python alfred_store.py treasury g10_3m credit treasury_extra`) | weekly (daily for treasury/credit if needed); each run writes new dated files | ~1-2 min |
 
-Suggested daily order: corporate_actions, then daily_bars, total_return, assets_snapshot, earnings, qa. Run it at **07:30 SGT Tue-Sat** (US close + about 3.5 h; robust to the 1 Nov 2026 DST change). No schedules are configured; Daniel sets routines.
+Suggested daily order: corporate_actions, then daily_bars, total_return, assets_snapshot, earnings, qa. Run it **Tue-Sat** (US close + about 3.5 h; robust to the 1 Nov 2026 DST change). No schedules are configured.
 
 ## Blockers / not freely obtainable
 - **Macro release calendar (CPI/NFP/GDP/PCE/ISM), vintage-aware.**
@@ -292,42 +292,42 @@ Suggested daily order: corporate_actions, then daily_bars, total_return, assets_
 - **Borrow fees / historical shortability.** Alpaca exposes only current flags, so history starts today.
 - **Pre-2020 merger terms** for delisting returns (Alpaca CA starts in 2020-04). Could be built from SEC 8-K/S-4/DEFM14A filings, but that needs per-deal parsing.
 - **Intraday bars** (1-5 min SIP) are available from Alpaca but not yet pulled. This is the next step, not a blocker.
-- **Alpaca news** (for Ethan's sentiment) is available via `/v1beta1/news` but not yet pulled.
+- **Alpaca news** (for the sentiment researcher's sentiment) is available via `/v1beta1/news` but not yet pulled.
 - **Real-time SIP** needs a paid Alpaca plan. Historical SIP is fine.
 
 ## Paper data-requirement coverage (from research/REGISTRY.md + replication/DATA_REQUESTS_dave.md)
 Legend: COVERED = in store now; PARTIAL = usable with caveats; NO = not in store.
 | paper (owner) | needs | status |
 |---|---|---|
-| blitz-huij-martens-2011 residual momentum (Dave) | adjusted SIP bars, PIT S&P 500 incl. former, FF3 daily/monthly, borrow flags | COVERED: bars, membership, FF. PARTIAL: borrow (from today) |
-| blitz-huij-lansdorp-verbeek-2013 residual reversal (Sofia) | adjusted daily TR bars, FF3 daily, borrow | COVERED: TR bars, FF3/5, ST_Rev. PARTIAL: borrow flags from today; NO: fees |
-| avellaneda-lee-2010 PCA/ETF residuals (Sofia) | adjusted bars stocks + sector ETFs, borrow | COVERED (11 SPDRs+SMH from 2016; XLRE from 2015-10, XLC from 2018-06). PARTIAL: borrow |
-| gatev 2006 / rad-low-faff 2016 / do-faff 2010 & 2012 pairs (Sofia) | adjusted bars, industry classification, borrow fees | COVERED: bars. PARTIAL: GICS is current only. NO: borrow fees |
-| lou-polk-skouras 2019 overnight/intraday (Sofia) | adjusted open and close | COVERED: adjusted open/close daily; intraday bars NO (next step) |
-| tadi-kortchemski 2021 crypto pairs (Sofia) | crypto | OUT OF SCOPE (crypto dropped) |
-| crypto-tsmom-liu-tsyvinski-2021 (Maya) | BTC/ETH daily | OUT OF SCOPE (crypto dropped; deprecated files exist) |
-| frazzini-pedersen-2014 BAB (Dave/PC) | adjusted daily returns, market, RF | COVERED (bars, FF RF/Mkt). AQR BAB copy in Dave's _public_data |
-| moskowitz-grinblatt-1999 industry momentum (Dave) | sector ETF history >10y, PIT GICS | PARTIAL: ETFs from 2016 only in store (Alpaca SIP starts 2016); GICS current only |
-| jegadeesh-1990 ST reversal (Dave) | daily returns, FF ST_Rev | COVERED |
-| novy-marx-2013 gross profitability; AFP-2019 QMJ; sloan-1996 accruals (Dave) | PIT fundamentals with filing dates, market cap | PARTIAL: XBRL companyfacts (filed-date PIT, 2014+ filings) and market_cap_daily (approx.); bank/insurer tags and multi-class caveats |
-| bernard-thomas-1989 PEAD; martineau-2022 (Dave/Ethan) | earnings dates+timing, EPS actuals, consensus | COVERED: dates/timing (EDGAR PIT), EPS actuals (XBRL, Nasdaq). PARTIAL: consensus (Nasdaq, not PIT) |
-| jegadeesh-kim-krische-lee-2004 rec changes (Ethan) | analyst recommendations | NO (paid: I/B/E/S) |
-| cohen-malloy-pomorski-2012 insiders (Ethan) | Form 4 filings, ticker-CIK map | PARTIAL: ticker-CIK map COVERED; Form 4 not pulled (free on EDGAR, next step) |
-| ke-kelly-xiu-2019 / price-2012 call tone (Ethan) | news text / call transcripts | NO (Alpaca news is pullable, transcripts are paid) |
-| greenwood-sammon-2025 index effect (Ethan) | S&P add/drop dates + announcement dates, bars | PARTIAL: effective dates COVERED; announcement dates NO (Wikipedia has effective date only) |
-| tsmom-moskowitz 2012; trend-century 2017 (Maya) | cross-asset ETF adjusted bars 15y+, T-bill | PARTIAL: 49 ETFs from 2016 only (Alpaca limit); BIL plus FF RF as T-bill; pre-2016 needs another source |
-| carry-koijen 2018 (Maya) | rates curves, futures, dividend yields | NO (futures/rates not in store); dividends for ETFs COVERED |
-| pre-fomc-drift-lucca-moench-2015 (Maya) | FOMC timestamps, intraday SPY | PARTIAL: FOMC calendar COVERED 2016-2027; intraday SPY NO (next step) |
-| macro-announcement-premium-savor-wilson-2013 (Maya) | macro release calendar, SPY/IEF/TLT/BIL TR | PARTIAL: TR COVERED; release calendar BLOCKED (see Blockers) |
-| daniel-moskowitz-2016; barroso-santa-clara-2015 (Rachel) | SPY daily 2y+, momentum factor daily | COVERED (SPY TR, FF Mom daily) |
-| khandani-lo-2011 (Rachel) | fundamentals B/M, E/P, earnings surprise | PARTIAL (XBRL + earnings events) |
+| blitz-huij-martens-2011 residual momentum (the derivatives researcher) | adjusted SIP bars, PIT S&P 500 incl. former, FF3 daily/monthly, borrow flags | COVERED: bars, membership, FF. PARTIAL: borrow (from today) |
+| blitz-huij-lansdorp-verbeek-2013 residual reversal (the stat-arb researcher) | adjusted daily TR bars, FF3 daily, borrow | COVERED: TR bars, FF3/5, ST_Rev. PARTIAL: borrow flags from today; NO: fees |
+| avellaneda-lee-2010 PCA/ETF residuals (the stat-arb researcher) | adjusted bars stocks + sector ETFs, borrow | COVERED (11 SPDRs+SMH from 2016; XLRE from 2015-10, XLC from 2018-06). PARTIAL: borrow |
+| gatev 2006 / rad-low-faff 2016 / do-faff 2010 & 2012 pairs (the stat-arb researcher) | adjusted bars, industry classification, borrow fees | COVERED: bars. PARTIAL: GICS is current only. NO: borrow fees |
+| lou-polk-skouras 2019 overnight/intraday (the stat-arb researcher) | adjusted open and close | COVERED: adjusted open/close daily; intraday bars NO (next step) |
+| tadi-kortchemski 2021 crypto pairs (the stat-arb researcher) | crypto | OUT OF SCOPE (crypto dropped) |
+| crypto-tsmom-liu-tsyvinski-2021 (the macro strategist) | BTC/ETH daily | OUT OF SCOPE (crypto dropped; deprecated files exist) |
+| frazzini-pedersen-2014 BAB (the derivatives researcher/PC) | adjusted daily returns, market, RF | COVERED (bars, FF RF/Mkt). AQR BAB copy in the derivatives researcher's _public_data |
+| moskowitz-grinblatt-1999 industry momentum (the derivatives researcher) | sector ETF history >10y, PIT GICS | PARTIAL: ETFs from 2016 only in store (Alpaca SIP starts 2016); GICS current only |
+| jegadeesh-1990 ST reversal (the derivatives researcher) | daily returns, FF ST_Rev | COVERED |
+| novy-marx-2013 gross profitability; AFP-2019 QMJ; sloan-1996 accruals (the derivatives researcher) | PIT fundamentals with filing dates, market cap | PARTIAL: XBRL companyfacts (filed-date PIT, 2014+ filings) and market_cap_daily (approx.); bank/insurer tags and multi-class caveats |
+| bernard-thomas-1989 PEAD; martineau-2022 (the derivatives researcher/sentiment researcher) | earnings dates+timing, EPS actuals, consensus | COVERED: dates/timing (EDGAR PIT), EPS actuals (XBRL, Nasdaq). PARTIAL: consensus (Nasdaq, not PIT) |
+| jegadeesh-kim-krische-lee-2004 rec changes (the sentiment researcher) | analyst recommendations | NO (paid: I/B/E/S) |
+| cohen-malloy-pomorski-2012 insiders (the sentiment researcher) | Form 4 filings, ticker-CIK map | PARTIAL: ticker-CIK map COVERED; Form 4 not pulled (free on EDGAR, next step) |
+| ke-kelly-xiu-2019 / price-2012 call tone (the sentiment researcher) | news text / call transcripts | NO (Alpaca news is pullable, transcripts are paid) |
+| greenwood-sammon-2025 index effect (the sentiment researcher) | S&P add/drop dates + announcement dates, bars | PARTIAL: effective dates COVERED; announcement dates NO (Wikipedia has effective date only) |
+| tsmom-moskowitz 2012; trend-century 2017 (the macro strategist) | cross-asset ETF adjusted bars 15y+, T-bill | PARTIAL: 49 ETFs from 2016 only (Alpaca limit); BIL plus FF RF as T-bill; pre-2016 needs another source |
+| carry-koijen 2018 (the macro strategist) | rates curves, futures, dividend yields | NO (futures/rates not in store); dividends for ETFs COVERED |
+| pre-fomc-drift-lucca-moench-2015 (the macro strategist) | FOMC timestamps, intraday SPY | PARTIAL: FOMC calendar COVERED 2016-2027; intraday SPY NO (next step) |
+| macro-announcement-premium-savor-wilson-2013 (the macro strategist) | macro release calendar, SPY/IEF/TLT/BIL TR | PARTIAL: TR COVERED; release calendar BLOCKED (see Blockers) |
+| daniel-moskowitz-2016; barroso-santa-clara-2015 (the risk manager) | SPY daily 2y+, momentum factor daily | COVERED (SPY TR, FF Mom daily) |
+| khandani-lo-2011 (the risk manager) | fundamentals B/M, E/P, earnings surprise | PARTIAL (XBRL + earnings events) |
 | moreira-muir-2017, ledoit-wolf-2004, HRP-2016, beta-estimation (PC) | 10y+ clean PIT daily returns, factors | COVERED (10.8y SIP from 2016-01; FF factors back to 1926/1963) |
 | garleanu-pedersen-2013 (PC) | per-name costs/borrow | PARTIAL: SIP volume/vwap/trade_count; no borrow fees |
-| kaminski-lo-2014 stop-loss (Rachel) | daily returns | COVERED for ETFs/stocks; the paper's futures data NO |
-| frazzini-israel-moskowitz-2018, almgren-chriss, perold, ATHL (Tomas) | SIP volume/ADV, intraday for impact | PARTIAL: SIP daily volume/vwap COVERED; intraday/quotes NO |
-| Victor's references (HLZ, DSR, PBO, McLean-Pontiff) | none (methodology) | n/a |
+| kaminski-lo-2014 stop-loss (the risk manager) | daily returns | COVERED for ETFs/stocks; the paper's futures data NO |
+| frazzini-israel-moskowitz-2018, almgren-chriss, perold, ATHL (the TCA owner) | SIP volume/ADV, intraday for impact | PARTIAL: SIP daily volume/vwap COVERED; intraday/quotes NO |
+| The review's references (HLZ, DSR, PBO, McLean-Pontiff) | none (methodology) | n/a |
 
-Dave's numbered requests:
+The derivatives researcher's numbered requests:
 1. SIP adjusted+raw incl. former members: COVERED.
 2. PIT membership per date, start_known resolved: COVERED (`start_date_filled`, monthly panel).
 3. Delisting returns: PARTIAL (47 matched 2020+; pre-2020 null).
@@ -397,7 +397,7 @@ It works from any desk venv: it needs only the stdlib, pandas and pyarrow, plus 
   - `alfred_vintages(id, start, end)`: every vintage of each observation, with `realtime_start`/`realtime_end`.
     - Uses output_type=1. FRED allows at most 2000 vintage dates per request, so the real-time axis is split into chunks of 1900 vintage dates and re-merged.
   - `fred_vintage_dates(id)`, `fred_series_info(id)`, `fred_release_dates(release_id)` (e.g. 18 = H.15), and the raw `fred_get` / `fred_get_all`.
-- **Point-in-time reads from the local store**, which is how Maya and every other reader should consume the data:
+- **Point-in-time reads from the local store**, which is how the macro strategist and every other reader should consume the data:
   - `alfred_asof(id, asof_et)` gives the value of each observation as known at `asof` (naive = New York time), using only vintages with `available_at_et <= asof`.
   - `alfred_first_available(id)` gives the "as first available" view.
   - `alfred_store(id)` gives all stored vintages.
@@ -413,7 +413,7 @@ y10 = ddc.alfred_asof("DGS10", "2022-04-04 17:00")  # what was known at 17:00 ET
 hy = ddc.alfred_asof("BAMLH0A0HYM2", pd.Timestamp("2026-10-29 22:30", tz="Asia/Singapore"))
 ```
 
-### 13. ALFRED vintage datasets (Maya: curve / carry / credit): frozen, dated, sha256-verified
+### 13. ALFRED vintage datasets (the macro strategist: curve / carry / credit): frozen, dated, sha256-verified
 Built by `pipelines/alfred_store.py`; observation start 2004-01-01. Every run writes **new dated, read-only (0444) files**. Earlier files are never overwritten. Check them with `sha256sum -c SHA256SUMS_<group>_<YYYYMMDD>.txt`.
 
 | group | dir | series | rows (vintages / obs) | coverage |
@@ -462,11 +462,11 @@ Built by `pipelines/alfred_store.py`; observation start 2004-01-01. Every run wr
 The live store is mutable: fixes land in place (v1.0, v1.1, ...). A snapshot hash alone does not freeze content, because the live files can be replaced after hashing. A **release** is a read-only copy (`chmod -R a-w`) of every data file. Its manifest hashes the copies.
 | version | top_hash | files | notes |
 |---|---|---|---|
-| v1.2 | 8972e558626bc70d38c4ec5d4ea8f74b73c872545aab1f6d26f4f86e78bac4d3 | 1,939 | first frozen release. Includes bars/daily/raw, security master v1.2b, VIX, index, macro. Earnings captured mid Victor fix #2 (final earnings fixes go to v1.3). See `releases/v1.2/RELEASE.md` |
-| v1.3 | d137eea39928ec8d27b4e8ace5266c01bf74a81ca7e6d07a9d84f9a71b6dc13a | 1,939 | Dave freeze pin. v1.2 bars unchanged; Fix-2-final earnings (`edgar_8k_202` d0735831…, `earnings_events` 83feda17…). SIP methodology doc 5e0767ce…. SUE not included (addendum). See `releases/v1.3/RELEASE.md` |
+| v1.2 | — | 1,939 | first frozen release. Includes bars/daily/raw, security master v1.2b, VIX, index, macro. Earnings captured mid validation fix #2 (final earnings fixes go to v1.3). See `releases/v1.2/RELEASE.md` |
+| v1.3 | — | 1,939 | derivatives researcher freeze pin. v1.2 bars unchanged; Fix-2-final earnings (`edgar_8k_202`, `earnings_events`). SIP methodology doc. SUE not included (addendum). See `releases/v1.3/RELEASE.md` |
 - Releases v1.0/v1.1 were never frozen. By 02:10 SGT, `earnings_events`, `edgar_8k_202` and `ticker_cik_map` no longer matched the v1.1 manifest, so v1.1 content cannot be reproduced.
 - **Policy:** cut a new frozen release after each fix batch (`releases/v1.3/`, ...), never overwrite one, and append to `snapshots/CHANGELOG.md`. Researchers read from `releases/<version>/...` and cite **release version + top_hash**. Verify with the snippet in RELEASE.md.
-- **Dave batch pin (2026-11-06):** use `releases/v1.3/` (top_hash d137eea39928ec8d27b4e8ace5266c01bf74a81ca7e6d07a9d84f9a71b6dc13a). SIP bar definitions: `docs/SIP_DAILY_BAR_METHODOLOGY.md` (sha256 5e0767cef725197d69f67b4334b4a3dcaaa2a15dbacc426692a7addb99370b8d). SUE table not in v1.3.
+- **Derivatives researcher batch pin (2026-11-06):** use `releases/v1.3/`. SIP bar definitions: `docs/SIP_DAILY_BAR_METHODOLOGY.md`. SUE table not in v1.3.
 ```python
 R = "$QR_DATA_DIR/releases/v1.2"
 raw = pd.read_parquet(f"{R}/bars/daily/raw")
@@ -474,31 +474,31 @@ tr = pd.read_parquet(f"{R}/bars/daily/total_return/daily_total_return.parquet")
 ```
 
 ## Staleness reporting (added 2026-11-06 06:15 SGT)
-- Module/check: `lib/staleness.py` (sha256 cce474fe52303c9065a3062ea8b46ff48f3223ed015b491949ac204c93c8ef8a). It writes one JSON per dataset to `staleness/<dataset>.json`, using the max observation column of the newest parquet (not mtime).
+- Module/check: `lib/staleness.py`. It writes one JSON per dataset to `staleness/<dataset>.json`, using the max observation column of the newest parquet (not mtime).
 - Check command: `.venv/bin/python lib/staleness.py [dataset...]`. It exits 1 if any dataset is STALE or MISSING.
 - Hooked after commit (it never changes a script exit code) into daily_bars.py, total_return.py, assets_snapshot.py, earnings_forward.py, update_sp500_index.py, and alfred_store.py (credit group).
 - Release pins (releases/, snapshots/) are not tracked; they are frozen by design.
 - **Schedule reality:** there is NO local scheduler (no cron or systemd timers). Only three Grok Bot routines exist (S&P 16:50 ET, next-earnings 06:30 ET, borrow 08:00 ET), and they failed from 10-30 to 11-05 because of missing usage. Nothing else refreshes unless someone runs it. Freshness is not guaranteed.
-- 06:14 SGT check: FRESH for index_sp500, bars_daily, total_return, credit_oas (2026-11-04), earnings_forward, and assets_borrow. STALE: vix_vix3m (2026-10-28), which has no build script. Not tracked/stale: earnings_events and corporate_actions (left alone during the Victor fixes).
+- check: FRESH for index_sp500, bars_daily, total_return, credit_oas (2026-11-04), earnings_forward, and assets_borrow. STALE: vix_vix3m (2026-10-28), which has no build script. Not tracked/stale: earnings_events and corporate_actions (left alone during the review fixes).
 ## Immutable component reconciliation (2026-11-06, 06:49 SGT)
 
-### Ethan 8-K Item 2.02 timestamp component — optional additive only
-- `/derived/earnings_events_8k202_v1.parquet` sha256 `d568a60d19348ad2948083df6a95f64e501f25615d773cdac14ebd9629216d2e` remains a **timestamps/event-spine additive component only**, not a replacement for v1.3 `edgar_8k_202` or multi-source `earnings_events`; not a SUE-ready input, v1.4, return-bearing authorization or a full complete press-release package.
-- Immutable addendum: `/derived/earnings_events_8k202_v1_reconciliation/DECISION.md` sha256 `94921e0e8c95a61b14134a257f48e781d5086f5882f0660d25243b82d26bb926`, `accession_union_diff.parquet` sha256 `028c154716d33a0687f10af27af636b241bbad7a406d625f6a6f5b069440b6ce`, `reconciliation_summary.json` sha256 `1d74142c9bfc9e7e883b0a54fce061d675ddad683e9c2137e98ea352443aab5e`, `build_reconciliation.py` sha256 `336775f823f5afa6f3e57b8e9f6c4d7d2fbdf6bbc4660e970e3483980be1f3ac`. Local independent check verified every documented count and SHA256; all five addendum files are mode 0444.
-- Canonical parent remains v1.3 `d137eea39928ec8d27b4e8ace5266c01bf74a81ca7e6d07a9d84f9a71b6dc13a`. Its EDGAR table `d0735831…` is event-symbol grain (29,519 rows/28,768 unique accessions); Ethan is accession grain (31,467). Reconciled union is 31,913: 28,322 shared with exactly equal UTC acceptance and first-open-session fields; 446 v1.3-only = 397 withheld as cluster member + 49 AA/EVHC identity mapping; 3,145 Ethan-only = 2,807 intentional 2015 extension + 338 requiring lineage review. 131 shared accessions retain CIK alias/display differences; 133 v1.3-only contain an 8-K/A in forms (NOT an assertion of amended public-content timing). These are bounded/known gaps, not silent superset or complete-identity coverage.
-- Victor disposition measured from file bytes: `6eb132f1ee9e5fd65cb48e49828ed2e63b16fc54fe46dcc98b89406082e4474f`, `$QR_DESK_DIR/validation/prereg_rulings/2026-11-06-ethan-8k202-pit-review.md`. ACCEPT INPUT TIMESTAMP TABLE only, not main promotion/SUE. Do not mix cluster-first vs keep-all-actings enumeration policies in one trial; need explicit dual-pin/versioned trial pin when optional component used. v1 files and README remain byte-identical and read-only.
-- Future v2 by Ethan (new immutable paths) must restore/support AA & EVHC lineage, preserve all component CIK aliases, reason-code the diffs and separately audit late/partial siblings/amendments and EX-99 timing/content. First SEC acceptance is not inferred as full release-public evidence. No source table was silently repaired.
+### Sentiment researcher 8-K Item 2.02 timestamp component — optional additive only
+- `/derived/earnings_events_8k202_v1.parquet` remains a **timestamps/event-spine additive component only**, not a replacement for v1.3 `edgar_8k_202` or multi-source `earnings_events`; not a SUE-ready input, v1.4, return-bearing authorization or a full complete press-release package.
+- Immutable addendum: `/derived/earnings_events_8k202_v1_reconciliation/DECISION.md`, `accession_union_diff.parquet`, `reconciliation_summary.json`, `build_reconciliation.py`. Local independent check verified every documented count and SHA256; all five addendum files are mode 0444.
+- Canonical parent remains v1.3. Its EDGAR table is event-symbol grain (29,519 rows/28,768 unique accessions); the sentiment researcher is accession grain (31,467). Reconciled union is 31,913: 28,322 shared with exactly equal UTC acceptance and first-open-session fields; 446 v1.3-only = 397 withheld as cluster member + 49 AA/EVHC identity mapping; 3,145 sentiment-researcher-only = 2,807 intentional 2015 extension + 338 requiring lineage review. 131 shared accessions retain CIK alias/display differences; 133 v1.3-only contain an 8-K/A in forms (NOT an assertion of amended public-content timing). These are bounded/known gaps, not silent superset or complete-identity coverage.
+- Review disposition measured from file bytes, the internal review record. ACCEPT INPUT TIMESTAMP TABLE only, not main promotion/SUE. Do not mix cluster-first vs keep-all-actings enumeration policies in one trial; need explicit dual-pin/versioned trial pin when optional component used. v1 files and README remain byte-identical and read-only.
+- Future v2 by the sentiment researcher (new immutable paths) must restore/support AA & EVHC lineage, preserve all component CIK aliases, reason-code the diffs and separately audit late/partial siblings/amendments and EX-99 timing/content. First SEC acceptance is not inferred as full release-public evidence. No source table was silently repaired.
 
 ### Gate primary-calendar candidate — DATA usable for replay but adoption WITHHELD
-- `/earnings/gate/DATA_ADOPTION_WITHHELD.md` is the controlling disposition for this candidate: **Historical disposition of the original rejection**—Rachel has since re-verified the corrected gate (signed2026-11-06~06:54 SGT); exact state below: **pin replacement/cutover is false** and old accepted Risk pin registry is unchanged. Tables 20261105 retain exact observed hashes (`earnings_events` `0fc428f4…`, `nasdaq_calendar` `f8c60088…`, sidecar `8c9cfe2d…`) for independent replay, not for Risk adoption. Future-bias note: future rows are schedules/estimates, not proof a company announced a forthcoming date. `fetched_at_utc` is provenance of my fetch, not company knowledge time; EDGAR acceptance belongs to realised filings, not advance confirmation of a future earnings release.
-- Hana currently found 20 forecasts incorrectly marked confirmed by consumer branch, skipping estimate buffer; 11 names fell outside required warning/entry window and three had late/wrong exits. Previous 0 stale-fail-safe count was source-freshness behavior ONLY, not an all-clear. Raw hashes still validate content integrity, not policy correctness. Do not point production construct at candidate; no construct/target rerun by Dmitri. Full fail-safe state/CIO hold remains until consumer correction + independent tests + Rachel Risk re-verification. Unknown AVGO stays unknown; BAC/JNJ carried-forward records are explicitly NOT freshly rechecked.
+- `/earnings/gate/DATA_ADOPTION_WITHHELD.md` is the controlling disposition for this candidate: **Historical disposition of the original rejection**—the risk manager has since re-verified the corrected gate (signed2026-11-06~06:54 SGT); exact state below: **pin replacement/cutover is false** and old accepted Risk pin registry is unchanged. Tables 20261105 retain exact observed hashes (`earnings_events`, `nasdaq_calendar`, sidecar) for independent replay, not for Risk adoption. Future-bias note: future rows are schedules/estimates, not proof a company announced a forthcoming date. `fetched_at_utc` is provenance of my fetch, not company knowledge time; EDGAR acceptance belongs to realised filings, not advance confirmation of a future earnings release.
+- The portfolio-construction check found 20 forecasts incorrectly marked confirmed by consumer branch, skipping estimate buffer; 11 names fell outside required warning/entry window and three had late/wrong exits. Previous 0 stale-fail-safe count was source-freshness behavior ONLY, not an all-clear. Raw hashes still validate content integrity, not policy correctness. Do not point production construct at candidate; no construct/target rerun. The full fail-safe state and the trading hold remain until consumer correction + independent tests + risk re-verification. Unknown AVGO stays unknown; BAC/JNJ carried-forward records are explicitly NOT freshly rechecked.
 - `/earnings/next_earnings/` sidecar stored dates are unbuffered. Estimated short/entry window = 15 sessions before earliest candidate; long-buffer release = 5 sessions before; preserve minimum actual candidate dates and exact exit contracts in consumer, not hack dates stored in data. Required future explicit forecast-vs-company-confirmed metadata does not authorize retroactively altering pinned candidate bytes.
 
 
-- **Signed gate correction / exact pin + read-only shadow CLOSED:** `risk/2026-11-06-earnings-gate-reverification.md` initial `36444f8c6d0b517481c44a90ee42b9e2aa5e1a70df9322bec17058fddd7753e9` / measured `5bed339814684a58cb126c05192bddf11f33e1e150cc1b5dd6ede060c777b3a3` (parent-stated `97802a456d332fb4cc04acfaa0e50fa12fbd1f1541f279adc8d6ad1b1de323e8` recorded separately). Owner final `f66ddb29…` (shadow `ae9becb0…`); sidecar pin `8c9cfe2d…`. Evidence 7/14/70/3; targets unchanged; hold/tradable false. Status `EXACT_GATE_SIDECAR_READ_ONLY_SHADOW_CLOSED_NO_PRODUCTION_TRADING`; scope `read_only_shadow_closed_exact_gate_sidecar`; `eval_safety=false`; no production construct/trades. Historic `earnings/gate/DATA_ADOPTION_WITHHELD.md` retained.
+- **Signed gate correction / exact pin + read-only shadow CLOSED:** `risk/2026-11-06-earnings-gate-reverification.md` initial / measured (parent-stated recorded separately). Owner final (shadow); sidecar pin. Evidence 7/14/70/3; targets unchanged; hold/tradable false. Status `EXACT_GATE_SIDECAR_READ_ONLY_SHADOW_CLOSED_NO_PRODUCTION_TRADING`; scope `read_only_shadow_closed_exact_gate_sidecar`; `eval_safety=false`; no production construct/trades. Historic `earnings/gate/DATA_ADOPTION_WITHHELD.md` retained.
 
 ### Routine/staleness source truth — current override of earlier statements above
 - Routine records enabled as of 06:49 SGT: S&P ~16:50 ET, earnings evidence (forward+gate-only+sidecar) ~06:30 ET weekdays, borrow ~08:00, daily bars/total return ~19:00, credit ~11:30, VIX ~22:00 (all NY local dates except VIX clock schedule). The earlier statement "only three routines" was true at 06:15 and is superseded. Routines are not a local croned scheduler; do not assume silently successful runs; inspect current run result.
 - Actual scripts: `/pipelines/daily_bars.py`, `/pipelines/total_return.py`, `/pipelines/update_vix_vix3m.py`, `/pipelines/alfred_store.py`, `/pipelines/earnings_forward.py`, `/pipelines/earnings_gate_refresh.py` (gate calendar only; sidecar parameterized future build not yet supported), `/pipelines/update_sp500_index.py`, `/pipelines/assets_snapshot.py`. Primary gate orchestrator is data candidate only, not production approval; routine earns source observations even when not adopted. Some reported prior routine errors were lacking plan usage, NOT data/source faults; don't relabel.
 - `lib/staleness.py` current sha256 must be read live, not copied from earlier revisions. It also contains a pointer/written-hash `earnings_gate_calendar` record: no overwritten timestamps or lexicographic date shortcut, observation-time basis `fetched_at_utc` aligned to NYSE session. If record says FRESH or STALE it refers narrowly to source freshness, **not** estimated/confirmed gate correctness or investor permission.
-- 06:41 verified snapshot: VIX latest published source session Nov4 `0b565c415d03a886950a3cdebe8f45f0ceca71525ad3cdf6d5c3bb217298a786`; Nov5 source session pending (no fabricated observation). S&P and forward-earnings through Nov5 fresh; next-sidecar fresh 94; exact-gate read-only shadow closed (no production trading). TSC parked with NO full/creeping backfill. No future data artifact/output generated by these documentation notes.
+- 06:41 verified snapshot: VIX latest published source session Nov4; Nov5 source session pending (no fabricated observation). S&P and forward-earnings through Nov5 fresh; next-sidecar fresh 94; exact-gate read-only shadow closed (no production trading). TSC parked with NO full/creeping backfill. No future data artifact/output generated by these documentation notes.

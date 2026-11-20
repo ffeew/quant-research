@@ -6,19 +6,19 @@
 
 **Slippage retraction.**
 - The pilot slippage figures I quoted earlier (+837 / +480 / +246 / −126 bps) are **retracted**. They came from a TCA time-zone bug and were benchmarked against pre-market quotes.
-- Corrected figures vs the NBBO mid at submission (Tomas, `tca/baseline_report.md` §2): CAT 3.82, GOOGL 1.32, XLE 0.73, LLY 7.63 bps; mean 3.14 bps. MA was 2.20 bps.
+- Corrected figures vs the NBBO mid at submission (the TCA owner, `tca/baseline_report.md` §2): CAT 3.82, GOOGL 1.32, XLE 0.73, LLY 7.63 bps; mean 3.14 bps. MA was 2.20 bps.
 - The wrong figures appeared only in my chat report. A grep of every file I own found none.
 - Costs now follow `baseline_report.md` §5 (see §1 and §4).
 
 **BAB card.**
-- Dave overwrote `research/papers/frazzini-pedersen-2014-betting-against-beta.md`. I did **not** edit that file. Per the new desk rule, BAB as a signal is Dave's.
-- My construction material is now `research/papers/beta-estimation-and-neutralisation.md`, a reference card citing Frazzini–Pedersen 2014 and Novy-Marx–Velikov 2022. It cites Dave's replication in `research/replication/frazzini-pedersen-2014-betting-against-beta/` (read only).
+- `research/papers/frazzini-pedersen-2014-betting-against-beta.md` was overwritten by its signal owner; this report did **not** edit it. BAB as a signal belongs to the academic-replications track.
+- My construction material is now `research/papers/beta-estimation-and-neutralisation.md`, a reference card citing Frazzini–Pedersen 2014 and Novy-Marx–Velikov 2022. It cites the derivatives researcher's replication in `research/replication/frazzini-pedersen-2014-betting-against-beta/` (read only).
 - My temporary `…--construction.md` file has been removed.
 - My REGISTRY row now points at the new slug. No other owner's row was touched.
-- Ownership of the main BAB card is pending Jeremy. Note that no REGISTRY row now references that slug: Dave or Jeremy should add one.
+- Ownership of the main BAB card is open. No REGISTRY row now references that slug; one should be added.
 
-**Maya's notes.** `$QR_SCRATCH_DIR/maya-notes/vol-managed-duplicate-draft.md` was read only and treated as data.
-- Only items I verified against Moreira–Muir (2017) or Cederburg et al. (2020) were folded into my MM card, cited as "notes from Macro Strategist (Maya)":
+**the macro strategist's notes.** A scratch notes draft (vol-managed duplicate) was read only and treated as data.
+- Only items I verified against Moreira–Muir (2017) or Cederburg et al. (2020) were folded into my MM card, cited as "notes from Macro Strategist (the macro strategist)":
   - Table IV turnover, alpha and break-even;
   - Table V weight percentiles;
   - the COWY counts.
@@ -31,11 +31,11 @@
 
 **Implementation.** See FRAMEWORK.md §8; v1 is archived at `archive/construct_v1_2026-10-30.py`.
 - `--fallback derisk` is the default.
-- `--victor_passed` is empty, since no Victor PASS exists as of 2026-10-30.
+- `--validator_passed` is empty, since no validation PASS exists as of 2026-10-30.
 - The default cost model is `--cost_model tca`:
   - per side = measured pilot half-spread (or bucket default) + 0.75·σ·√(Q/ADV20) + H;
   - ADV is SIP where measured, else IEX × 21.6, the median SIP/IEX ratio over the 5 pilot names;
-  - plus 25 bp/yr borrow (a Tomas assumption).
+  - plus 25 bp/yr borrow (a TCA owner assumption).
 - Per-side costs for 2026-10-30: min 2.43, median 5.01, max 9.82 bps.
 
 **Tradable book: `targets_2026-10-30.json` (DE-RISK ONLY, tradable).**
@@ -69,7 +69,7 @@
 - That leaves 94 single stocks. MMC was dropped for <99% coverage.
 - Two data sources:
   1. `data.json` (IEX, about 290 bars, 2025-07..2026-10-28).
-  2. Dave's `statarb/data/daily_bars.json` (IEX, adjusted, from 2020-07; read only). Same 94 names, so a longer but **survivorship-biased** sample (today's names).
+  2. The derivatives researcher's `statarb/data/daily_bars.json` (IEX, adjusted, from 2020-07; read only). Same 94 names, so a longer but **survivorship-biased** sample (today's names).
 
 **Methods.**
 - (a) **IV:** inverse-vol.
@@ -95,7 +95,7 @@
 - data.json gives only 167 OOS days (34 weekly rebalances) after a 120-day lookback. Its Sharpe CIs span about 4.5 units, so treat it as indicative only.
 - statarb gives 1,448 OOS days (2021-01..2026-10), which is better, but uses a survivorship-biased universe on the IEX feed.
 - Close-to-close fills.
-- Neither sample meets Victor's ≥10y PIT bar.
+- Neither sample meets the review's ≥10y PIT bar.
 
 #### A. statarb bars, L120, weekly: N=94, OOS 2021-01-20..2026-10-28 (1448 days, 290 rebalances)
 
@@ -281,18 +281,18 @@ GP map (ℓ → a/γ, τ): ℓ=0.5: (0.366, 0.7321), ℓ=2: (1.000, 0.5000), ℓ
    - GP tradable de-risk files (`research/gp_runs/ell_*`) still pass every hard limit. Their trims are smaller than the default de-risk, e.g. ℓ = 2 gives XLE 146→101 and GOOGL −35→−21.
    - **Fix before enabling GP:** re-project the blended weights onto the beta constraint, or put the |β| constraint on the blended weights inside the optimiser.
 4. **Parameters.**
-   - ℓ = λ/γ is not yet calibrated. λ needs Tomas's per-name costs at our size, and γ the desk's risk aversion.
-   - φ_k uses signal autocorrelation as a proxy for alpha decay. Proper IC-decay curves need Victor-validated signals.
+   - ℓ = λ/γ is not yet calibrated. λ needs the TCA owner's per-name costs at our size, and γ the book's risk aversion.
+   - φ_k uses signal autocorrelation as a proxy for alpha decay. Proper IC-decay curves need validated signals.
    - Measured mean φ on statarb: MOM_12_1 0.031, RS63 0.096, TREND 0.050, REV5 0.992. On data.json, at the latest 120 days: MOM 0.018, RS63 0.121, TREND 0.071, REV5 1.0, PEAD 0.362.
 
 ## 4. Recommendations
 
 1. **Adopt LW δ\*** in construct.py in place of fixed δ = 0.5, logging δ* each run. Keep MV-LW as the primary risk model.
-2. **Do not adopt HRP.** Re-test on ≥10y PIT data from Dmitri.
+2. **Do not adopt HRP.** Re-test on ≥10y PIT data from the data owner.
 3. **Recalibrate risk forecasts.** Either scale forecasts by the trailing realised/forecast ratio, or set the ex-ante cap to about 5% to deliver about 6%.
 4. **Keep GP off** until the beta re-projection is in and ℓ is calibrated. Then a τ of about 0.5 (ℓ ≈ 2) is a reasonable starting point: about 40% less cost for <1% TE on risk books.
 5. **Keep the de-risk fallback.** Decide whether de-risk trims follow the shadow book (current) or limits only.
-6. **Costs.** Keep the TCA §5 model as default and flat 10 bp as stress. k (0.75 vs 1.0) and live borrow are open. GOOGL and XLE per-side costs are below Victor's 5 bp bar, so validation should still use ≥5 bp.
+6. **Costs.** Keep the TCA §5 model as default and flat 10 bp as stress. k (0.75 vs 1.0) and live borrow are open. GOOGL and XLE per-side costs are below the review's 5 bp bar, so validation should still use ≥5 bp.
 
 ## 5. Files
 
@@ -307,8 +307,8 @@ GP map (ℓ → a/γ, τ): ℓ=0.5: (0.366, 0.7321), ℓ=2: (1.000, 0.5000), ℓ
 **Read only:**
 - `tca/*`
 - `statarb/data/daily_bars.json`
-- Dave's BAB card and replication
-- Maya's notes
+- The derivatives researcher's BAB card and replication
+- the macro strategist's notes
 - `data.json`, `positions.json`, `orders_status.json`, `performance/history.csv`
 
 ## Addendum (01:32 SGT): LIMITS.md alignment run (construct.py v0.3)
@@ -338,12 +338,12 @@ GP map (ℓ → a/γ, τ): ℓ=0.5: (0.366, 0.7321), ℓ=2: (1.000, 0.5000), ℓ
 
 ## Addendum 2 (01:35 SGT): LW δ* and risk-forecast inflation (construct.py v0.4, CIO-approved)
 - **Covariance.** construct.py now uses the Ledoit–Wolf (2004) optimal constant-correlation δ* (own implementation, same as `lw_cc`). On 2026-10-30, δ* = **0.0858** over 120 days (average correlation 0.087). Fixed 0.5 stays available as `--shrinkage fixed`.
-- **Risk inflation k = 1.25** applies only to the ex-ante vol in the 6% cap. Source: the §2 forecast bias of 1.15–1.37 for MV on Dave's bars (MV-LW 1.20 [1.10, 1.30]). It does not stack with the sleeve m.
+- **Risk inflation k = 1.25** applies only to the ex-ante vol in the 6% cap. Source: the §2 forecast bias of 1.15–1.37 for MV on the derivatives researcher's bars (MV-LW 1.20 [1.10, 1.30]). It does not stack with the sleeve m.
 - **Realised vs targeted vol.** MV-LW, 6% cap applied as c = min(1, 6%/(k·σ̂)) with the rest in cash; L120 weekly, 10 bp; stationary bootstrap, block 10, 2,000 reps. Script: `research/volcap_wf.py`; outputs: `research/out/volcap_{statarb,datajson}_L120_w.json`.
 
 | Data | k | Realised vol [95% CI] | Realised / 6% | Mean ex-ante (raw → inflated) | Bias [95% CI] | 63d windows > 6% | Mean scale c |
 |---|---|---|---|---|---|---|---|
-| Dave's statarb bars, 2021-01-20 → 2026-10-28 (1,448 days, 290 rebal.) | 1.00 | 7.19% [6.62, 7.79] | 1.20 | 6.00% → 6.00% | 1.20 [1.10, 1.30] | 73% | 0.69 |
+| The derivatives researcher's statarb bars, 2021-01-20 → 2026-10-28 (1,448 days, 290 rebal.) | 1.00 | 7.19% [6.62, 7.79] | 1.20 | 6.00% → 6.00% | 1.20 [1.10, 1.30] | 73% | 0.69 |
 | | **1.25** | **5.75% [5.30, 6.24]** | **0.96** | 4.80% → 6.00% | 1.20 [1.10, 1.30] | 37% | 0.55 |
 | data.json, 2026-03-03 → 2026-10-28 (167 days, 34 rebal.) | 1.00 | 7.02% [5.96, 8.03] | 1.17 | 5.97% → 5.97% | 1.17 [1.00, 1.34] | 81% | 0.89 |
 | | **1.25** | **5.63% [4.79, 6.44]** | **0.94** | 4.80% → 6.00% | 1.17 [1.00, 1.34] | 40% | 0.72 |
@@ -357,9 +357,9 @@ GP map (ℓ → a/γ, τ): ℓ=0.5: (0.366, 0.7321), ℓ=2: (1.000, 0.5000), ℓ
 
 ## Addendum 3 (~01:55 SGT): k re-estimated on ≥10 years of PIT data, L/S shadow construction (v0.5)
 
-> **PROVISIONAL – data defects pending Dmitri's fixes.** Victor's 2026-10-30 data_issues.json applies to the store this addendum uses: missing delisting returns, former-member and predecessor history gaps, and SNDK ticker reuse. See Addendum 4 for exposure and a sensitivity check. k stays 1.25.
+> **PROVISIONAL – data defects pending the data owner's fixes.** the review's 2026-10-30 data_issues.json applies to the store this addendum uses: missing delisting returns, former-member and predecessor history gaps, and SNDK ticker reuse. See Addendum 4 for exposure and a sensitivity check. k stays 1.25.
 
-**Data check (Dmitri, `$QR_DATA_DIR/`, read-only):**
+**Data check (the data owner, `$QR_DATA_DIR/`, read-only):**
 - **Span and coverage:** `bars/daily/adjusted/` covers SIP daily bars from **2016-01-04 → 2026-10-28** (10.81 years). There are 774 files for 772 symbols:
   - 503 current S&P 500 members;
   - 220 former members removed since 2016, including delisted names;
@@ -420,7 +420,7 @@ GP map (ℓ → a/γ, τ): ℓ=0.5: (0.366, 0.7321), ℓ=2: (1.000, 0.5000), ℓ
 - Raising k is not supported on average. The residual risk is regime-specific (2020), and a static k cannot fix it. That is the job of panic and the breakers.
 
 **Survivorship / PIT caveats:**
-1. **Membership** is PIT but reconstructed from Wikipedia, not S&P's official record, with 26 anomalies flagged by Dmitri.
+1. **Membership** is PIT but reconstructed from Wikipedia, not S&P's official record, with 26 anomalies flagged by the data owner.
 2. **Survivorship:** only names that were members on or after 2016 are present. Pre-2016 leavers are absent. That does not matter for a universe drawn from members on date t ≥ 2016, but former members' histories end at delisting.
 3. **Delistings:** 47 matched terminal returns were applied on the session after the last bar. Unmatched names (null terminal return) got 0% on exit. Held this way: ESRX, APC, CELG, XLNX and TWTR, all acquisitions, weights ≤ 3.6%. Bankruptcies such as SIVB, FRC and SBNY were not held, but a −100% would not be captured if they were.
 4. **Sectors:** GICS is **current, not PIT**, and null for former members. Those names are unconstrained by sector caps, which slightly loosens the sector constraint historically.
@@ -430,22 +430,22 @@ GP map (ℓ → a/γ, τ): ℓ=0.5: (0.366, 0.7321), ℓ=2: (1.000, 0.5000), ℓ
 8. **Performance:** the Sharpe and drawdown figures are reported only for context. They are not evidence for any signal.
 
 
-## Addendum 4 (02:10 SGT): LIMITS alignment (then cited as v0.2; current header v0.3.5) (construct.py v0.6) and Victor's data defects
+## Addendum 4: LIMITS alignment (then cited as v0.2; current header v0.3.5) (construct.py v0.6) and the review's data defects
 
 ### A. Data defects: what is affected
-Source: `validation/backtests/pead_long_pit/data_issues.json` and `results.md` (Victor; read-only).
-- **Affected, now marked PROVISIONAL – data defects pending Dmitri's fixes:**
+Source: `validation/backtests/pead_long_pit/data_issues.json` and `results.md` (review; read-only).
+- **Affected, now marked PROVISIONAL – data defects pending the data owner's fixes:**
   - the Addendum 3 k re-estimate: `research/ls_volcap_wf.py`, `research/out/ls_volcap_sip_N100_w.json`, `ls_volcap_sip_N100_all5_w.json` and their `_daily.csv`;
   - the v2 re-runs below.
-  - This is the only output of mine built on Dmitri's SIP/PIT store.
+  - This is the only output of mine built on the data owner's SIP/PIT store.
 - **Not affected:**
   - today's shadow and tradable books, and their betas, vols, LW Σ and sleeve m / σ_target;
   - the statarb/data.json walk-forwards (§2, Addendum 2, `research/out/volcap_*`, `riskmodels_*`).
-  - Reason: they use data.json (Alpaca IEX) or Dave's statarb bars. The data.json universe has 120 symbols (117 for statarb). Intersected with the 220 former members, or with SNDK, it is empty. The intersection with Victor's 59 no-bar symbols is {LIN} only, and LIN's defect is in Dmitri's store (Praxair history before 2018-10-31), not in data.json.
-- The new earnings gate reads Dmitri's `data/earnings/` calendar. That is a separate dataset. It uses forward Nasdaq dates for current names and avoids `first_tradable_session` (Victor's DURING_MKT defect). It is listed in `data_provenance`, not marked provisional.
+  - Reason: they use data.json (Alpaca IEX) or the derivatives researcher's statarb bars. The data.json universe has 120 symbols (117 for statarb). Intersected with the 220 former members, or with SNDK, it is empty. The intersection with the validator's 59 no-bar symbols is {LIN} only, and LIN's defect is in the data owner's store (Praxair history before 2018-10-31), not in data.json.
+- The new earnings gate reads the data owner's `data/earnings/` calendar. That is a separate dataset. It uses forward Nasdaq dates for current names and avoids `first_tradable_session` (the review's DURING_MKT defect). It is listed in `data_provenance`, not marked provisional.
 
 ### B. Exposure of the k backtest to the defects, and a sensitivity check (PROVISIONAL)
-`research/ls_volcap_wf.py` v2 (the v1 copy is in `archive/`) adds exposure tracking and `--exclude_defects`, which drops Victor's 59 symbols plus SNDK. Re-running without exclusion reproduces Addendum 3 exactly. Logs: `research/out/log_ls_{base,base_x,all5,all5_x}_v2.txt`; JSON: `ls_volcap_sip_N100_*_v2.json`.
+`research/ls_volcap_wf.py` v2 (the v1 copy is in `archive/`) adds exposure tracking and `--exclude_defects`, which drops the review's 59 symbols plus SNDK. Re-running without exclusion reproduces Addendum 3 exactly. Logs: `research/out/log_ls_{base,base_x,all5,all5_x}_v2.txt`; JSON: `ls_volcap_sip_N100_*_v2.json`.
 
 | Weights | k | Defects | Realised vol [CI] | Bias [CI] | Mean former / defect names in top-100 | Gross share former / defect | Defect names held |
 |---|---|---|---|---|---|---|---|
@@ -460,7 +460,7 @@ Source: `validation/backtests/pead_long_pit/data_issues.json` and `results.md` (
 - **Reading:** the bias and the k = 1.25 conclusion do not move when the defect names are dropped. But exclusion is not a fix:
   - it cannot restore missing predecessor history or the 0% delisting exits;
   - it removes names, which is itself a survivorship tilt.
-  - So the result stays **PROVISIONAL** until Dmitri's fixes, and will be re-run then. **k unchanged at 1.25.**
+  - So the result stays **PROVISIONAL** until the data owner's fixes, and will be re-run then. **k unchanged at 1.25.**
 
 ### C. LIMITS v0.2 changes and the re-run
 - Changes: see FRAMEWORK v0.6, §4a.1–4a.3, 4a.7 and 4a.8.
@@ -471,10 +471,10 @@ Source: `validation/backtests/pead_long_pit/data_issues.json` and `results.md` (
   - m: momentum 0.451, trend 0.464, reversal 0.572, event 0.675.
 
 ## Addendum 5 (02:25 SGT): DESK_RULES #5 data sources, store_pit sleeve proxy, shadow v2 (construct.py v0.7)
-> **PROVISIONAL: data defects are pending Dmitri's fixes.** This applies to the sleeve m / σ_target below (the store_pit proxy).
+> **PROVISIONAL: data defects are pending the data owner's fixes.** This applies to the sleeve m / σ_target below (the store_pit proxy).
 
 **Data sources (DESK_RULES #5)**
-- History comes only from Dmitri's store (v1.1 6e6353ec…, coverage end 2026-10-28), read through `desk_data_client`.
+- History comes only from the data owner's store (v1.1, coverage end 2026-10-28), read through `desk_data_client`.
 - The live row comes from SIP 5-min bars through the client.
 - construct.py no longer reads data.json and makes no direct HTTP calls.
 - The research scripts default to the store.
@@ -490,7 +490,7 @@ Source: `validation/backtests/pead_long_pit/data_issues.json` and `results.md` (
 | event | 14.06% / 9.49% / 0.675 | 11.11% / 5.98% / 0.539 |
 
 - Proxy days: 2,521–2,715 (from 2016) vs 1,370–1,564 before.
-- Victor's 59 defect symbols (SNDK among them) are excluded, leaving ≈482 PIT members per day on average.
+- The review's 59 defect symbols (SNDK among them) are excluded, leaving ≈482 PIT members per day on average.
 - Source: the `risk_overlays.vol_scaling` fields of `shadow/targets_20261030T020824SGT.json` and `shadow/targets_20261030T022224SGT.json`.
 
 **Signal study on SIP history (same 420-day window as before)**

@@ -1,4 +1,4 @@
-"""Residual momentum (Blitz, Huij & Martens 2011) on Dmitri's SIP total returns, PIT S&P 500. Dave, 2026-10-30 (v2).
+"""Residual momentum (Blitz, Huij & Martens 2011) on the data owner's SIP total returns, PIT S&P 500. The derivatives researcher, 2026-10-30 (v2).
 Codified rules (base params; every number below is a parameter perturbed +/-20% in the sensitivity grid):
   Universe at month-end t: PIT S&P 500 members (membership interval contains t) with a bar on t.
   Fit: OLS with intercept of daily excess returns on FF3 (Mkt-RF, SMB, HML) over (t - fit_months, t - skip_days],

@@ -10,12 +10,12 @@ Timing / no look-ahead: trading day d gets every article with created_at in
   [09:30 ET of session d-1, 09:25 ET of session d)   (primary, "prev-open window")
   [16:00 ET of session d-1, 09:25 ET of session d)   (variant, "overnight only")
   Position opened at the OPEN of d, returns open(d)->open(d+1) ("1d") and open(d)->open(d+5) ("5d").
-Universe: stock must be a point-in-time S&P 500 member on d (Dmitri's file via ../desk_data.py).
-  Old tickers (e.g. FB) are mapped to current file symbols (META) using aliases.csv (from Dmitri's
+Universe: stock must be a point-in-time S&P 500 member on d (the data owner's file via../desk_data.py).
+  Old tickers (e.g. FB) are mapped to current file symbols (META) using aliases.csv (from the data owner's
   corporate_actions name_changes) for news dated before the change.
 Tests per day: (i) long-short = EW long all score>0 minus EW short all score<0;
   (ii) decile spread D10-D1 on days with >= 30 scored stocks. Stats: N days, hit rate, mean,
-  t-stat clustered by calendar month. Net = Tomas's cost model v1.1 (tca/tca_scripts/cost_model.py):
+  t-stat clustered by calendar month. Net = the TCA owner's cost model v1.1 (tca/tca_scripts/cost_model.py):
   round trip at the open by liquidity bucket (lagged 20d $ADV), assuming each leg fully turns over every
   day (r1); r5 = 5-day cohort return net of one round trip per leg, + ETB borrow 25 bp/yr on the short leg; 2x stress too.
 Components (kept separate; panels saved to OUT/stock_day_scores.parquet and OUT/sector_day_scores.parquet):
@@ -71,7 +71,7 @@ class DeskStore(Protocol):
 dd = cast(DeskStore, _desk_data)
 
 sys.path.insert(0, f"{_QR.COSTS_DIR}")
-from quant_research.backtest.costs import cost_model as tca  # Tomas's plug-in cost model v1.1 (read-only use)
+from quant_research.backtest.costs import cost_model as tca  # The TCA owner's plug-in cost model v1.1 (read-only use)
 
 # round-trip cost (bps) per liquidity bucket, $10k clip at $50, venue='open' (we trade at the open)
 _ADV = {"L1": 2e9, "L2": 5e8, "L3": 1e8, "L4": 2e7}
@@ -98,7 +98,7 @@ vader = SentimentIntensityAnalyzer()
 
 # analyse only months completed in the PRIMARY raw dir (alias dir only supplements those months)
 months_loaded = sorted(fn.split("/")[-1][:7] for fn in glob.glob(f"{a.raw[0]}/*.jsonl"))
-# ---- OOS LOCK (Victor, 2026-10-30): months before 2025-06 are the untouched hold-out for
+# ---- OOS LOCK (the review, 2026-10-30): months before 2025-06 are the untouched hold-out for
 # PREREG_sector_lm_5d.md. They are skipped unless NEWS_OOS_UNLOCK equals the sha256 of the frozen
 # pre-registration file AND that hash is recorded in PREREG_sector_lm_5d.sha256 (written only at freeze).
 import hashlib
@@ -114,7 +114,7 @@ _ok = (
     and _unlock
     and _unlock == hashlib.sha256(open(_pr, "rb").read()).hexdigest() == open(_ph).read().split()[0]
 )
-# Sequencing (Victor final ruling X1 / interim #4): even with a valid unlock, this exploratory script (36 cells,
+# Sequencing (validation final decision X1 / interim #4): even with a valid unlock, this exploratory script (36 cells,
 # VADER, analyst cells) may touch hold-out months only AFTER the single gating run (prereg_run.py) is logged.
 sys.path.insert(0, f"{_QR.DESK_DIR}/equity")
 from quant_research.strategies.news_sentiment import holdout_guard as _hg
@@ -305,7 +305,7 @@ for comp in ("rating_chg", "pt_chg"):
     res[f"analyst_{comp}"] = daily_tests(sd, comp, "prev_open", deciles=False)
     variants += 1
     res[f"analyst_{comp}"]["stock_days"] = int(len(sd))
-# Stock-day panel with all components kept separate (for Victor)
+# Stock-day panel with all components kept separate (for review)
 P = ex[ex.in_primary]
 txt = (
     P[~P.is_analyst]

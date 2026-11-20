@@ -184,7 +184,7 @@ def validate_mock_gate(g: dict[str, Any], virtual_documents: dict[str, bytes]) -
     if g.get("p1_owner_authorized_at_freeze") is not True:
         raise Blocked("P1 owner confirmation/current freeze re-pin pending")
     if g.get("tomas_binding_signature_verified") is not True or g.get("victor_cost_pin_at_freeze") is not True:
-        raise Blocked("signed cost applicability plus Victor freeze pin required")
+        raise Blocked("signed cost applicability plus validator freeze pin required")
     return True
 
 

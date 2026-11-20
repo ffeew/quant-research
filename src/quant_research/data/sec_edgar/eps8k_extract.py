@@ -1,6 +1,6 @@
 """(a) EX-99.1 EPS extractor for 8-K Item 2.02 press releases.
 
-For each 8-K accession: locate EX-99.1 (from Ethan's ex99_url when available, else the EDGAR filing index),
+For each 8-K accession: locate EX-99.1 (from the sentiment researcher's ex99_url when available, else the EDGAR filing index),
 fetch it through sec_http (cached, <= 8 req/s, User-Agent from SEC_USER_AGENT), and extract:
   eps_diluted_reported : GAAP diluted EPS for the quarter (primary); if only an unlabeled per-share figure exists,
                          that figure with eps_basis = 'unlabeled-per-share'; NaN if only non-GAAP is reported
@@ -336,7 +336,7 @@ def choose(cands: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def find_ex99(cik: int, accession: str) -> tuple[str | None, str | None]:
-    """EX-99.1 URL from the EDGAR filing index (used until Ethan's ex99_url is available)."""
+    """EX-99.1 URL from the EDGAR filing index (used until the sentiment researcher's ex99_url is available)."""
     nod = accession.replace("-", "")
     idx = f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{nod}/{accession}-index.htm"
     h = sec_http.get(idx).decode("utf-8", "replace")

@@ -336,7 +336,7 @@ Full table:
   - +0.68% at 20d over the full sample; OOS 2022+ +0.51% (month-mean t 0.05).
   - Long side (AR0 ≥ +4%): +1.54% at 60d over the full sample (NW t 2.85), but OOS +0.63% (t 0.76–1.56).
   - Short side (AR0 ≤ −4%): −0.92% at 60d (reversal) over the full sample (t −1.3 to −1.75); OOS −0.65% (t −0.5 to −0.8).
-- **Conclusion:** Ethan's qualitative conclusion holds. Large-cap earnings drift is weak or absent recently, and shorting big negative reactions has not paid. This agrees with my bracket backtest, where the PEAD short legs lose in every period.
+- **Conclusion:** the sentiment researcher's qualitative conclusion holds. Large-cap earnings drift is weak or absent recently, and shorting big negative reactions has not paid. This agrees with my bracket backtest, where the PEAD short legs lose in every period.
 
 ## E4. Trials and significance
 - Their `results.json` reports **192 test cells with a t-stat**, excluding the unsigned baselines:

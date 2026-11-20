@@ -1,7 +1,7 @@
-# fiscal_diag_s6b.py - S6b rerun of prereg v5 §2 step-4 fiscal-label diagnostic under Victor ruling 2495e0cd (S1,S2,S4,S5)
-# as amended by Erratum 1 (7584b5b5...099b; S3 and S4 denominator replaced by the DUE-quarter rule).
-# Based on fiscal_diag_s6.py (e238440f); only S3/S4 logic changed, plus: S2 months are READ from the frozen table
-# FYE_MONTH_FROZEN.tsv (67d7eab8, copied byte-for-byte) and cross-checked against the S1 recomputation; EDGE is a parameter.
+# fiscal_diag_s6b.py - S6b rerun of prereg v5 §2 step-4 fiscal-label diagnostic under validation decision (S1,S2,S4,S5)
+# as amended by Erratum 1 (S3 and S4 denominator replaced by the DUE-quarter rule).
+# Based on fiscal_diag_s6.py; only S3/S4 logic changed, plus: S2 months are READ from the frozen table
+# FYE_MONTH_FROZEN.tsv (copied byte-for-byte) and cross-checked against the S1 recomputation; EDGE is a parameter.
 # DEV metadata only: annual FYE cut, earnings_dev.csv, transcript LABELS/status from coverage_transcripts.tsv (index only).
 # No transcript file opened. No returns, no sentiment, no holdout, no network.
 from __future__ import annotations
@@ -15,6 +15,7 @@ from typing import Any, cast
 import pandas as pd
 
 from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DATA_DIR, ...)
+from quant_research.utils.pins import desk_pin
 
 OUT = f"{_QR.DESK_DIR}/research/original/sentiment_returns_fiscal_diag_s6b_20261111"
 PA = f"{_QR.DATA_DIR}/av_annual_fye_dev_20261111/annual_fye_dev.csv"
@@ -22,9 +23,9 @@ PE = f"{_QR.DATA_DIR}/av_returns_events_20261111/partitioned/dev/earnings_dev.cs
 PC = f"{_QR.DATA_DIR}/av_sentiment_20261110/clean/coverage_transcripts.tsv"
 PF = f"{OUT}/FYE_MONTH_FROZEN.tsv"
 SHA = {
-    PA: "c6b8a9507e9d27255e1ecbe767f8f8538da7023175662b7fff73f01dd347f351",
-    PE: "cb6a4e6fa7ba0a98850f38a717f6510a8ef9b80c91076edb8815beb96b473982",  # per dev/SHA256SUMS (b835e488), checked before run
-    PF: "67d7eab8140fb62a64983df54b2ca775acae0ad39d5d3d185fd96aed705ec326",
+    PA: desk_pin("strategies.sentiment_returns.fiscal_diag_s6b", "SHA[0]"),
+    PE: desk_pin("strategies.sentiment_returns.fiscal_diag_s6b", "SHA[1]"),  # per dev/SHA256SUMS, checked before run
+    PF: desk_pin("strategies.sentiment_returns.fiscal_diag_s6b", "SHA[2]"),
     PC: None,
 }
 for p, h in SHA.items():
@@ -78,7 +79,7 @@ def due_date(Y: int, m: int, n: int) -> dt.date:
     return qend(Y, m, n) + dt.timedelta(LAG)
 
 
-# ---- S1/S2: frozen m read from FYE_MONTH_FROZEN.tsv (67d7eab8); recomputed from DEV annual rows as a cross-check only
+# ---- S1/S2: frozen m read from FYE_MONTH_FROZEN.tsv; recomputed from DEV annual rows as a cross-check only
 syms = sorted(set(E.symbol) | set(A.symbol) | set(C.symbol))
 F = pd.read_csv(PF, sep="\t", dtype=str)
 M = {r.symbol: int(cast(str, r.fye_month)) for r in F.itertuples() if r.status == "FROZEN"}

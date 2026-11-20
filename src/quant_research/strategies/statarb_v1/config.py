@@ -18,7 +18,7 @@ EXECS = (
     "close_t1",
 )  # signal at close t; trade at open(t+1) [MOO] or close(t+1) [MOC]; MOC after 15:50 ET is rejected so no same-close
 AUM_GROSS = (10e6, 100e6, 1e9)  # gross book sizes for size-dependent impact (baseline = first)
-K_BASE, K_STRESS = 0.75, 1.0  # sqrt-impact coefficient (Tomas cost_model v1.1)
+K_BASE, K_STRESS = 0.75, 1.0  # sqrt-impact coefficient (TCA owner cost_model v1.1)
 BORROW_BASE, BORROW_STRESS = 0.0025, 0.0050
 MIN_ADV = 2e7  # $ ADV floor for eligibility
 STRATEGIES: dict[str, tuple[str, dict[str, Any]]] = {
@@ -34,7 +34,7 @@ STRATEGIES: dict[str, tuple[str, dict[str, Any]]] = {
 }
 
 # ---------------- v1 variant grid (PRE-REGISTERED 2026-10-30 ~01:40 SGT, before any v1 result was seen) ----------------
-# Priority (Tomas): cut turnover -> wider AL bands and a no-trade buffer. Selection rule, fixed in advance: within each
+# Priority (the TCA owner): cut turnover -> wider AL bands and a no-trade buffer. Selection rule, fixed in advance: within each
 # family pick the variant with the best DEV (2017-2021) net Sharpe under the desk-standard cost floor, exec=open_t1;
 # the holdout is then read once for that pick. All variants are logged as trials (DSR N, PBO matrix).
 AL_BANDS = {
@@ -136,7 +136,7 @@ PRIOR_TRIALS = [
     ),
 ]
 # Cost scenarios. 'std' = desk STANDARD.md section 5 floors: per side max(TCA, floor + half-spread), floor 5 bps
-# large (L1/L2), 10 mid (L3), 20 small (L4), 2 bps ETFs; borrow 1%/yr. Verdicts use std / std_2x.
+# large (L1/L2), 10 mid, 20 small, 2 bps ETFs; borrow 1%/yr. Verdicts use std / std_2x.
 SCENARIOS = {
     "tca_base": dict(k=0.75, borrow=0.0025, mult=1.0, floor=False),
     "tca_stress": dict(k=1.0, borrow=0.0050, mult=1.0, floor=False),
