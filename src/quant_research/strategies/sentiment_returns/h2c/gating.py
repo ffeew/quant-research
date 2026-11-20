@@ -9,7 +9,7 @@ from .config import PURGE_COUNT_KEYS, Partition
 from .errors import ConfigError, PartitionError, PurgeMismatch, SchemaError
 from .schema import ISO_DATE, PURGE_HEADER
 
-SCORED_STATUSES = ("candidate", "included", "excl_quarter_lt20_events")
+SCORED_STATUSES = ("candidate", "included", "excl_quarter_lt_min_events")
 
 
 def read_purge_row(text: str, boundary: str, n_data_rows: int | None = None) -> dict[str, int]:
