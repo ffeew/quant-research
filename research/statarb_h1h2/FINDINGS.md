@@ -23,7 +23,7 @@ ratio (DSR) and purged cross-validation land in a later PR. No DEV run yet; no r
   positions; hedge = sector SPDR (SPY if it has < 252 sessions).
 - Execution: signal at the close of t, fill at the close of t+1, first return t+1 -> t+2 (H1 and H2
   alike); each session trades at most 1% of 20-day ADV and the unfilled rest carries forward.
-- Costs: every trade pays at least the desk standard's per-side minimum (5 bps large-cap, 10 bps
+- Costs: every trade pays at least the standard's per-side minimum (5 bps large-cap, 10 bps
   mid-cap, 20 bps small-cap/thin, 2 bps liquid ETFs, each plus half-spread); required path uses >= 10%/yr borrow on every historically unknown short, ETF hedges included;
   impact k = 1.0 base (0.75 is a lighter sensitivity); 1%/yr general-collateral path is a labelled
   counterfactual only.
@@ -32,7 +32,7 @@ ratio (DSR) and purged cross-validation land in a later PR. No DEV run yet; no r
 - Trial count N = 212 for the deflated Sharpe ratio. Stage A (DEV) pass bar: net Sharpe > 0.85 on the
   required cost path with the predicted sign; a fail ends the idea and the holdout stays closed.
 
-## Fixes after the validator's review (harness only; the sealed desk runner is unchanged)
+## Fixes after review (harness only; the sealed runner is unchanged)
 - **B1, look-ahead in H1.** H1 used to hold each tranche on its own signal bar, so it effectively
   filled at the signal close. Each tranche is now held from the next session, the same as H2: a
   signal at t first earns t+1 -> t+2.
@@ -50,7 +50,7 @@ ratio (DSR) and purged cross-validation land in a later PR. No DEV run yet; no r
   actually held (a capped exit still open when a name delists is bound on what is left), and a
   name with no print can't trade. ADV20 is the trailing window ending the session before the fill
   day, and a name with no ADV history can't trade (cap 0). The cost-floor table cites its source,
-  the desk validation STANDARD cost floor.
+  the validation STANDARD cost floor.
 - Third review:
   - **Fill timing.** A fill at close j-1 used to be priced and print-checked on row j, so an
     exit at a name's real last print was settled without its cost and a name could trade on a
@@ -80,7 +80,7 @@ ratio (DSR) and purged cross-validation land in a later PR. No DEV run yet; no r
     all use that rule. No normal fill is possible on a positive close with zero volume. Gross
     is explicitly zero past the last tradable print, even if the input return frame has stale
     nonzero returns. The forced settlement is charged at the stress cost at the last real close.
-  - **Named one-way stress.** `STRESS_ONE_WAY_COST_MULT = 2.0` is the desk's explicit choice:
+  - **Named one-way stress.** `STRESS_ONE_WAY_COST_MULT = 2.0` is an explicit choice:
     twice the one-way cost of a forced trade priced with no ADV. It is NOT borrowed from the
     cost model's round-trip break-even multiple. The L4 minimum plus half-spread holds only
     under `FlooredCostModel`, not the bare `SharedCostModel`. A numeric test pins 2.0 and the

@@ -89,7 +89,7 @@ class SharedCostModel:
     """Default: the repo's shared cost model at the close (MOC) venue, borrow on a 360-day basis
     over calendar days.
 
-    The desk's frozen pre-registered cost path can be injected instead (same protocol)."""
+    The frozen pre-registered cost path can be injected instead (same protocol)."""
 
     def one_way_bps(
         self,
@@ -111,7 +111,7 @@ class SharedCostModel:
 
 
 # Source: backtest/engine.py:39-40 (the 5/5/10/20 bp L1-L4 floor table and the 2 bp ETF floor),
-# i.e. the desk validation STANDARD cost floor: per-side minimum = asset-class floor + half-spread.
+# i.e. the validation STANDARD cost floor: per-side minimum = asset-class floor + half-spread.
 # The shared cost model (quant_research.backtest.costs.cost_model) has no floor table; its
 # BUCKETS / liq_bucket give the L1-L4 buckets and the half-spread used here. Cost-model buckets map
 # L1/L2 -> large (5 bps), L3 -> mid (10 bps), L4 -> small / thin (20 bps); liquid ETFs 2 bps. A
@@ -182,8 +182,8 @@ FORCED_CUT = "zero_adv_cut"  # cut toward 0 with no usable ADV (cap 0): allowed,
 FORCED_SETTLEMENT = "post_last_print_settlement"  # held remainder closed at the last close
 # Stress cost on forced trades: STRESS_ONE_WAY_COST_MULT x the ONE-WAY cost of that trade, priced
 # with no ADV (the smallest liquidity bucket). Under FlooredCostModel that one-way cost is at least
-# the L4 floor plus half-spread; under the bare SharedCostModel there is no floor. 2.0 is a desk
-# choice for the one-way stress. It is deliberately NOT cost_model.net_edge's stress_mult, which
+# the L4 floor plus half-spread; under the bare SharedCostModel there is no floor. 2.0 is an
+# explicit choice for the one-way stress. It is deliberately NOT cost_model.net_edge's stress_mult, which
 # is a round-trip break-even multiple and is not reused here as a one-way multiple.
 STRESS_ONE_WAY_COST_MULT = 2.0
 
@@ -253,7 +253,7 @@ def _fills(
             adv_sh = (adv / px) if (np.isfinite(adv) and adv > 0) else None
             if adv_sh is None:
                 # no usable ADV: cap 0, never left uncapped. It may not grow, but may always be cut
-                # toward 0 (review ruling), at the stress cost.
+                # toward 0, at the stress cost.
                 h = float(held.loc[str(s)])
                 cut = _cut_only(h, float(target.loc[str(s)])) - h
                 fill.loc[str(s)] = cut
