@@ -11,3 +11,70 @@ findings = "research/sentiment_returns/FINDINGS.md"
 [data]
 root_env = "QR_DATA_DIR"
 requires = ["av news sentiment", "bars/daily"]
+
+# H2-C library parameters (quant_research.strategies.sentiment_returns.h2c). Method constants only, per the
+# pre-registration; holdout expected counts are runtime inputs ($QR_H2C_HOLDOUT_EXPECTED), never stored here.
+[h2c]
+universe = ["AAPL", "ABBV", "ADBE", "AMD", "AMZN", "AVGO", "BA", "BAC", "C", "CAT", "CMCSA", "COST", "CRM", "CSCO",
+            "CVX", "DIS", "GE", "GOOGL", "GS", "HD", "HON", "INTC", "JNJ", "JPM", "KO", "LLY", "MA", "MCD", "META",
+            "MRK", "MS", "MSFT", "NFLX", "NKE", "NVDA", "ORCL", "PEP", "PFE", "PG", "QCOM", "SBUX", "T", "TSLA",
+            "TXN", "UNH", "V", "VZ", "WFC", "WMT", "XOM"]
+hedge = "SPY"
+beta_n = 252
+h0 = 1
+h1 = 21
+lag = 100
+nprior_max = 4
+nprior_min = 2
+tone_min = 10
+q_min_events = 20
+quantile_div = 5
+cost_side = 0.0010
+cost_side_sens = 0.0020
+borrow = 0.10
+nw_lag = 1
+g1_min_t = 2.0
+g2_alpha = 0.01
+g2_ic_frac = 0.5
+
+[h2c.partitions.DEV]
+lo = "2014-01-01"
+hi = "2020-12-31"
+score_lo = "2015-01-01"
+scored_years = [2015, 2020]
+g0_min_quarters = 22
+purge_window = ["2020-11-01", "2020-12-31"]
+purge_boundary = "2020"
+
+[h2c.partitions.HOLDOUT]
+lo = "2010-01-01"
+hi = "2013-12-31"
+score_lo = "2011-01-01"
+scored_years = [2011, 2013]
+g0_min_quarters = 11
+purge_window = ["2013-11-01", "2013-12-31"]
+purge_boundary = "2013"
+exclude_mapped_before = "2010-01-01"
+
+# H3 library parameters (quant_research.strategies.sentiment_returns.h3). Method constants only. Unsettled design
+# choices (flat_clears_band_memory, drift_renormalise_legs, sector_ic_method, n_universe) are deliberately absent
+# here; set them explicitly before use. Data locations and integrity pins are runtime inputs, never stored here.
+[h3]
+window_sessions = 20
+window_sessions_fast = 5
+min_items = 5
+min_names = 40
+min_leg = 5
+long_in = 0.80
+long_hold = 0.60
+short_in = 0.20
+short_hold = 0.40
+rel_min = 0.50
+nw_lag = 4
+cost_side = 0.0010
+cost_side_sens = 0.0020
+beta_n = 252
+quantile_div = 5
+cutoff_hhmm = [15, 30]
+hedge = "SPY"
+research_only = ["MSTR"]

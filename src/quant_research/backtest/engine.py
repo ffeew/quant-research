@@ -1,4 +1,4 @@
-"""Daily portfolio simulator: Tomas's cost model v1.1 (read-only import) with Victor's STANDARD.md v1.0 minimums.
+"""Daily portfolio simulator: typed cost-model adapter (v1.1-identical totals) with Victor's STANDARD.md v1.0 minimums.
 Dave, 2026-10-30 (v2).
 
 Conventions
@@ -23,16 +23,12 @@ Conventions
 
 from __future__ import annotations
 
-import sys
 from typing import Any, cast
 
 import numpy as np
 import pandas as pd
 
-from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DATA_DIR, ...)
-
-sys.path.insert(0, f"{_QR.COSTS_DIR}")
-from quant_research.backtest.costs import cost_model as cm
+from quant_research.backtest.costs import engine_compat as cm
 
 BOOK_USD = 100_000.0  # desk paper account equity ~ $100k (risk/2026-10-30-pilot-positions-review.md)
 BORROW_RATE = 0.01  # Victor §5 GC minimum
@@ -76,10 +72,12 @@ def trade_costs(
             venue=venue,
             trade_date=date.date(),
         )
-        b = tc["bucket"].split()[0]
-        hs = cm.BUCKETS[tc["bucket"]][1]
+        bucket = tc["bucket"]
+        tomas_bps = tc["total_bps"]
+        b = bucket.split()[0]
+        hs = cm.BUCKETS[bucket][1]
         floor = (ETF_FLOOR if s in etfs else VICTOR_FLOOR[b]) + hs
-        rows.append((date, s, d, b, tc["total_bps"], floor, max(tc["total_bps"], floor), sh / a if a > 0 else np.nan))
+        rows.append((date, s, d, b, tomas_bps, floor, max(tomas_bps, floor), sh / a if a > 0 else np.nan))
     return pd.DataFrame(
         rows, columns=["date", "symbol", "dw", "bucket", "tomas_bps", "victor_floor_bps", "bps", "participation"]
     )

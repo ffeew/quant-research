@@ -1,0 +1,58 @@
+# Example transaction-cost parameters for the typed cost model in
+# quant_research.backtest.costs.model. Values are published-example rates for
+# illustration only, not a recommendation or a trading authorization. Replace
+# them from the named public sources when those sources update.
+#
+# Load with any TOML parser and pass the mapping to CostSchedule.from_mapping;
+# the cost module itself performs no I/O.
+
+ceil_fees_to_cent = true
+
+[commission]
+# Example: $0 per-share / per-contract / per-order commission, as advertised on
+# several public retail-broker equity commission schedules. Optional bounds
+# (min_per_order, max_per_order) apply to commission only, before the cent ceiling.
+per_share = "0"
+per_contract = "0"
+per_order = "0"
+
+[regulatory.sec_section_31]
+# SEC Section 31 fee, FY2026 fee-rate advisory: $20.60 per $1,000,000 of covered sales.
+basis = "per_dollar_notional"
+applies_to = "sell"
+rate = "0.0000206"
+
+[regulatory.finra_taf]
+# FINRA Trading Activity Fee for covered equity sales (FINRA TAF rate notices).
+# Example rate $0.000195 per share, cap $9.79 per trade. min_price skips the fee
+# when the reference price is below the per-share rate (published TAF rule).
+basis = "per_share"
+applies_to = "sell"
+rate = "0.000195"
+cap = "9.79"
+min_price = "0.000195"
+
+[regulatory.cat]
+# Example CAT pass-through, per share, both sides (public broker fee schedules).
+basis = "per_share"
+applies_to = "both"
+rate = "0.000003"
+
+# Per-contract components are supported generically. They are omitted from the
+# default example (rate would be taken from the OCC clearing-fee schedule and
+# from exchange Options Regulatory Fee circulars). Including a per-contract
+# component does not imply that listed options are traded.
+
+[spread]
+# half_spread with fraction=1 is standard marketable crossing (pay the half-spread).
+# fraction_of_spread with fraction=0.5 is the same crossing assumption.
+mode = "half_spread"
+fraction = "1"
+
+[impact]
+# Unhaircut square-root impact: k * sigma * sqrt(participation) of notional.
+# k=1 is a conservative published-order-of-unity coefficient (Almgren, Thum,
+# Hauptmann, Li 2005; Toth, Lemperiere, Deremble, de Lataillade, Kockelkoren,
+# Bouchaud 2011). linear is also supported: k * sigma * participation of notional.
+model = "sqrt"
+k = "1"
