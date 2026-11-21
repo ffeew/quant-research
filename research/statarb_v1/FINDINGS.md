@@ -15,7 +15,7 @@ Dev and holdout splits as in RESULTS.md.
 ## Results
 - All 48 trials FAIL.
 - Best (AL_ETF): gross edge 5.5 bps vs 10.6 bps cost; holdout gross Sharpe 0.46; holdout net Sharpe -0.56 (desk cost floor) / -0.35 (lower base cost).
-- **Survivorship-suspect:** the sector grouping uses a current GICS snapshot that lacks delisted names, so these results are survivorship-suspect until rerun on point-in-time industry data (desk GICS-dependence audit, sha 0c6efe39). No rerun for now.
+- **Survivorship-suspect:** the sector grouping uses a current GICS snapshot that lacks delisted names, so these results are survivorship-suspect until rerun on point-in-time industry data. No rerun for now.
 
 ## Code
 - Entry point: `qr run statarb_v1` (`python -m quant_research.strategies.statarb_v1.run_all`)
