@@ -136,7 +136,7 @@ DESK_CLIENT_PATH = _pin("DESK_CLIENT_PATH")
 DESK_CLIENT_SHA256 = _pin("DESK_CLIENT_SHA256")
 PIN_RECONCILIATION_SEAL_SHA256 = _pin("PIN_RECONCILIATION_SEAL_SHA256")  # sealed SHA256SUMS of the reconciliation root
 PIN_CA_LEDGER_SHA256 = _pin("PIN_CA_LEDGER_SHA256")  # reconciled corporate-action ledger
-PIN_FACTOR_TABLE_SHA256 = _pin("PIN_FACTOR_TABLE_SHA256")  # cumulative PIT adjustment factor table
+PIN_FACTOR_TABLE_SHA256 = _pin("PIN_FACTOR_TABLE_SHA256")  # cumulative PIT adjustment factor table (desk factor table)
 PIN_FACTOR_CODE_SHA256 = _pin("PIN_FACTOR_CODE_SHA256")  # factor code (tested on synthetic fixtures)
 PIN_AV_RAW_BARS_SHA256 = _pin("PIN_AV_RAW_BARS_SHA256")  # AV raw bar file (--av-factor-sensitivity only)
 # H1 terminal roster (unresolved delisting rows), pinned.
@@ -355,7 +355,7 @@ def verify_tr_cut_sums() -> None:
 
 
 def verify_b1c_accepted() -> None:
-    """H1/H2 refuse until B1c is accepted: the accepted B1c checksum file must exist and
+    """H1/H2 refuse until B1c is accepted: the accepted B1c SUMS checksum file must exist and
     match its pin. Hash only; nothing in it is parsed."""
     if PENDING in (B1C_ACCEPTED_SUMS_PATH, B1C_ACCEPTED_SUMS_SHA256):
         raise Blocked("REFUSING: B1c not accepted (B1C_ACCEPTED_SUMS_PATH / B1C_ACCEPTED_SUMS_SHA256 PENDING).")
@@ -828,7 +828,7 @@ class DeskClientH1H2Adapter:
 
 
 def load_bars(filter_end: date, load_start: date = LOAD0, *, client: Any = None) -> dict[str, pd.DataFrame]:
-    """AV raw close x adjustment factor via the desk client, read-time end filter.
+    """AV raw close x adjustment factor (desk factor) via the desk client, read-time end filter.
 
     No hand-rolled reads of AV CSVs. No rows after filter_end.
     """
@@ -1829,7 +1829,7 @@ def main(argv: list[str] | None = None) -> int:
         pass  # ok
     # Load with read-time filters
     if args.av_factor_sensitivity:
-        bars = load_bars(filter_end)  # AV raw x adjustment factor = DECLARED SENSITIVITY only
+        bars = load_bars(filter_end)  # AV raw x adjustment factor (desk factor) = DECLARED SENSITIVITY only
     else:
         bars = load_bars_tr(filter_end)  # PRIMARY = pre-registered total return (DEV cut)
     # Extra guard: no holdout rows in DEV

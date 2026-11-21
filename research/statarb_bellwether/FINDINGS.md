@@ -12,6 +12,9 @@ n/a
 ## Method
 Frozen runner v1.3f (refuses to run until unsealed; exits 17 on import).
 
+## Successor
+Config-driven harness for further work: [../statarb_h1h2/FINDINGS.md](../statarb_h1h2/FINDINGS.md).
+
 Execution and settlement rules (shared with the H1/H2 harness):
 - **Fill timing.** A fill at close j-1 is priced, print-checked and ADV-capped on its own fill
   row, so an exit at a name's real last print pays its cost and nothing fills on a no-print day.
@@ -55,9 +58,6 @@ Print rule and costs:
   primary path. There, forward-filled rows are excluded only when they also have zero or NaN
   volume or no positive close. A missing flag counts as forward-filled only when FFILL is
   supplied.
-
-## Successor
-Config-driven harness for further work: [../statarb_h1h2/FINDINGS.md](../statarb_h1h2/FINDINGS.md).
 
 ## Results
 - No returns computed.

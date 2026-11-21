@@ -38,3 +38,7 @@ class PurgeMismatch(H2CError):
 
 class PartitionError(H2CError):  # row outside the partition
     code = 8
+
+
+class HoldoutRefusedError(PartitionError):  # the HOLDOUT partition is spent; this library never runs it
+    code = 8

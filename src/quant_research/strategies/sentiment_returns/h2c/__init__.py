@@ -8,9 +8,10 @@ Pure functions over in-memory inputs (no file or network IO here):
 - ``events``   event construction, timing filters, straddle-purge counts.
 - ``signal``   call tone and tone surprise.
 - ``target``   252-day beta and beta-adjusted forward return.
-- ``stats``    Newey-West t, per-quarter L/S metrics, G1 (DEV) and G2 (holdout) gates.
+- ``stats``    Newey-West t, per-quarter L/S metrics, G1 (DEV) and generic G2 gates.
 - ``gating``   generic partition / purge / expected-count checks.
-- ``pipeline`` end-to-end ``run_h2c`` over one partition.
+- ``pipeline`` end-to-end ``run_h2c`` over one partition. The HOLDOUT partition is spent and is refused in code
+  (``HoldoutRefusedError``); this library must not be used to run the holdout.
 
 The frozen pre-registered runner stays in ``sentiment_returns/h2c_dev_run.py``; this package is a refactor for reuse.
 

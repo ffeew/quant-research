@@ -1,0 +1,27 @@
+name: Setup uv
+description: Install the pinned uv release, select Python, and sync the lockfile.
+
+inputs:
+  python-version:
+    description: Python version to install and select
+    required: false
+    default: "3.12"
+  sync:
+    description: Run uv sync --locked after install
+    required: false
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    - name: Install uv
+      uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+      with:
+        version: "0.13.9"
+        python-version: ${{ inputs.python-version }}
+        enable-cache: true
+        cache-dependency-glob: uv.lock
+    - name: Sync lockfile
+      if: inputs.sync == 'true'
+      shell: bash
+      run: uv sync --locked
