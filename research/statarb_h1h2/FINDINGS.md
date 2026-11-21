@@ -89,7 +89,26 @@ ratio (DSR) and purged cross-validation land in a later PR. No DEV run yet; no r
     unfillable. Tests use five trailing positive zero-volume closes, check tau == last-print,
     W_adj flat from tau+1, no gross after the -100% bound, and receipt / -30% stress / charged
     settlement for a capped H2 remainder. Reverting each fix makes its regression test fail.
+  - **Two design choices kept (both conservative).** (1) Past a name's last tradable print its
+    return is blanked: the held position earns 0 gross, even where the input still carries stale
+    nonzero returns on later zero-volume closes, so no gain can be booked on a name that no longer
+    trades. (2) After the H1 -100% bound there is exactly one forced settlement of the held
+    remainder at the last real close, charged at the 2x one-way stress cost. That cost comes on
+    top of the bound and is never an exit credit, so it can only lower H1's result.
+  - **ADV20 counts non-print sessions as $0.** From a name's first tradable print on, a session in
+    the t-1 window with zero or NaN volume, no close, or a forward-filled row adds $0 to ADV20
+    rather than being skipped (skipping raised the cap). Before the first print the name has no
+    history, so the 10-session minimum still applies. A test fails if this is reverted.
+  - **FFILL is inert with this loader.** `loaders.bars_from_long` returns R, TRI, PX and VOL
+    only, and never an FFILL frame, so `tradable_mask` skips the forward-fill test for these
+    bars. The rule that a missing flag counts as forward-filled applies only when a caller
+    supplies FFILL, to its NaN cells. With this loader, forward-filled rows are excluded only when
+    they also have zero or NaN volume or no positive close.
   - Synthetic checks only; no DEV run or real returns.
+- **Borrow and session alignment.** The H1 short bound's tau -> tau+1 session is charged borrow
+  once, at max(base, source-rate bound): the overlay adds only the excess above base on tau+1,
+  then the full bound from tau+2. The weight index
+  must equal the price index (same sessions, same order), not just be a subset.
 - Not done yet: DSR and purged CV. Until they land there is no Stage A verdict, whatever a DEV
   Sharpe shows.
 

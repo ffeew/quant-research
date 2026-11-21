@@ -50,10 +50,16 @@ def last_print_index(bars: dict[str, pd.DataFrame], s: str, tp: pd.DataFrame | N
 
 
 def require_aligned(bars: dict[str, pd.DataFrame], W: pd.DataFrame) -> None:
-    """Fail closed when a weight session is not a price session (it would silently never fill)."""
-    missing = W.index.difference(bars["PX"].index)
-    if len(missing):
-        raise Blocked(f"BLOCK: {len(missing)} weight session(s) not in the price index, e.g. {missing[0]!r}.")
+    """Fail closed unless the weight index equals the price index (same sessions, same order): a
+    weight session with no price row would silently never fill, and a price session with no weight
+    row would silently skip a session's return and borrow."""
+    if not W.index.equals(bars["PX"].index):
+        extra = W.index.difference(bars["PX"].index)
+        absent = bars["PX"].index.difference(W.index)
+        raise Blocked(
+            f"BLOCK: weight index != price index ({len(extra)} weight session(s) not in the price index, "
+            f"{len(absent)} price session(s) not in the weight index, or a different order)."
+        )
 
 
 def _any(v: Any) -> Any:
@@ -220,7 +226,10 @@ def _fills(
     PX, VOL = bars["PX"], bars["VOL"]
     TP = tradable_mask(bars)
     W_exec = W.shift(1).fillna(0.0)
-    DV = (PX * VOL).mask(~TP & PX.notna(), 0.0)  # a priced non-print session trades $0
+    # Dollar volume: from a name's first tradable print on, every non-print session (zero or NaN
+    # volume, no close, forward-filled) counts as $0 traded in the ADV20 window, never skipped.
+    # Before its first print the name has no history (NaN), so min_periods still means history.
+    DV = (PX * VOL).where(TP, 0.0).where(TP.cummax())
     ADV20 = DV.rolling(20, min_periods=10).mean().shift(1)  # row k: window ending k-1; read at the fill day
     last_print = {str(c): last_print_index(bars, str(c), TP) for c in PX.columns}
     pos = {d: i for i, d in enumerate(PX.index)}
@@ -393,8 +402,8 @@ def h1_terminal_bound(
 ) -> tuple[pd.DataFrame, pd.Series, list[dict[str, Any]]]:
     """Positions stranded in unresolved terminal rows: zero the leg from tau+1 (no print there, so
     it can't fill: no exit-cost credit) and book an equity overlay at tau+1:
-    long -100% of marked value; short max(P_tau, V_max) liability plus borrow from tau+1 to
-    max(frozen exit, h). The bound applies to the position actually held into tau+1 (after the
+    long -100% of marked value; short max(P_tau, V_max) liability plus borrow through
+    max(frozen exit, h). On tau -> tau+1 charge max(base, overlay), never both. The bound applies to the position actually held into tau+1 (after the
     ADV cap), not the target: a capped exit still holding at delisting is bound on what is left.
     Fails closed (Blocked). Paths A and B coincide in this harness."""
     if path not in H1_TERMINAL_PATHS:
@@ -468,8 +477,14 @@ def h1_terminal_bound(
             rate = max(cfg.borrow_rate, float(terms.get("borrow_rate_source", 0.0)))
             per_day = costs.borrow_usd(abs(w) * AUM, 1.0, cfg) / AUM
             per_day *= rate / cfg.borrow_rate if cfg.borrow_rate > 0 else 1.0
+            # The base charges the held short on tau -> tau+1. Add only the excess needed for
+            # the source-rate bound on that session: total borrow is max(base, overlay).
+            # Thereafter the settled leg has no base borrow, so charge the full bound.
             for j in range(book_i, end_i + 1):
-                overlay.iloc[j] -= per_day * (dates[j] - dates[j - 1]).days  # calendar days, weekends accrue
+                days = (dates[j] - dates[j - 1]).days
+                bound = per_day * days
+                base = costs.borrow_usd(abs(w) * AUM, float(days), cfg) / AUM if j == book_i else 0.0
+                overlay.iloc[j] -= max(0.0, bound - base)  # calendar days, weekends accrue
             rec.update({"h": str(h_d.date()), "V_max": vmax, "liability": liab, "borrow_rate": rate})
         # flat from tau+1: the stranded amount is never traded at tau (no exit-cost credit)
         W_adj.iloc[t + 1 :, iloc_int(W_adj.columns, s)] = 0.0

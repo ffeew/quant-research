@@ -22,7 +22,8 @@ if TYPE_CHECKING:
 # h2c_dev_run.py - H2-C DEV runner (confirmatory DEV leg), FROZEN CODE, per sealed PREREG r3 + Erratum 01
 # + Erratum 02 (seal note). Method adapted from h2_dev.py (helpers copied, not imported).
 # DEV ONLY. Never opens HOLDOUT / TRANSCRIPTS_HOLDOUT / TRANSCRIPTS_EXCLUDED / ROUTE_TABLE / clean/. No network, no env vars.
-# Real run: --pull_root <dir> only (LOCK command, PREREG r3 §12; required, no default). Test run: --synthetic <cfg.json>, all paths must sit under SYNTH_ROOT.
+# Real run: --pull_root <dir> plus the five desk-input flags in REAL_INPUTS (LOCK command, PREREG r3 §12 plus
+# the input flags; all required, no defaults). Test run: --synthetic <cfg.json>, all paths must sit under SYNTH_ROOT.
 # Exit codes: 0 ok | 2 sha mismatch | 3 mapping cross-check | 4 schema | 5 LOCK slots unfilled | 6 allowlist/forbidden path
 #             7 purge mismatch | 8 partition (row outside DEV) | 9 interpreter/flags/version/import | 10 argv/config | 11 calendar
 #             12 uncaught exception BEFORE any output (coded STOP, FD-6) | 13 any STOP/exception AFTER RUN_DIR/STATS exist (FD-6, final)
@@ -45,6 +46,15 @@ SYNTH_ROOT = FREEZE_DIR + "/synthetic_test/"
 # FD-4: the AV pull copy (no scratch path). Its root is a required real-run argument (--pull_root), no default.
 PULL_ROOT_PLACEHOLDER = "<--pull_root>"
 PULL_REL = {"COPY_SUMS": "/COPY_SUMS", "PRICES_DEV": "/DEV/PRICES_DEV.json", "EARNINGS_DEV": "/DEV/EARNINGS_DEV.json"}
+# The other desk inputs are required real-run arguments too (no defaults): flag -> (what, pin keys it sets, root key it
+# sets). A *_root flag is a TRANSCRIPTS_DEV directory; its pin is <root>/SHA256SUMS.
+REAL_INPUTS = {
+    "--purge": ("the AV pull PURGE.tsv", ("PURGE",), None),
+    "--tx_dev_root": ("the transcript route TRANSCRIPTS_DEV dir", ("TX_DEV_SUMS",), "TX_DEV_ROOT"),
+    "--fye_month_frozen": ("the fiscal-diag FYE_MONTH_FROZEN.tsv", ("FYE_MONTH_FROZEN",), None),
+    "--cost_clean": ("the COST clean COST_EARNINGS_DEV_CLEAN.json", ("COST_EARNINGS_CLEAN",), None),
+    "--cost_tx_root": ("the COST delta-route TRANSCRIPTS_DEV dir", ("COST_TX_SUMS",), "COST_TX_ROOT"),
+}
 PINS = {
     "COPY_SUMS": (
         PULL_ROOT_PLACEHOLDER + PULL_REL["COPY_SUMS"],
@@ -59,24 +69,24 @@ PINS = {
         desk_pin("strategies.sentiment_returns.h2c_dev_run", "PINS.EARNINGS_DEV[1]"),
     ),
     "PURGE": (
-        f"{_QR.DESK_DIR}/validation/dmitri/h2c_av_pull_20261114_r1_inc70/PURGE.tsv",
+        "<--purge>",
         desk_pin("strategies.sentiment_returns.h2c_dev_run", "PINS.PURGE[1]"),
     ),
     "TX_DEV_SUMS": (
-        f"{_QR.DESK_DIR}/validation/dmitri/h2c_tx_route_20261114_r1_inc70/TRANSCRIPTS_DEV/SHA256SUMS",
+        "<--tx_dev_root>/SHA256SUMS",
         desk_pin("strategies.sentiment_returns.h2c_dev_run", "PINS.TX_DEV_SUMS[1]"),
     ),
     "FYE_MONTH_FROZEN": (
-        f"{_QR.DESK_DIR}/research/original/sentiment_returns_fiscal_diag_s6b_20261111/FYE_MONTH_FROZEN.tsv",
+        "<--fye_month_frozen>",
         desk_pin("strategies.sentiment_returns.h2c_dev_run", "PINS.FYE_MONTH_FROZEN[1]"),
     ),  # path+sha as pinned in h2_dev.py/L32
     # ---- LOCK SLOTS (COST decision): filled at LOCK only ----
     "COST_EARNINGS_CLEAN": (
-        f"{_QR.DESK_DIR}/validation/dmitri/h2c_cost_clean_20261114_r4_inc70/COST_EARNINGS_DEV_CLEAN.json",
+        "<--cost_clean>",
         desk_pin("strategies.sentiment_returns.h2c_dev_run", "PINS.COST_EARNINGS_CLEAN[1]"),
     ),  # The data owner's DEV-only H4 clean output for COST (after validation readback)
     "COST_TX_SUMS": (
-        f"{_QR.DESK_DIR}/validation/dmitri/h2c_cost_delta_route_20261114_r2_inc70/TRANSCRIPTS_DEV/SHA256SUMS",
+        "<--cost_tx_root>/SHA256SUMS",
         desk_pin("strategies.sentiment_returns.h2c_dev_run", "PINS.COST_TX_SUMS[1]"),
     ),  # SHA256SUMS of COST's TRANSCRIPTS_DEV delta-route partition
 }
@@ -84,8 +94,8 @@ COPY_SUMS_REL = {
     "PRICES_DEV": "DEV/PRICES_DEV.json",
     "EARNINGS_DEV": "DEV/EARNINGS_DEV.json",
 }  # FD-4: relative lines of COPY_SUMS
-TX_DEV_ROOT = f"{_QR.DESK_DIR}/validation/dmitri/h2c_tx_route_20261114_r1_inc70/TRANSCRIPTS_DEV"
-COST_TX_ROOT = f"{_QR.DESK_DIR}/validation/dmitri/h2c_cost_delta_route_20261114_r2_inc70/TRANSCRIPTS_DEV"  # LOCK SLOT: COST delta-route TRANSCRIPTS_DEV root
+TX_DEV_ROOT = "<--tx_dev_root>"
+COST_TX_ROOT = "<--cost_tx_root>"  # LOCK SLOT: COST delta-route TRANSCRIPTS_DEV root
 COST_EXCLUDED_BY_ERRATUM = False  # set True ONLY by a sealed erratum excluding COST (before any DEV result)
 COST_ERRATUM_PIN = (None, None)  # required (path, sha) when COST_EXCLUDED_BY_ERRATUM is True
 RUN_DIR = f"{_QR.DESK_DIR}/research/original/h2c_dev_run_20261114_r2"  # LOCK SLOT: new run dir (must not exist; created with 'x' semantics)
@@ -371,8 +381,32 @@ def tq(d: str) -> str:
     return f"{d[:4]}Q{(int(d[5:7]) - 1) // 3 + 1}"
 
 
+def real_inputs(S: dict[str, Any], args: list[str]) -> dict[str, Any]:
+    """Real mode: fill the PINS paths and roots from the required flags (every flag once, none empty, no default)."""
+    if len(args) % 2:
+        raise Stop(10, f"bad argv {args}")
+    given: dict[str, str] = {}
+    for flag, value in zip(args[::2], args[1::2], strict=True):
+        if (flag != "--pull_root" and flag not in REAL_INPUTS) or flag in given:
+            raise Stop(10, f"bad argv {args}")
+        given[flag] = value.rstrip("/")
+    if not given.get("--pull_root"):
+        raise Stop(10, "missing required --pull_root <dir> (AV pull copy root; no default)")
+    root = given["--pull_root"]
+    S["PINS"].update({k: (root + rel, S["PINS"][k][1]) for k, rel in PULL_REL.items()})
+    for flag, (what, keys, root_key) in REAL_INPUTS.items():
+        value = given.get(flag, "")
+        if not value:
+            raise Stop(10, f"missing required {flag} <path> ({what}; no default)")
+        for k in keys:
+            S["PINS"][k] = (value + "/SHA256SUMS" if root_key else value, S["PINS"][k][1])
+        if root_key:
+            S[root_key] = value
+    return S
+
+
 def load_config(argv: list[str]) -> dict[str, Any]:
-    """Returns (pins, settings). Real mode: constants only. Synthetic: every path must be under SYNTH_ROOT."""
+    """Returns (pins, settings). Real mode: constants plus the required input flags. Synthetic: every path must be under SYNTH_ROOT."""
     S: dict[str, Any] = dict(
         PINS=dict(PINS),
         TX_DEV_ROOT=TX_DEV_ROOT,
@@ -387,12 +421,8 @@ def load_config(argv: list[str]) -> dict[str, Any]:
     )
     if len(argv) == 1:
         raise Stop(10, "missing required --pull_root <dir> (AV pull copy root; no default)")
-    if len(argv) == 3 and argv[1] == "--pull_root":
-        root = argv[2].rstrip("/")
-        if not root:
-            raise Stop(10, "missing required --pull_root <dir> (AV pull copy root; no default)")
-        S["PINS"].update({k: (root + rel, S["PINS"][k][1]) for k, rel in PULL_REL.items()})
-        return S
+    if argv[1] == "--pull_root":
+        return real_inputs(S, argv[1:])
     if len(argv) != 3 or argv[1] != "--synthetic":
         raise Stop(10, f"bad argv {argv[1:]}")
     cp = os.path.realpath(argv[2])

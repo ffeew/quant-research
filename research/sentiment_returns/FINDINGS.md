@@ -38,5 +38,9 @@ Numbers above are copied from these documents:
 ## Status update: H2-C and H3
 - H2-C: closed. The single holdout run (2011-2013) failed the pre-registered gate on significance and on net-of-cost return; the holdout is spent and will not be rerun. See [reports/OOS_RESULT_H2C.md](reports/OOS_RESULT_H2C.md).
   - Code (reference only; `run_h2c` refuses the holdout partition): `src/quant_research/strategies/sentiment_returns/h2c/`
+  - Run command: the LOCK command in [PREREG_H2C_r3.md](reports/PREREG_H2C_r3.md) §12 predates the required-input
+    change. `h2c_dev_run.py` now refuses a real run (exit 10) unless it is given `--pull_root <dir>` (the AV pull copy
+    root) and also `--purge`, `--tx_dev_root`, `--fye_month_frozen`, `--cost_clean` and `--cost_tx_root`. None has a
+    default. Any rerun of the DEV runner needs these flags. The prereg is frozen and is not edited.
 - H3: closed; holdout never opened.
   - Code (reference only): `src/quant_research/strategies/sentiment_returns/h3/`

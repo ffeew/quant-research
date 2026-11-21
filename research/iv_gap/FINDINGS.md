@@ -22,4 +22,7 @@ Per-symbol-year cell comparisons with report and usability floors.
 ## Sources
 Numbers above are copied from these documents:
 - [reports/PREREG_v2.md](reports/PREREG_v2.md)
+  - Note: PREREG_v2.md lines 109 and 114 cite internal incident numbers (for the run-constraint ruling and the pinned
+    venv). Those records are desk-internal and are not in this repo. The quoted rule and the venv path
+    on those lines are the operative text. The prereg is frozen and is not edited.
 - [reports/RESULTS_v2_DEV.md](reports/RESULTS_v2_DEV.md)
