@@ -348,3 +348,60 @@ def test_ineligible_name_at_zero_weight_passes():
 def test_report_group_gross_skips_ineligible():
     rep = pr.build_risk_report({"AAA": 0.1, "BBB": 0.1, "CCC": 0.0}, EX, groups=_groups())
     assert rep.group_gross == {"28": pytest.approx(0.2)} and rep.passed
+
+
+# ------------------------------------------------------------------ sector_constraint_groups
+
+
+def test_sector_constraint_groups_happy_path():
+    groups = {"AAA": "28", "BBB": "36", "CCC": "28", "DDD": "13"}
+    out = sg.sector_constraint_groups(["AAA", "BBB", "CCC", "DDD"], groups)
+    assert out == {"13": ("DDD",), "28": ("AAA", "CCC"), "36": ("BBB",)}
+
+
+def test_sector_constraint_groups_deterministic_order():
+    groups = {"AAA": "28", "BBB": "36", "CCC": "28"}
+    a = sg.sector_constraint_groups(["CCC", "BBB", "AAA"], groups)
+    b = sg.sector_constraint_groups(["CCC", "BBB", "AAA"], dict(reversed(list(groups.items()))))
+    assert a == b and list(a) == ["28", "36"] and a["28"] == ("CCC", "AAA")
+    assert list(a.items()) == list(b.items())
+
+
+def test_sector_constraint_groups_ineligible_raises():
+    with pytest.raises(sg.SectorGroupError) as ei:
+        sg.sector_constraint_groups(["AAA", "BBB"], {"AAA": "28", "BBB": None})
+    assert [n for n, _ in ei.value.offenders] == ["BBB"]
+    assert "ineligible" in ei.value.offenders[0][1]
+
+
+def test_sector_constraint_groups_missing_raises():
+    with pytest.raises(sg.SectorGroupError) as ei:
+        sg.sector_constraint_groups(["AAA", "ZZZ"], {"AAA": "28"})
+    assert ei.value.offenders == (("ZZZ", "missing from group mapping"),)
+
+
+def test_sector_constraint_groups_reports_every_offender():
+    groups = {"AAA": "28", "BBB": None, "DDD": None}
+    with pytest.raises(sg.SectorGroupError) as ei:
+        sg.sector_constraint_groups(["BBB", "AAA", "CCC", "DDD", "EEE", "AAA"], groups)
+    names = [n for n, _ in ei.value.offenders]
+    assert names == ["BBB", "CCC", "DDD", "EEE", "AAA"]
+    msg = str(ei.value)
+    for n in ("BBB", "CCC", "DDD", "EEE"):
+        assert n in msg
+    assert isinstance(ei.value, SicGroupError)
+
+
+def test_sector_constraint_groups_empty():
+    assert sg.sector_constraint_groups([], {"AAA": "28"}) == {}
+
+
+def test_sector_constraint_groups_duplicate_raises():
+    with pytest.raises(sg.SectorGroupError) as ei:
+        sg.sector_constraint_groups(["AAA", "BBB", "AAA"], {"AAA": "28", "BBB": "36"})
+    assert ei.value.offenders == (("AAA", "duplicate name"),)
+
+
+def test_sector_constraint_groups_has_no_catch_all():
+    out = sg.sector_constraint_groups(["AAA"], {"AAA": "28", "BBB": None})
+    assert set(out) == {"28"}
