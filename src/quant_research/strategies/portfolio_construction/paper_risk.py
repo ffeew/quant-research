@@ -1,9 +1,9 @@
 """Typed, pure-function risk helpers for PAPER position sizing.
 
 This module is research and paper-sizing code only. It does no file, network or broker I/O,
-reads no environment variables, and holds no desk limit values: every threshold is a required
+reads no environment variables, and holds no policy limit values: every threshold is a required
 parameter or config field supplied by the caller. Numbers that appear in docstrings below are
-EXAMPLES only, not desk policy.
+EXAMPLES only, not policy.
 
 Weights are fractions of equity keyed by symbol (``{"AAA": 0.10, "BBB": -0.05}``). Long weights
 are positive, short weights negative. ``gross = sum(|w|)``, ``net = sum(w)``.
@@ -73,8 +73,8 @@ __all__ = [
     "vol_target_weights",
 ]
 
-#: Structural no-leverage ceiling. This is not a desk limit; it is the hard invariant of the
-#: module (paper sizing never borrows). Desk gross limits are supplied by the caller and must be
+#: Structural no-leverage ceiling. This is not a policy limit; it is the hard invariant of the
+#: module (paper sizing never borrows). Gross limits are supplied by the caller and must be
 #: at or below this value.
 MAX_GROSS: float = 1.0
 
@@ -178,7 +178,7 @@ def _scale_net_to_cap(weights: Mapping[str, float], cap: float) -> tuple[dict[st
 
 @dataclass(frozen=True)
 class VolTargetConfig:
-    """Vol-target parameters. All fields required; no desk defaults.
+    """Vol-target parameters. All fields required; no built-in defaults.
 
     Example values (illustrative only): ``target_vol_annual=0.10, lookback=63,
     annualisation_factor=252, gross_cap=1.0``.
@@ -357,7 +357,7 @@ _SEVERITY = {BreakerState.NORMAL: 0, BreakerState.REDUCE: 1, BreakerState.FLAT: 
 
 @dataclass(frozen=True)
 class DrawdownBreakerConfig:
-    """Drawdown breaker thresholds. All fields required; no desk defaults.
+    """Drawdown breaker thresholds. All fields required; no built-in defaults.
 
     * ``reduce_at``: current drawdown at/above which the breaker signals REDUCE.
     * ``flat_at``: current drawdown at/above which it signals FLAT (must be >= ``reduce_at``).
@@ -447,12 +447,16 @@ def run_drawdown_breaker(
 
 @dataclass(frozen=True)
 class ExposureLimits:
-    """Paper-sizing exposure limits. All caps required; no desk defaults.
+    """Paper-sizing exposure limits. All caps required; no built-in defaults.
 
     * ``single_name_cap``: max ``|w|`` per symbol, in [0, 1].
     * ``gross_cap``: max ``sum(|w|)``, in (0, 1]. Values above 1.0 (leverage) are rejected.
     * ``net_cap``: max ``|sum(w)|``, in [0, ``gross_cap``].
-    * ``group_caps``: optional max gross per group (e.g. sector), each in [0, 1].
+    * ``group_caps``: optional max gross per group, each in [0, 1]. Groups are supplied by the caller
+      as ``symbol -> group``; for sector caps use point-in-time SIC-2 groups from
+      :mod:`quant_research.strategies.portfolio_construction.sic_groups`. There is no catch-all bucket:
+      a name whose group is ``None`` (ineligible) or missing cannot carry weight while group caps
+      are configured (fail closed).
     * ``prohibited_symbols`` / ``prohibited_asset_classes``: always sized to zero and reported.
       Matching is case-insensitive. When asset classes are prohibited, a symbol with no known
       asset class is treated as prohibited (fail closed).
@@ -506,7 +510,7 @@ class LimitResult:
     adjustments: tuple[str, ...]
 
 
-def _group_gross(weights: Mapping[str, float], groups: Mapping[str, str]) -> dict[str, float]:
+def _group_gross(weights: Mapping[str, float], groups: Mapping[str, str | None]) -> dict[str, float]:
     out: dict[str, float] = {}
     for s, w in weights.items():
         g = groups.get(s)
@@ -519,15 +523,16 @@ def apply_exposure_limits(
     weights: Weights,
     limits: ExposureLimits,
     *,
-    groups: Mapping[str, str] | None = None,
+    groups: Mapping[str, str | None] | None = None,
     asset_classes: Mapping[str, str] | None = None,
 ) -> LimitResult:
     """Size a book down to ``limits``. Only ever reduces ``|w|``; never adds leverage.
 
     Order: zero prohibited names, clip single names, scale each over-cap group, scale the whole
     book for net, then for gross. Every step only shrinks weights, so earlier caps stay met.
-    Raises :class:`RiskInputError` on bad input (including a weighted symbol with no group when
-    group caps are configured).
+    Raises :class:`RiskInputError` on bad input, including a nonzero-weight symbol whose group is
+    missing or ``None`` (ineligible) when group caps are configured: such names are rejected, never
+    silently zeroed or left uncapped.
     """
     w = _validate_weights(weights)
     classes = asset_classes or {}
@@ -552,9 +557,9 @@ def apply_exposure_limits(
     if limits.group_caps:
         if groups is None:
             raise RiskInputError("group_caps configured but no groups mapping given")
-        ungrouped = sorted(s for s, x in w.items() if x != 0.0 and s not in groups)
+        ungrouped = sorted(s for s, x in w.items() if x != 0.0 and groups.get(s) is None)
         if ungrouped:
-            raise RiskInputError(f"symbols with no group while group caps are configured: {ungrouped}")
+            raise RiskInputError(f"symbols with no (or ineligible) group while group caps are configured: {ungrouped}")
         for grp, gcap in sorted(limits.group_caps.items()):
             members = {s: x for s, x in w.items() if groups.get(s) == grp}
             scaled, did = _scale_gross_to_cap(members, float(gcap))
@@ -603,7 +608,7 @@ _EPS = 1e-12
 def _check(
     weights: Any,
     limits: Any,
-    groups: Mapping[str, str] | None,
+    groups: Mapping[str, str | None] | None,
     asset_classes: Mapping[str, str] | None,
     portfolio_vol_annual: float | None,
 ) -> list[Violation]:
@@ -657,6 +662,10 @@ def _check(
             for s in sorted(clean):
                 if clean[s] != 0.0 and s not in groups:
                     v.append(Violation("UNGROUPED", "no group while group caps are configured", s))
+                elif clean[s] != 0.0 and groups[s] is None:
+                    v.append(
+                        Violation("INELIGIBLE_GROUP", "group ineligible as of this session; weight must be zero", s)
+                    )
             gg = _group_gross(clean, groups)
             for grp, cap in sorted(limits.group_caps.items()):
                 if gg.get(grp, 0.0) > float(cap) + _EPS:
@@ -668,7 +677,7 @@ def pre_trade_check(
     weights: Weights,
     limits: ExposureLimits,
     *,
-    groups: Mapping[str, str] | None = None,
+    groups: Mapping[str, str | None] | None = None,
     asset_classes: Mapping[str, str] | None = None,
     portfolio_vol_annual: float | None = None,
 ) -> PreTradeResult:
@@ -676,7 +685,9 @@ def pre_trade_check(
 
     Returns ``passed=False`` with typed violations for any breach, and also for bad input:
     empty book, NaN/inf weights, invalid symbols, NaN or negative vol, gross above 1.0, missing
-    group mapping when group caps are set, or an unexpected internal error (``INTERNAL_ERROR``).
+    group mapping when group caps are set, a nonzero weight on a name with no group (``UNGROUPED``)
+    or an ineligible ``None`` group (``INELIGIBLE_GROUP``), or an unexpected internal error
+    (``INTERNAL_ERROR``).
     """
     try:
         violations = _check(weights, limits, groups, asset_classes, portfolio_vol_annual)
@@ -732,7 +743,7 @@ def build_risk_report(
     weights: Weights,
     limits: ExposureLimits,
     *,
-    groups: Mapping[str, str] | None = None,
+    groups: Mapping[str, str | None] | None = None,
     asset_classes: Mapping[str, str] | None = None,
     portfolio_vol_annual: float | None = None,
     drawdown: DrawdownStats | None = None,
