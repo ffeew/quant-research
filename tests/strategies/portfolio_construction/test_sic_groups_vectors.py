@@ -208,6 +208,21 @@ def test_v10_excluded_name_without_a_link_is_r1():
     _bad(_one("DD", [], [_hdr("800", 1, date(2015, 1, 5), "2821")], date(2017, 1, 3)), R.NO_CIK_LINK)
 
 
+def test_v10_tyc_alone_excluded_with_a_link_stops():
+    # Both names are on the exclusion list; only TYC (synthetic CIK) has a link, so only TYC is named.
+    with pytest.raises(sg.ExcludedLinkError) as ei:
+        sg.resolve_sic2_groups(
+            ["TYC"],
+            [_link("TYC", "810")],
+            [_hdr("810", 1, date(2015, 3, 2), "3829")],
+            date(2017, 1, 3),
+            SESSIONS,
+            excluded={"DD", "TYC"},
+        )
+    assert ei.value.symbols == ("TYC",)
+    assert "TYC" in str(ei.value) and "DD" not in str(ei.value)
+
+
 # ------------------------------------------------------------------ same vectors through the interval adapter
 
 
