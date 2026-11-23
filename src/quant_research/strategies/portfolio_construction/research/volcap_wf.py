@@ -64,8 +64,10 @@ if __name__ == "__main__":
     ap.add_argument("--cap", type=float, default=0.06)
     ap.add_argument("--boot", type=int, default=2000)
     ap.add_argument("--out", required=True)
+    ap.add_argument("--universe", required=True, help="universe file, one symbol per line (construct_inputs format)")
     a = ap.parse_args()
-    fr, dropped = load_closes(a.src, allow_retired=a.allow_retired)
+    from quant_research.strategies.portfolio_construction.construct_inputs import read_universe_file
+    fr, dropped = load_closes(a.src, allow_retired=a.allow_retired, universe=read_universe_file(a.universe).symbols)
     C = fr["c"]
     R = C.pct_change(fill_method=None).iloc[1:]
     ks = [1.0, 1.25]

@@ -10,6 +10,7 @@ GP scalar mapping (Prop. 2 under Lambda = lambda*Sigma, rho = 0): ell = lambda/g
 """
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any, cast
 
 from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DATA_DIR, ...)
@@ -27,8 +28,8 @@ TAUS = [1.0, gp(0.5)[1], gp(2)[1], gp(8)[1], 0.1]
 
 def te_ann(x: Any) -> Any: return float(x.std() * math.sqrt(252))
 
-def part_a(src: str, allow_retired: bool = False) -> Any:
-    fr, _ = rw.load_closes(src, fields=("c", "v"), allow_retired=allow_retired)
+def part_a(src: str, allow_retired: bool = False, *, universe: Sequence[str] | None) -> Any:
+    fr, _ = rw.load_closes(src, fields=("c", "v"), allow_retired=allow_retired, universe=universe)
     C = fr["c"]
     R = C.pct_change().iloc[1:]
     tca, _ = rw.tca_costs(C, fr["v"], src)
@@ -61,8 +62,8 @@ def spearman_ac(S: pd.DataFrame, lag: int = 5) -> Any:
     b = b.sub(b.mean(axis=1), axis=0)
     return (a * b).sum(axis=1) / np.sqrt((a * a).sum(axis=1) * (b * b).sum(axis=1))
 
-def part_b(src: str, gross: float = 0.58, cap: float = 0.095, borrow_yr: float = 0.0025, allow_retired: bool = False) -> Any:
-    fr, _ = rw.load_closes(src, fields=("c", "v"), allow_retired=allow_retired)
+def part_b(src: str, gross: float = 0.58, cap: float = 0.095, borrow_yr: float = 0.0025, allow_retired: bool = False, *, universe: Sequence[str] | None) -> Any:
+    fr, _ = rw.load_closes(src, fields=("c", "v"), allow_retired=allow_retired, universe=universe)
     C = fr["c"]
     R = C.pct_change()
     tca, _ = rw.tca_costs(C, fr["v"], src)
@@ -135,12 +136,17 @@ if __name__ == "__main__":
     # (statarb audit copy + data.json) for audit only. New output never overwrites the retired-source file out/gp_wf.json.
     retired = "--retired" in sys.argv
     if retired:
-        A = part_a("statarb", True) + part_a("datajson", True)
-        B, phis = part_b("statarb", allow_retired=True)
+        A = part_a("statarb", True, universe=None) + part_a("datajson", True, universe=None)
+        B, phis = part_b("statarb", allow_retired=True, universe=None)
         out = "gp_wf_retired_rerun.json"
     else:
-        A = part_a("store")
-        B, phis = part_b("store")
+        # the store source needs an explicit universe: --universe <file> (one symbol per line; no default)
+        if "--universe" not in sys.argv[:-1]:
+            raise SystemExit("--universe <file> is required for the store source")
+        from quant_research.strategies.portfolio_construction.construct_inputs import read_universe_file
+        uni = read_universe_file(sys.argv[sys.argv.index("--universe") + 1]).symbols
+        A = part_a("store", universe=uni)
+        B, phis = part_b("store", universe=uni)
         out = "gp_wf_store.json"
     json.dump(dict(data_source="RETIRED (audit)" if retired else "the data owner's store via desk_data_client", taus=TAUS, gp_map={e: gp(e) for e in (0.5, 2, 8)},
                    partA=A, partB=B, phi_mean=phis), open(f"{_QR.DESK_DIR}/portfolio/research/out/{out}", "x"), indent=1, default=float)

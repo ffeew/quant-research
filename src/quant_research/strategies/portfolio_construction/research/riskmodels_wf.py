@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import Any, cast
 
 #!/usr/bin/env python3
@@ -31,18 +31,19 @@ SECTOR_ETF = {"XLB", "XLC", "XLE", "XLF", "XLI", "XLK", "XLP", "XLRE", "XLU", "X
 CRYPTO = {"BTC/USD", "ETH/USD", "SOL/USD"}
 CUTOFF = "2026-10-29"   # 2026-10-29 bar is partial at run time (market open)
 # Data-provenance rule (2026-10-30): history ONLY from the shared store, via $QR_DATA_DIR/lib/desk_data_client.py.
-# src="store" (default) = desk universe (construct.DESK_UNIVERSE, alpha names only) from bars/daily/adjusted (SIP, adjustment=all),
+# src="store" (default) = the explicit universe (required --universe file / universe= argument, alpha names only) from bars/daily/adjusted (SIP, adjustment=all),
 # allow_api=False (history only; no live calls in research). "datajson"/"statarb" are RETIRED sources kept only so earlier
 # outputs can be reproduced/audited: they raise unless allow_retired=True (CLI --allow_retired). statarb -> the derivatives researcher's audit copy.
 RETIRED = {"datajson": f"{_QR.DESK_DIR}/data.json", "statarb": f"{_QR.DESK_DIR}/statarb/data/_deprecated/daily_bars.json"}
 STORE_START = "2016-01-01"
 
-def _load_store(fields: tuple[str, ...], start: str = STORE_START) -> Any:
+def _load_store(fields: tuple[str, ...], start: str = STORE_START, *, universe: Sequence[str]) -> Any:
     sys.path.insert(0, f"{_QR.DATA_DIR}/lib")
     sys.path.insert(0, f"{_QR.DESK_DIR}/portfolio")
     from quant_research.data.client import desk_data_client as ddc
-    from quant_research.strategies.portfolio_construction.construct import DESK_UNIVERSE
-    syms = [s for s in DESK_UNIVERSE if s not in CRYPTO and s not in NON_ALPHA and s not in SECTOR_ETF]
+    syms = [s for s in universe if s not in CRYPTO and s not in NON_ALPHA and s not in SECTOR_ETF]
+    if not syms:
+        raise SystemExit("universe has no alpha names after the crypto / index / sector-ETF exclusions; fail closed")
     df = ddc.get_daily_bars(syms, start, (pd.Timestamp(CUTOFF) - pd.Timedelta(days=1)).date(), adjustment="all", allow_api=False)
     df = df[df["session_date"].astype(str) < CUTOFF].copy()
     df["session_date"] = pd.to_datetime(df["session_date"])
@@ -51,9 +52,12 @@ def _load_store(fields: tuple[str, ...], start: str = STORE_START) -> Any:
     col = {"c": "close", "v": "volume", "o": "open", "h": "high", "l": "low"}
     return {f: df.pivot(index="session_date", columns="symbol", values=col[f]).sort_index() for f in fields}
 
-def load_closes(src: str = "store", fields: tuple[str, ...] = ("c",), allow_retired: bool = False, start: str = STORE_START) -> Any:
+def load_closes(src: str = "store", fields: tuple[str, ...] = ("c",), allow_retired: bool = False, start: str = STORE_START, *, universe: Sequence[str] | None) -> Any:
+    """``universe`` is required for src="store" (no built-in universe); the retired sources carry their own symbol lists."""
     if src == "store":
-        frames = _load_store(fields, start)
+        if universe is None:
+            raise SystemExit("src='store' needs an explicit universe (--universe file); there is no default")
+        frames = _load_store(fields, start, universe=universe)
         C = frames["c"]
         keep_dates = C.index[C.notna().mean(1) >= 0.5]
         C = C.loc[keep_dates]
@@ -299,8 +303,11 @@ if __name__ == "__main__":
     ap.add_argument("--step", type=int, default=5)
     ap.add_argument("--boot", type=int, default=2000)
     ap.add_argument("--out", required=True)
+    ap.add_argument("--universe", required=True, help="universe file, one symbol per line (construct_inputs format)")
     a = ap.parse_args()
-    fr, dropped = load_closes(a.src, fields=("c", "v"), allow_retired=a.allow_retired, start=a.start)
+    from quant_research.strategies.portfolio_construction.construct_inputs import read_universe_file
+    uni = read_universe_file(a.universe)
+    fr, dropped = load_closes(a.src, fields=("c", "v"), allow_retired=a.allow_retired, start=a.start, universe=uni.symbols)
     C = fr["c"]
     R = C.pct_change(fill_method=None).iloc[1:]
     jumps = [(str(d.date()), s, round(float(v), 3)) for (d, s), v in R.stack().items() if abs(v) > 0.3]
@@ -323,7 +330,7 @@ if __name__ == "__main__":
         s["lw_delta_range"] = (float(res[m]["delta"].min()), float(res[m]["delta"].max())) if len(res[m]["delta"]) else None
         table[m] = s
     ci, dci = bootstrap(res, methods, B=a.boot)
-    meta = dict(src=a.src, data_provenance=("shared store via desk_data_client (data-provenance rule)" if a.src == "store" else "RETIRED source (audit reproduction)"), universe_n=C.shape[1], dropped_incomplete=dropped, first_bar=str(C.index[0].date()), last_bar=str(C.index[-1].date()),
+    meta = dict(src=a.src, universe_file=dict(path=uni.path, sha256=uni.sha256, n=len(uni.symbols)), data_provenance=("shared store via desk_data_client (data-provenance rule)" if a.src == "store" else "RETIRED source (audit reproduction)"), universe_n=C.shape[1], dropped_incomplete=dropped, first_bar=str(C.index[0].date()), last_bar=str(C.index[-1].date()),
                 lookback=a.lookback, step=a.step, oos_start=str(res["IV"]["ret"].index[0].date()), oos_end=str(res["IV"]["ret"].index[-1].date()),
                 oos_days=oos_days, n_rebal=int(len(res["IV"]["cost"])), tc_bps_oneway=10, big_moves_gt30pct=jumps,
                 tca_cost_model=tca_meta, bootstrap=dict(type="stationary (Politis-Romano), joint across methods", mean_block_days=10, reps=a.boot))

@@ -370,8 +370,12 @@ def sector_constraint_groups(names: Sequence[str], groups: Mapping[str, str | No
     ``group -> member names``, groups in sorted order and members in the order of ``names``.
     There is no catch-all bucket: a name that is ineligible (``None``), missing from ``groups``,
     or listed more than once makes the call raise :class:`SectorGroupError`, which reports every
-    offending name with its reason, not only the first.
+    offending name with its reason, not only the first. A bare ``str`` or ``bytes`` passed as ``names``
+    is refused rather than iterated character by character.
     """
+    as_object: object = names
+    if isinstance(as_object, (str, bytes)):
+        raise SectorGroupError([(repr(as_object), "names must be a collection of symbols, not a bare str or bytes")])
     offenders: list[tuple[str, str]] = []
     seen: set[str] = set()
     members: dict[str, list[str]] = {}
