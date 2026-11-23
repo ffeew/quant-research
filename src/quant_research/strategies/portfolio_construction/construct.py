@@ -9,6 +9,10 @@ Portfolio construction model for the CIO desk (Alpaca PAPER).  READ-ONLY w.r.t. 
 reads the data owner's store (data/bars, data/universe, data/earnings) + desk_data_client (rule #5), $QR_DESK_DIR/{positions.json,orders_status.json,performance/history.csv},
 writes only $QR_DESK_DIR/portfolio/targets_<date>.json (+ diagnostics).  Places NO orders.
 
+Research-only for now: this module refuses any session its SIC-2 map does not cover. The current map ends
+2021-12-31, so no current-date paper targets can be built until a post-2021 SIC-2 map is built, reviewed
+and accepted.
+
 Pipeline
  1. Point-in-time signals rebuilt from daily bars for every date (same definitions as quant.py).
  2. Holdout ("pseudo-OOS") rank-IC of each signal vs forward 5-day returns, sampled every 5 days

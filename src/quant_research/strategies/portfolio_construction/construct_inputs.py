@@ -1,5 +1,9 @@
 """Explicit inputs for portfolio construction and the pure helpers that use them.
 
+Research-only for now: this module refuses any session its SIC-2 map does not cover. The current map ends
+2021-12-31, so no current-date paper targets can be built until a post-2021 SIC-2 map is built, reviewed
+and accepted.
+
 Inputs (all required, no built-in defaults):
 
 * Universe file (``--universe``): UTF-8 text, one symbol per line. Leading/trailing whitespace is
