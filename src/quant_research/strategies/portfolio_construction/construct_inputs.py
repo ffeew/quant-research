@@ -2,11 +2,11 @@
 
 Research-only for now: this module refuses any session its SIC-2 map does not cover. The current map ends
 2021-12-31, so no current-date paper targets can be built until a post-2021 SIC-2 map is built, reviewed
-and accepted.
+and accepted. A SIC-2 map covering sessions after 2021-12-31 must be reviewed and accepted before use.
 
 Inputs (all required, no built-in defaults):
 
-* Universe file (``--universe``): UTF-8 text, one symbol per line. Leading/trailing whitespace is
+* Universe file (``--universe``): UTF-8 text (a leading byte-order mark is ignored), one symbol per line. Leading/trailing whitespace is
   stripped; blank lines and lines whose first non-blank character is ``#`` are ignored. A symbol is
   upper-case letters, digits, ``.`` or ``-`` and starts with a letter (e.g. ``AAPL``, ``BRK.B``).
   Invalid or duplicate symbols, or an empty file, are refused with every problem listed.
@@ -18,6 +18,9 @@ Inputs (all required, no built-in defaults):
 
 ETFs are a declared non-SIC asset class (:data:`DECLARED_ETFS`): they are never SIC-grouped and
 instead sit in one ETF sleeve with their own caps (per-ETF position cap, sleeve gross and |net|).
+Within the sleeve, gross across the declared sector ETFs (:data:`SECTOR_ETFS`) has its own cap
+(``--sector_etf_gross``), no greater than the sleeve gross cap. Sector ETFs are not looked through to
+SIC-2 groups; a reviewed ETF-to-SIC-2 look-through is required before any paper use.
 The hedge instrument is in neither a SIC group nor the ETF sleeve. Single names (everything else)
 must have a SIC-2 group; any that do not are rejected, all listed at once. There is no catch-all
 group.
@@ -63,7 +66,10 @@ __all__ = [
     "parse_universe",
     "read_sic2_map",
     "read_universe_file",
+    "sector_etf_gross",
+    "sector_etf_positions",
     "validate_etf_caps",
+    "validate_sector_etf_gross",
 ]
 
 # Index / macro ETFs: never in the alpha cross-section (the hedge is one of them).
@@ -141,7 +147,8 @@ def parse_universe(text: str) -> tuple[str, ...]:
 
 def read_universe_file(path: str) -> Universe:
     data = _read_bytes(path, "universe file rejected")
-    symbols = parse_universe(_decode(data, "universe file rejected"))
+    text = _decode(data, "universe file rejected")
+    symbols = parse_universe(text.removeprefix("\ufeff"))  # a UTF-8 byte-order mark is not part of a symbol
     return Universe(path=path, sha256=hashlib.sha256(data).hexdigest(), symbols=symbols)
 
 
@@ -285,6 +292,32 @@ def validate_etf_caps(etf_max_pos: float, etf_sleeve_gross: float, etf_sleeve_ne
         raise ConstructInputError("ETF caps rejected", problems)
 
 
+def validate_sector_etf_gross(sector_etf_gross: float, etf_sleeve_gross: float) -> None:
+    """The sector-ETF gross cap is required: a finite number in (0, 1] and no greater than the sleeve gross cap."""
+    val = sector_etf_gross
+    if not (isinstance(val, (int, float)) and math.isfinite(val) and 0.0 < val <= 1.0):
+        raise ConstructInputError("ETF caps rejected", [f"sector_etf_gross = {val!r} must be in (0, 1]"])
+    if val > etf_sleeve_gross:
+        raise ConstructInputError(
+            "ETF caps rejected",
+            [f"sector_etf_gross = {val!r} must not exceed etf_sleeve_gross = {etf_sleeve_gross!r}"],
+        )
+
+
+def sector_etf_positions(symbols: Sequence[str], etf_index: Sequence[int]) -> tuple[int, ...]:
+    """Positions (within ``symbols``) of the ETF-sleeve entries that are declared sector ETFs."""
+    return tuple(i for i in etf_index if symbols[i] in SECTOR_ETFS)
+
+
+def sector_etf_gross(rows: Iterable[Mapping[str, Any]]) -> float:
+    """Gross |weight| of ETF-sleeve target rows whose symbol is a declared sector ETF (zero targets skipped)."""
+    return sum(
+        abs(float(r["target_weight"]))
+        for r in rows
+        if str(r["sector"]) == ETF_LABEL and r["target_shares"] != 0 and str(r["symbol"]) in SECTOR_ETFS
+    )
+
+
 def apply_etf_position_cap(cap: Any, etf_index: Sequence[int], etf_max_pos: float) -> np.ndarray[Any, Any]:
     """Per-name cap vector with ETF-sleeve entries capped at ``etf_max_pos`` (other entries unchanged)."""
     out = np.array(cap, dtype=float, copy=True)
@@ -346,3 +379,10 @@ def add_construct_input_args(ap: argparse.ArgumentParser) -> None:
     ap.add_argument("--etf_max_pos", type=float, default=0.095, help="per-ETF |w| cap (sleeve; hedge excluded)")
     ap.add_argument("--etf_sleeve_gross", type=float, default=0.20, help="ETF sleeve aggregate gross cap")
     ap.add_argument("--etf_sleeve_net", type=float, default=0.10, help="ETF sleeve aggregate |net| cap")
+    ap.add_argument(
+        "--sector_etf_gross",
+        type=float,
+        required=True,
+        help="gross cap across the declared sector ETFs inside the ETF sleeve, in (0, 1] and <= --etf_sleeve_gross"
+        " (e.g. 0.10)",
+    )

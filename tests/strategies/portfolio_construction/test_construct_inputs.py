@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import hashlib
 import pathlib
 
 import cvxpy as cp
@@ -66,8 +67,22 @@ def test_cli_requires_universe_and_sic2_map():
         ap.parse_args(["--sic2_map", "m.csv"])
     with pytest.raises(SystemExit):
         ap.parse_args(["--universe", "u.txt"])
-    a = ap.parse_args(["--universe", "u.txt", "--sic2_map", "m.csv"])
+    with pytest.raises(SystemExit):
+        ap.parse_args(["--universe", "u.txt", "--sic2_map", "m.csv"])  # --sector_etf_gross is required
+    a = ap.parse_args(["--universe", "u.txt", "--sic2_map", "m.csv", "--sector_etf_gross", "0.10"])
     assert (a.etf_max_pos, a.etf_sleeve_gross, a.etf_sleeve_net) == (0.095, 0.20, 0.10)
+    assert a.sector_etf_gross == 0.10
+
+
+def test_universe_file_utf8_bom_stripped(tmp_path):
+    f = tmp_path / "u.txt"
+    raw = b"\xef\xbb\xbfAAA\nBBB\n"
+    f.write_bytes(raw)
+    u = ci.read_universe_file(str(f))
+    assert u.symbols == ("AAA", "BBB")
+    assert u.sha256 == hashlib.sha256(raw).hexdigest()  # hash is of the file bytes as read
+    with pytest.raises(ci.ConstructInputError, match="invalid symbol"):
+        ci.parse_universe("\ufeffAAA\n")  # only the file reader strips it
 
 
 # ------------------------------------------------------------------ SIC-2 map
@@ -210,6 +225,86 @@ def test_etf_sleeve_caps_bind_in_optimiser():
     assert np.isclose(sleeve.sum(), 0.10, atol=1e-5)  # net cap binds (unconstrained the sleeve would be 0.24 long)
     assert max(abs(sleeve)) <= 0.08 + 1e-6 and np.isclose(wv[2], 0.08, atol=1e-5)  # per-ETF cap binds
     assert abs(wv[univ.index("SPY")]) < 1e-6  # hedge has no alpha and is outside the sleeve
+
+
+def test_sector_etf_gross_validated():
+    ci.validate_sector_etf_gross(0.10, 0.20)
+    ci.validate_sector_etf_gross(0.20, 0.20)
+    with pytest.raises(ci.ConstructInputError, match="must not exceed etf_sleeve_gross"):
+        ci.validate_sector_etf_gross(0.25, 0.20)
+    for bad in (0.0, -0.1, 1.5, float("nan"), float("inf")):
+        with pytest.raises(ci.ConstructInputError, match=r"must be in \(0, 1\]"):
+            ci.validate_sector_etf_gross(bad, 0.20)
+
+
+def test_sector_etf_positions_and_gross():
+    univ = ["AAA", "XLK", "QQQ", "SMH", "SPY"]
+    assert ci.sector_etf_positions(univ, (1, 2, 3)) == (1, 3)
+    rows = [
+        dict(symbol="XLK", sector="ETF", target_weight=0.06, target_shares=4),
+        dict(symbol="SMH", sector="ETF", target_weight=-0.03, target_shares=-2),
+        dict(symbol="XLE", sector="ETF", target_weight=0.05, target_shares=0),
+        dict(symbol="QQQ", sector="ETF", target_weight=0.04, target_shares=1),
+        dict(symbol="AAA", sector="SIC2:28", target_weight=0.05, target_shares=10),
+        dict(symbol="SPY", sector="HEDGE", target_weight=-0.2, target_shares=-9),
+    ]
+    assert ci.sector_etf_gross(rows) == pytest.approx(0.09)
+
+
+def test_sector_etf_gross_cap_binds_in_optimiser():
+    """Same constraint form as construct.py: sector ETFs want 0.18 gross; the 0.10 sector-ETF cap binds."""
+    univ = ["AAA", "BBB", "XLK", "XLE", "XLF", "QQQ", "SPY"]
+    g = ci.construction_groups(univ, {"AAA": "28", "BBB": "36"}, etfs=ci.DECLARED_ETFS, hedge="SPY")
+    cap = ci.apply_etf_position_cap(np.full(len(univ), 0.095), g.etf_index, 0.06)
+    alpha = np.array([0.001, 0.001, 0.05, -0.04, 0.03, 0.02, 0.0])
+    ix_e = list(g.etf_index)
+    ix_se = list(ci.sector_etf_positions(univ, g.etf_index))
+    assert [univ[i] for i in ix_se] == ["XLK", "XLE", "XLF"]
+
+    def solve(sector_etf_gross):
+        w = cp.Variable(len(univ))
+        cons = [cp.abs(w) <= cap, cp.norm1(w) <= 0.58]
+        for ix in g.sector_index.values():
+            cons += [cp.norm1(w[list(ix)]) <= 0.20, cp.abs(cp.sum(w[list(ix)])) <= 0.10]
+        cons += [cp.norm1(w[ix_e]) <= 0.20, cp.abs(cp.sum(w[ix_e])) <= 0.10]
+        if sector_etf_gross is not None:
+            cons.append(cp.norm1(w[ix_se]) <= sector_etf_gross)
+        cp.Problem(cp.Maximize(alpha @ w), cons).solve(solver="CLARABEL")
+        return np.asarray(w.value).ravel()
+
+    free = solve(None)
+    assert abs(free[ix_se]).sum() > 0.10 + 1e-3  # without the cap, sector ETFs exceed 0.10
+    wv = solve(0.10)
+    assert np.isclose(abs(wv[ix_se]).sum(), 0.10, atol=1e-5)  # cap binds
+    assert abs(wv[ix_e]).sum() <= 0.20 + 1e-6 and abs(wv[ix_e].sum()) <= 0.10 + 1e-6  # still inside the sleeve
+    rows = [
+        dict(symbol=s, sector=g.labels[s], target_weight=float(wv[i]), target_shares=1 if abs(wv[i]) > 1e-9 else 0)
+        for i, s in enumerate(univ)
+    ]
+    assert ci.sector_etf_gross(rows) <= 0.10 + 1e-6
+
+
+def test_construct_source_wires_sector_etf_gross():
+    assert "ci.validate_sector_etf_gross(a.sector_etf_gross, a.etf_sleeve_gross)" in CONSTRUCT_SRC
+    assert "cp.norm1(w[ix_se]) <= a.sector_etf_gross" in CONSTRUCT_SRC
+    assert '"Sector ETF gross cap"' in CONSTRUCT_SRC
+    for sentence in (
+        "A SIC-2 map covering sessions after 2021-12-31 must be reviewed and accepted before use.",
+        "a reviewed ETF-to-SIC-2 look-through is required before",
+    ):
+        assert sentence in " ".join(CONSTRUCT_SRC.split())
+    tree = ast.parse(CONSTRUCT_SRC)
+    # statement-level string literals (docstrings; the module's sits after the __future__ import)
+    docstrings = {id(n.value) for n in ast.walk(tree) if isinstance(n, ast.Expr) and isinstance(n.value, ast.Constant)}
+    in_code = [
+        n.value
+        for n in ast.walk(tree)
+        if isinstance(n, ast.Constant)
+        and isinstance(n.value, str)
+        and "2021-12-31" in n.value
+        and id(n) not in docstrings
+    ]
+    assert in_code == []  # the map end date appears in docstrings only
 
 
 # ------------------------------------------------------------------ construct.py wiring (source-level; main is not run)
