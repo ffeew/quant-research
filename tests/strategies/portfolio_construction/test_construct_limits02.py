@@ -16,6 +16,8 @@ import sys
 import tempfile
 from typing import cast
 
+import pytest
+
 from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DATA_DIR, ...)
 
 HERE = os.path.dirname(
@@ -35,7 +37,17 @@ PROXY = f"{_QR.DESK_DIR}/statarb/data/_deprecated/daily_bars.json"
 # offline live row (no API) so they are deterministic; test D exercises store_pit; test E the episode backstop at run equity.
 
 
+def _construct_inputs():
+    """construct.py needs an explicit universe file and a SIC-2 map covering the as-of session (no defaults).
+    E2E runs take them from QR_E2E_UNIVERSE / QR_E2E_SIC2_MAP and skip when either is unset."""
+    uni, sic = os.environ.get("QR_E2E_UNIVERSE", ""), os.environ.get("QR_E2E_SIC2_MAP", "")
+    if not (uni and sic):
+        pytest.skip("needs QR_E2E_UNIVERSE and QR_E2E_SIC2_MAP (universe file and SIC-2 map for the as-of session)")
+    return ["--universe", uni, "--sic2_map", sic]
+
+
 def run(panic, breaker, *extra, proxy=("--proxy_src", "statarb", "--proxy_path", PROXY)):
+    inputs = _construct_inputs()
     d = tempfile.mkdtemp()
     os.makedirs(f"{d}/targets")
     os.makedirs(f"{d}/shadow")
@@ -59,6 +71,7 @@ def run(panic, breaker, *extra, proxy=("--proxy_src", "statarb", "--proxy_path",
             pp,
             "--breaker_path",
             bp,
+            *inputs,
             *extra,
         ],
         capture_output=True,

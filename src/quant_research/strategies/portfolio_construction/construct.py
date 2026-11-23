@@ -101,9 +101,11 @@ import pandas as pd
 from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DATA_DIR, ...)
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from quant_research.strategies.portfolio_construction import construct_inputs as ci
 from quant_research.strategies.portfolio_construction import earnings_gate as eg
 from quant_research.strategies.portfolio_construction import targets_io as tio
 from quant_research.strategies.portfolio_construction.risk_state import ET, NYSE_HOLIDAYS, SGT, read_breaker, read_panic
+from quant_research.strategies.portfolio_construction.sic_groups import SectorGroupError
 
 DDC_LIB = f"{_QR.DATA_DIR}/lib"  # data-provenance rule: the shared data client (read-only; never edited here)
 if DDC_LIB not in sys.path:
@@ -161,33 +163,11 @@ def excluded_asset(sym: str) -> bool:
 SLEEVE_OF = {"MOM_12_1": "momentum", "RS63": "momentum", "TREND": "trend", "REV5": "reversal", "PEAD": "event"}
 PANIC_SLEEVES = {"momentum", "trend"}
 # Index / macro ETFs: not in the alpha cross-section. SPY is allowed as a beta hedge only.
-NON_ALPHA = {"SPY", "QQQ", "IWM", "DIA", "EEM", "EFA", "TLT", "HYG", "GLD", "SLV"}
+NON_ALPHA = set(ci.NON_ALPHA_ETFS)
 HEDGE = "SPY"
-# Hand-coded GICS sectors (kept from v1; the store has CURRENT GICS only). Sector ETFs map to their sector.
-SECTOR = {}
-for sec, names in {
-    "Tech": "AAPL MSFT NVDA AVGO ORCL CRM AMD ADBE CSCO ACN INTC QCOM TXN IBM NOW INTU MU AMAT LRCX KLAC PANW XLK SMH",
-    "Comm": "GOOGL META NFLX DIS T VZ XLC",
-    "ConsDisc": "AMZN TSLA HD MCD LOW BKNG SBUX NKE TJX XLY",
-    "Fin": "BRK.B JPM V MA BAC WFC GS MS SPGI BLK SCHW C AXP MMC CB PGR XLF",
-    "Health": "LLY UNH JNJ ABBV MRK TMO ABT AMGN PFE ISRG ELV CI REGN VRTX BMY MDT GILD SYK XLV",
-    "Energy": "XOM CVX COP XLE",
-    "Staples": "WMT PG COST KO PEP PM MO XLP",
-    "Industrials": "GE CAT RTX HON UNP DE LMT ETN FDX UPS ADP UBER XLI",
-    "Materials": "LIN XLB",
-    "Utilities": "NEE XLU",
-    "RealEstate": "PLD XLRE",
-    "Index": "SPY QQQ IWM DIA EEM EFA",
-    "Rates": "TLT HYG",
-    "Commod": "GLD SLV",
-}.items():
-    for s in names.split():
-        SECTOR[s] = sec
-
-# Desk universe (DESK RULE #5, 2026-10-30): the 117 US equities/ETFs of quant.py's list, frozen here (= SECTOR map keys).
-# data.json is no longer read. MMC is absent from the data owner's store (Marsh McLennan trades as MRSH there); it was already
-# dropped under data.json (90 bars < 260), so the effective universe is unchanged at 116.
-DESK_UNIVERSE = sorted(SECTOR)
+# The trading universe is a required input (--universe file) and single-name groups come from a required
+# point-in-time SIC-2 map (--sic2_map); ETFs are a declared non-SIC class (construct_inputs.DECLARED_ETFS)
+# with their own sleeve caps. There is no built-in universe and no catch-all group.
 HIST_CAL_DAYS = 420  # same window as quant.py (start = today - 420 calendar days)
 DATA_PROVENANCE: dict[str, Any] = {}  # filled by load() / sleeve_vol_scaling(); written to every targets doc
 
@@ -202,7 +182,7 @@ def load(args: Any) -> tuple[Any, ...]:
     cut = pd.Timestamp(args.asof_bar_cutoff)
     end = (cut - pd.Timedelta(days=1)).date()
     start = (cut - pd.Timedelta(days=HIST_CAL_DAYS)).date()
-    syms = [s for s in DESK_UNIVERSE if not excluded_asset(s)]
+    syms = [s for s in args.universe_input.symbols if not excluded_asset(s)]
     df = ddc.get_daily_bars(syms, start, end, adjustment="all", allow_api=(args.live_source == "client"))
     df = df[pd.to_datetime(df["session_date"]) < cut].copy()
     if "zero_volume" in df.columns:
@@ -276,7 +256,7 @@ def load(args: Any) -> tuple[Any, ...]:
             window=[str(start), str(end)],
             rows_by_source=src_counts,
             warnings=list(df.attrs.get("warnings", [])),
-            universe=f"DESK_UNIVERSE ({len(syms)} symbols, frozen quant.py list)",
+            universe=f"--universe {args.universe_input.path} (sha256 {args.universe_input.sha256}, {len(syms)} symbols)",
             used=len(keep),
             missing_in_store=missing,
             dropped_short_history=short,
@@ -803,6 +783,7 @@ def main() -> None:
     ap.add_argument(
         "--next_earnings_file", default="", help="explicit sidecar file (tests); overrides the newest-file search"
     )
+    ci.add_construct_input_args(ap)
     a = ap.parse_args()
     # Resolve asof_bar_cutoff (partial/live session date). Post-close / pre-open runs use the prior NYSE session.
     if a.asof_bar_cutoff is None:
@@ -821,6 +802,23 @@ def main() -> None:
         a.asof_bar_cutoff = _d.isoformat()
     if a.date is None:
         a.date = str(a.asof_bar_cutoff)
+    # Required construction inputs: universe file, SIC-2 map for the as-of session, ETF caps (fail closed before any data read).
+    try:
+        ci.validate_etf_caps(a.etf_max_pos, a.etf_sleeve_gross, a.etf_sleeve_net)
+        a.universe_input = ci.read_universe_file(a.universe)
+        SIC2 = ci.read_sic2_map(a.sic2_map, str(a.asof_bar_cutoff))
+    except ci.ConstructInputError as exc_in:
+        raise SystemExit(f"construction inputs rejected: {exc_in}; fail closed, no targets written") from exc_in
+    DATA_PROVENANCE.update(
+        sector_groups=dict(
+            source=f"--sic2_map {SIC2.path}",
+            sha256=SIC2.sha256,
+            asof_session=SIC2.asof,
+            rows=len(SIC2.groups),
+            ineligible=sum(1 for g_ in SIC2.groups.values() if g_ is None),
+        ),
+        etf_class=dict(declared=sorted(ci.DECLARED_ETFS), hedge=HEDGE),
+    )
     gp_on = a.gp_ell is not None or a.gp_rate is not None
 
     if a.equity is None:
@@ -959,6 +957,14 @@ def main() -> None:
     R = C[univ].pct_change().iloc[-120:].dropna(axis=1)
     univ = [s for s in univ if s in R.columns]
     alpha_univ = [s for s in alpha_univ if s in univ]
+    # SIC-2 groups for single names, ETF sleeve, hedge; single names without a group are rejected (fail closed).
+    try:
+        GRP = ci.construction_groups(univ, SIC2.groups, etfs=ci.DECLARED_ETFS, hedge=HEDGE, reasons=SIC2.reasons)
+    except SectorGroupError as exc_grp:
+        raise SystemExit(
+            f"single names without a SIC-2 group rejected: {exc_grp}; fail closed, no targets written"
+        ) from exc_grp
+    ETF_SLEEVE = {univ[i] for i in GRP.etf_index}
     Sig_d, rbar, shrink_delta = shrunk_cov(R[univ], a.shrinkage, a.shrink_delta)
     Sig_cap = Sig_d * 252 * a.risk_inflation**2  # ex-ante covariance used ONLY in the 6% book vol cap
     sd_d = np.sqrt(np.diag(Sig_d))
@@ -981,6 +987,7 @@ def main() -> None:
     n = len(univ)
     w = cp.Variable(n)
     cap = np.minimum(a.max_pos, a.max_risk / stop_pct)
+    cap = ci.apply_etf_position_cap(cap, GRP.etf_index, a.etf_max_pos)  # per-ETF cap (sleeve; hedge excluded)
     Sig5 = Sig_d * 5
     Sig5 = (Sig5 + Sig5.T) / 2
     if not passed:  # fallback: alpha is unvalidated -> charge full round-trip cost up front (no amortisation)
@@ -1067,10 +1074,11 @@ def main() -> None:
             cons.append(beta @ w >= PANIC["net_beta_floor"])
     if a.long_only:
         cons.append(w[[i for i, s in enumerate(univ) if s != HEDGE]] >= 0)
-    for sec in {SECTOR.get(s, "Other") for s in univ}:
-        ix = [i for i, s in enumerate(univ) if SECTOR.get(s, "Other") == sec and s != HEDGE]
-        if ix:
-            cons += [cp.norm1(w[ix]) <= a.sector_gross, cp.abs(cp.sum(w[ix])) <= a.sector_net]
+    for ix_g in GRP.sector_index.values():  # single names by SIC-2 group (hedge and ETFs excluded)
+        cons += [cp.norm1(w[list(ix_g)]) <= a.sector_gross, cp.abs(cp.sum(w[list(ix_g)])) <= a.sector_net]
+    if GRP.etf_index:  # ETF sleeve (declared non-SIC class; hedge excluded)
+        ix_e = list(GRP.etf_index)
+        cons += [cp.norm1(w[ix_e]) <= a.etf_sleeve_gross, cp.abs(cp.sum(w[ix_e])) <= a.etf_sleeve_net]
     bl = [s.strip() for s in a.blackout.split(",") if s.strip()]
     for s in bl:  # earnings blackout: may reduce toward 0, may not add risk
         if s in univ:
@@ -1088,7 +1096,7 @@ def main() -> None:
         etf_roles = set(_u.loc[_u["role"] == "etf", "symbol"])
     except Exception:
         etf_roles = set()
-    ETFS = set(NON_ALPHA) | {s_ for s_ in univ if SECTOR.get(s_) and s_.startswith("XL")} | {"SMH"} | etf_roles
+    ETFS = set(NON_ALPHA) | {s_ for s_ in univ if s_ in ci.SECTOR_ETFS and s_.startswith("XL")} | {"SMH"} | etf_roles
     now_eg = now or dt.datetime.now(dt.timezone(dt.timedelta(hours=8)))
     ev_, einfo_ = eg.load_calendar(now_eg, a.earnings_dir, a.earn_max_age_days)
     exc = [x.strip() for x in a.earnings_hold_exceptions.split(",") if x.strip()]
@@ -1144,7 +1152,8 @@ def main() -> None:
 
     def within_limits(s: str, q: float) -> Any:
         st = stop_for(s, q, q)
-        return abs(q) * px[s] <= a.max_pos * E and abs(q) * abs(px[s] - st) <= a.max_risk * E
+        lim = min(a.max_pos, a.etf_max_pos) if s in ETF_SLEEVE else a.max_pos
+        return abs(q) * px[s] <= lim * E and abs(q) * abs(px[s] - st) <= a.max_risk * E
 
     shares = {}
     for i, s in enumerate(univ):
@@ -1286,9 +1295,7 @@ def main() -> None:
                     + ", ".join(f"{k} {Z.loc[s, k]:+.1f}" for k in keys if sw[k] > 0.01)
                     + ")"
                 )
-                why.append(
-                    f"sector {SECTOR.get(s, '?')}, beta {beta[i]:.2f}, vol {sd_d[i] * math.sqrt(252) * 100:.0f}%"
-                )
+                why.append(f"group {GRP.labels[s]}, beta {beta[i]:.2f}, vol {sd_d[i] * math.sqrt(252) * 100:.0f}%")
                 if s in bl:
                     why.append("earnings blackout: no added risk")
                 g_ = EG.get(s, {})
@@ -1336,7 +1343,7 @@ def main() -> None:
                     est_risk_usd=round(float(risk), 2),
                     est_risk_pct_equity=round(float(risk) / E * 100, 3),
                     beta=round(float(beta[i]), 2),
-                    sector=SECTOR.get(s, "Other"),
+                    sector=GRP.labels[s],
                     next_earnings=EG.get(s, {}).get("next"),
                     earnings_timing=EG.get(s, {}).get("timing"),
                     earnings_status=EG.get(s, {}).get("kind"),
@@ -1353,13 +1360,7 @@ def main() -> None:
         for r in out:
             wf[univ.index(r["symbol"])] = r["target_weight"]
         turn = float(np.abs(wf - w0).sum())
-        secs: dict[Any, Any] = {}
-        for r in out:
-            if r["symbol"] == HEDGE or r["target_shares"] == 0:
-                continue
-            g = secs.setdefault(r["sector"], [0, 0])
-            g[0] += abs(r["target_weight"])
-            g[1] += r["target_weight"]
+        secs, etf_x = ci.exposure_by_label(out)  # SIC-2 groups and the ETF sleeve (hedge excluded)
         checks = []
 
         def chk(name: str, thr: Any, val: Any, ok: Any, info: Any = False) -> None:
@@ -1400,7 +1401,7 @@ def main() -> None:
         chk(
             "No options / us_equity only",
             "US-listed stocks/ETFs only",
-            "universe = DESK_UNIVERSE us_equity stocks/ETFs (the data owner's store)",
+            f"universe = --universe file ({len(a.universe_input.symbols)} us_equity stocks/ETFs)",
             True,
         )
         cx = [r["symbol"] for r in out if excluded_asset(r["symbol"])]
@@ -1427,6 +1428,24 @@ def main() -> None:
             f"<={a.sector_gross * 100:.0f}% per sector",
             f"{ms[1][0] * 100:.2f}% ({ms[0]})",
             ms[1][0] <= a.sector_gross + 1e-6,
+        )
+        chk(
+            "ETF position cap",
+            f"<={a.etf_max_pos * 100:.1f}% per ETF (sleeve; hedge excluded)",
+            f"{etf_x.max_abs * 100:.2f}%",
+            etf_x.max_abs <= a.etf_max_pos + 1e-6,
+        )
+        chk(
+            "ETF sleeve gross cap",
+            f"<={a.etf_sleeve_gross * 100:.0f}% (hedge excluded)",
+            f"{etf_x.gross * 100:.2f}%",
+            etf_x.gross <= a.etf_sleeve_gross + 1e-6,
+        )
+        chk(
+            "ETF sleeve net cap",
+            f"|net| <={a.etf_sleeve_net * 100:.0f}% (hedge excluded)",
+            f"{etf_x.net * 100:+.2f}%",
+            abs(etf_x.net) <= a.etf_sleeve_net + 1e-6,
         )
         chk(
             "Earnings blackout",
@@ -1634,6 +1653,11 @@ def main() -> None:
             sector_exposure={
                 k: dict(gross_pct=round(v[0] * 100, 2), net_pct=round(v[1] * 100, 2)) for k, v in secs.items()
             },
+            etf_sleeve_exposure=dict(
+                gross_pct=round(etf_x.gross * 100, 2),
+                net_pct=round(etf_x.net * 100, 2),
+                max_position_pct=round(etf_x.max_abs * 100, 2),
+            ),
             solver_status=prob.status,
         )
         return out, port, checks

@@ -405,3 +405,9 @@ def test_sector_constraint_groups_duplicate_raises():
 def test_sector_constraint_groups_has_no_catch_all():
     out = sg.sector_constraint_groups(["AAA"], {"AAA": "28", "BBB": None})
     assert set(out) == {"28"}
+
+
+@pytest.mark.parametrize("bare", ["AAA", b"AAA"])
+def test_sector_constraint_groups_rejects_bare_str_or_bytes(bare):
+    with pytest.raises(sg.SectorGroupError, match="bare str or bytes"):
+        sg.sector_constraint_groups(bare, {"A": "28"})
