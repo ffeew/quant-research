@@ -147,7 +147,7 @@ def test_other_cik_block_sic_ignored():
     hs = [_h(1, _et(2030, 1, 7, 9, 0), "2834"), _h(2, _et(2030, 1, 14, 9, 0), "6798", block="0000000099")]
     assert _one(hs, date(2030, 1, 22)).sic == "2834"
     only_other = [_h(2, _et(2030, 1, 14, 9, 0), "6798", block="0000000099")]
-    assert _one(only_other, date(2030, 1, 22)).reason is IneligibleReason.NO_SIC_HEADER_BEFORE
+    assert _one(only_other, date(2030, 1, 22)).reason is IneligibleReason.CIK_NOT_IN_HEADERS
 
 
 def test_other_cik_records_ignored():

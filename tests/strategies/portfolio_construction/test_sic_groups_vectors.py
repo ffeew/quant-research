@@ -111,10 +111,6 @@ def test_v3_v4_unfiltered_other_block_row_is_not_sic_bearing():
     _ok(_one("BBB", [_link("BBB", "200")], H200_RAW, date(2017, 6, 2)), "3571")
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="unfiltered other-block row counts as a header without SIC, so the reason is R4, not R3",
-)
 def test_v3_unfiltered_reason_code():
     _bad(_one("BBB", [_link("BBB", "200")], H200_RAW, date(2016, 6, 1)), R.NO_HEADER_BEFORE)
 
@@ -151,10 +147,6 @@ def test_v7_cik_absent_and_no_link():
     _bad(out["FFF"], R.NO_CIK_LINK)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="unfiltered other-block rows make the CIK present without SIC, so the reason is R4, not R2",
-)
 def test_v7_unfiltered_reason_code():
     _bad(_one("EEE", [_link("EEE", "500")], H500_RAW, date(2017, 1, 3)), R.CIK_NOT_IN_HEADERS)
 
@@ -200,17 +192,35 @@ def test_v9_tie_larger_accession_wins():
 # ------------------------------------------------------------------ V10 (excluded name with a link)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="no caller exclusion list in this module: a link for a name that must stay unlinked is not refused",
-)
 def test_v10_excluded_name_with_a_link_stops():
-    with pytest.raises(sg.SicGroupError):
-        _one("DD", [_link("DD", "800")], [_hdr("800", 1, date(2015, 1, 5), "2821")], date(2017, 1, 3))
+    with pytest.raises(sg.ExcludedLinkError):
+        sg.resolve_sic2_groups(
+            ["DD"],
+            [_link("DD", "800")],
+            [_hdr("800", 1, date(2015, 1, 5), "2821")],
+            date(2017, 1, 3),
+            SESSIONS,
+            excluded={"DD"},
+        )
 
 
 def test_v10_excluded_name_without_a_link_is_r1():
     _bad(_one("DD", [], [_hdr("800", 1, date(2015, 1, 5), "2821")], date(2017, 1, 3)), R.NO_CIK_LINK)
+
+
+def test_v10_tyc_alone_excluded_with_a_link_stops():
+    # Both names are on the exclusion list; only TYC (synthetic CIK) has a link, so only TYC is named.
+    with pytest.raises(sg.ExcludedLinkError) as ei:
+        sg.resolve_sic2_groups(
+            ["TYC"],
+            [_link("TYC", "810")],
+            [_hdr("810", 1, date(2015, 3, 2), "3829")],
+            date(2017, 1, 3),
+            SESSIONS,
+            excluded={"DD", "TYC"},
+        )
+    assert ei.value.symbols == ("TYC",)
+    assert "TYC" in str(ei.value) and "DD" not in str(ei.value)
 
 
 # ------------------------------------------------------------------ same vectors through the interval adapter
@@ -257,3 +267,199 @@ def test_intervals_v8_rename_inclusive_end():
 
 def test_intervals_v9_tie_winner():
     _ok(_iv_one("TIE", [_iv("TIE", "700", "6022", date(2016, 5, 6), None)], date(2016, 5, 6)), "6022")
+
+
+# ------------------------------------------------------------------ regression: previously passing vectors
+
+# Outputs of the vector queries above, recorded from the earlier test revision (before header-scope
+# classification and the exclusion set): (case, symbol, session, cik, sic, sic2, reason, accession).
+SNAPSHOT = [
+    ("V1", "AAA", "2016-06-01", "100", "2834", "28", None, "0000000100-15-000001"),
+    ("V1", "AAA", "2015-12-31", "100", "2834", "28", None, "0000000100-15-000001"),
+    ("V2", "AAA", "2019-01-02", "100", "2834", "28", None, "0000000100-15-000001"),
+    ("V2", "AAB", "2019-01-02", "100", "2834", "28", None, "0000000100-15-000001"),
+    ("V3V4", "BBB", "2016-06-01", "200", None, None, "R3_NO_HEADER_BEFORE", None),
+    ("V3V4", "BBB", "2017-06-01", "200", None, None, "R3_NO_HEADER_BEFORE", None),
+    ("V3V4", "BBB", "2017-06-02", "200", "3571", "35", None, "0000000200-17-000002"),
+    ("V3V4_unfiltered_eligible", "BBB", "2017-06-02", "200", "3571", "35", None, "0000000200-17-000002"),
+    ("V5", "CCC", "2017-01-03", "300", None, None, "R4_NO_SIC_HEADER_BEFORE", None),
+    ("V6", "DDD", "2017-01-03", "400", "0000", None, "R5_INVALID_SIC", "0000000400-16-000001"),
+    ("V6", "DDD", "2018-01-02", "400", "0000", None, "R5_INVALID_SIC", "0000000400-16-000001"),
+    ("V6", "DDD", "2018-01-03", "400", "3572", "35", None, "0000000400-18-000002"),
+    ("V7", "EEE", "2017-01-03", "500", None, None, "R2_CIK_NOT_IN_HEADERS", None),
+    ("V7", "FFF", "2017-01-03", None, None, None, "R1_NO_CIK_LINK", None),
+    ("V8", "OLD", "2018-06-29", "600", "1311", "13", None, "0000000600-14-000001"),
+    ("V8", "NEW", "2018-06-29", None, None, None, "R1_NO_CIK_LINK", None),
+    ("V8", "OLD", "2018-07-02", None, None, None, "R1_NO_CIK_LINK", None),
+    ("V8", "NEW", "2018-07-02", "600", "1311", "13", None, "0000000600-14-000001"),
+    ("rename_new_cik", "NEW", "2018-07-02", "610", None, None, "R3_NO_HEADER_BEFORE", None),
+    ("rename_new_cik", "NEW", "2018-07-03", "610", "2911", "29", None, "0000000610-18-000001"),
+    ("rename_new_cik_no_headers", "NEW", "2018-07-03", "610", None, None, "R2_CIK_NOT_IN_HEADERS", None),
+    ("V9", "TIE", "2016-05-06", "700", "6022", "60", None, "0000000700-16-000002"),
+    ("V10_no_link", "DD", "2017-01-03", None, None, None, "R1_NO_CIK_LINK", None),
+    ("iv_V1V2", "AAA", "2016-06-01", "100", "2834", "28", None, None),
+    ("iv_V1V2", "AAB", "2016-06-01", "100", "2834", "28", None, None),
+    ("iv_V1V2", "AAA", "2019-01-02", "100", "2834", "28", None, None),
+    ("iv_V1V2", "AAB", "2019-01-02", "100", "2834", "28", None, None),
+    ("iv_V4V6", "BBB", "2017-06-01", None, None, None, "NO_INTERVAL", None),
+    ("iv_V4V6", "DDD", "2017-06-01", None, None, None, "NO_INTERVAL", None),
+    ("iv_V4V6", "BBB", "2017-06-02", "200", "3571", "35", None, None),
+    ("iv_V4V6", "DDD", "2017-06-02", None, None, None, "NO_INTERVAL", None),
+    ("iv_V4V6", "BBB", "2018-01-02", "200", "3571", "35", None, None),
+    ("iv_V4V6", "DDD", "2018-01-02", None, None, None, "NO_INTERVAL", None),
+    ("iv_V4V6", "BBB", "2018-01-03", "200", "3571", "35", None, None),
+    ("iv_V4V6", "DDD", "2018-01-03", "400", "3572", "35", None, None),
+    ("iv_V6", "DDD", "2017-01-03", "400", "0000", None, "R5_INVALID_SIC", None),
+    ("iv_V6", "DDD", "2018-01-02", "400", "0000", None, "R5_INVALID_SIC", None),
+    ("iv_V6", "DDD", "2018-01-03", "400", "3572", "35", None, None),
+    ("iv_V8", "OLD", "2018-06-29", "600", "1311", "13", None, None),
+    ("iv_V8", "NEW", "2018-06-29", None, None, None, "NO_INTERVAL", None),
+    ("iv_V8", "OLD", "2018-07-02", None, None, None, "NO_INTERVAL", None),
+    ("iv_V8", "NEW", "2018-07-02", "600", "1311", "13", None, None),
+    ("iv_V9", "TIE", "2016-05-06", "700", "6022", "60", None, None),
+]
+
+
+def _snapshot_now() -> list[tuple[str, str, str, str | None, str | None, str | None, str | None, str | None]]:
+    def hdr_cases():
+        H2 = [*H100, _hdr("100", 2, date(2018, 3, 5), None)]
+        L600b = [_link("OLD", "600", FIRST, date(2018, 7, 2)), _link("NEW", "610", date(2018, 7, 2))]
+        H610 = [*H600, _hdr("610", 1, date(2018, 7, 2), "2911")]
+        at = time(16, 0, 0)
+        H700 = [_hdr("700", 1, date(2016, 5, 5), "6798", at=at), _hdr("700", 2, date(2016, 5, 5), "6022", at=at)]
+        return {
+            "V1": (["AAA"], [_link("AAA", "100")], H100, [date(2016, 6, 1), FIRST]),
+            "V2": (["AAA", "AAB"], [_link("AAA", "100"), _link("AAB", "100")], H2, [date(2019, 1, 2)]),
+            "V3V4": (["BBB"], [_link("BBB", "200")], H200, [date(2016, 6, 1), date(2017, 6, 1), date(2017, 6, 2)]),
+            "V3V4_unfiltered_eligible": (["BBB"], [_link("BBB", "200")], H200_RAW, [date(2017, 6, 2)]),
+            "V5": (["CCC"], [_link("CCC", "300")], [_hdr("300", 1, date(2016, 3, 1), None)], [date(2017, 1, 3)]),
+            "V6": (
+                ["DDD"],
+                [_link("DDD", "400")],
+                [_hdr("400", 1, date(2016, 2, 1), "0000"), _hdr("400", 2, date(2018, 1, 2), "3572")],
+                [date(2017, 1, 3), date(2018, 1, 2), date(2018, 1, 3)],
+            ),
+            "V7": (["EEE", "FFF"], [_link("EEE", "500")], H500, [date(2017, 1, 3)]),
+            "V8": (["OLD", "NEW"], L600, H600, [date(2018, 6, 29), date(2018, 7, 2)]),
+            "rename_new_cik": (["NEW"], L600b, H610, [date(2018, 7, 2), date(2018, 7, 3)]),
+            "rename_new_cik_no_headers": (["NEW"], L600b, H600, [date(2018, 7, 3)]),
+            "V9": (["TIE"], [_link("TIE", "700")], H700, [date(2016, 5, 6)]),
+            "V10_no_link": (["DD"], [], [_hdr("800", 1, date(2015, 1, 5), "2821")], [date(2017, 1, 3)]),
+        }
+
+    out = []
+    for k, (syms, links, hs, ts) in hdr_cases().items():
+        for t in ts:
+            r = sg.resolve_sic2_groups(syms, links, hs, t, SESSIONS)
+            for sym in syms:
+                x = r[sym]
+                out.append(
+                    (
+                        k,
+                        sym,
+                        t.isoformat(),
+                        x.cik,
+                        x.sic,
+                        x.sic2,
+                        x.reason.value if x.reason else None,
+                        x.source_accession,
+                    )
+                )
+    iv = _iv
+    icases = {
+        "iv_V1V2": (
+            [iv("AAA", "100", "2834", FIRST, None), iv("AAB", "100", "2834", FIRST, None)],
+            ["AAA", "AAB"],
+            [date(2016, 6, 1), date(2019, 1, 2)],
+        ),
+        "iv_V4V6": (
+            [iv("BBB", "200", "3571", date(2017, 6, 2), None), iv("DDD", "400", "3572", date(2018, 1, 3), None)],
+            ["BBB", "DDD"],
+            [date(2017, 6, 1), date(2017, 6, 2), date(2018, 1, 2), date(2018, 1, 3)],
+        ),
+        "iv_V6": (
+            [
+                iv("DDD", "400", "0000", date(2016, 2, 2), date(2018, 1, 2)),
+                iv("DDD", "400", "3572", date(2018, 1, 3), None),
+            ],
+            ["DDD"],
+            [date(2017, 1, 3), date(2018, 1, 2), date(2018, 1, 3)],
+        ),
+        "iv_V8": (
+            [iv("OLD", "600", "1311", FIRST, date(2018, 6, 29)), iv("NEW", "600", "1311", date(2018, 7, 2), None)],
+            ["OLD", "NEW"],
+            [date(2018, 6, 29), date(2018, 7, 2)],
+        ),
+        "iv_V9": ([iv("TIE", "700", "6022", date(2016, 5, 6), None)], ["TIE"], [date(2016, 5, 6)]),
+    }
+    for k, (ivs, syms, ts) in icases.items():
+        for t in ts:
+            r = sg.resolve_from_intervals(syms, ivs, t, SESSIONS)
+            for sym in syms:
+                x = r[sym]
+                out.append(
+                    (
+                        k,
+                        sym,
+                        t.isoformat(),
+                        x.cik,
+                        x.sic,
+                        x.sic2,
+                        x.reason.value if x.reason else None,
+                        x.source_accession,
+                    )
+                )
+    return out
+
+
+def test_previously_passing_vectors_unchanged():
+    assert _snapshot_now() == SNAPSHOT
+
+
+def test_previously_passing_overlap_stop_unchanged():
+    links = [_link("GGG", "600", FIRST, date(2018, 7, 3)), _link("GGG", "610", date(2018, 7, 2))]
+    with pytest.raises(sg.SicGroupError, match="overlapping"):
+        _one("GGG", links, H600, date(2018, 7, 2))
+
+
+# ------------------------------------------------------------------ exclusion set
+
+
+def test_exclusion_empty_means_no_check():
+    links = [_link("DD", "800")]
+    hs = [_hdr("800", 1, date(2015, 1, 5), "2821")]
+    a = sg.resolve_sic2_groups(["DD"], links, hs, date(2017, 1, 3), SESSIONS)
+    b = sg.resolve_sic2_groups(["DD"], links, hs, date(2017, 1, 3), SESSIONS, excluded=frozenset())
+    assert a == b and a["DD"].sic == "2821"
+
+
+def test_exclusion_active_links_raise_listing_every_offender():
+    links = [_link("DD", "800"), _link("TYC", "810"), _link("AAA", "100"), _link("ZZZ", "820", FIRST, date(2016, 1, 4))]
+    with pytest.raises(sg.ExcludedLinkError) as ei:
+        sg.resolve_sic2_groups(["AAA"], links, H100, date(2017, 1, 3), SESSIONS, excluded={"TYC", "DD", "ZZZ"})
+    assert ei.value.symbols == ("DD", "TYC")  # ZZZ's link ended before the session
+    assert "DD" in str(ei.value) and "TYC" in str(ei.value)
+
+
+def test_exclusion_without_link_is_fine():
+    out = sg.resolve_sic2_groups(
+        ["AAA", "DD"], [_link("AAA", "100")], H100, date(2017, 1, 3), SESSIONS, excluded={"DD"}
+    )
+    _ok(out["AAA"], "2834")
+    _bad(out["DD"], R.NO_CIK_LINK)
+
+
+def test_exclusion_rejects_bare_string():
+    with pytest.raises(sg.SicGroupError, match="bare str"):
+        sg.resolve_sic2_groups(["AAA"], [_link("AAA", "100")], H100, date(2017, 1, 3), SESSIONS, excluded="DD")
+
+
+def test_exclusion_interval_path():
+    ivs = [_iv("DD", "800", "2821", FIRST, date(2016, 12, 30)), _iv("AAA", "100", "2834", FIRST, None)]
+    out = sg.resolve_from_intervals(["AAA", "DD"], ivs, date(2017, 1, 3), SESSIONS, excluded={"DD"})
+    _ok(out["AAA"], "2834")
+    _bad(out["DD"], R.NO_INTERVAL)
+    with pytest.raises(sg.ExcludedLinkError) as ei:
+        sg.resolve_from_intervals(["AAA"], ivs, date(2016, 12, 30), SESSIONS, excluded={"DD", "AAA"})
+    assert ei.value.symbols == ("AAA", "DD")
+    assert sg.resolve_from_intervals(["DD"], ivs, date(2016, 12, 30), SESSIONS)["DD"].sic == "2821"

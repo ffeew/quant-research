@@ -22,11 +22,22 @@ For a CIK ``c`` and an exchange session ``t``:
 A name is INELIGIBLE (group ``None``) on ``t`` for the first matching reason:
 
 * R1 ``NO_CIK_LINK``: no symbol->CIK link interval contains ``t``.
-* R2 ``CIK_NOT_IN_HEADERS``: the linked CIK has no header record at all.
-* R3 ``NO_HEADER_BEFORE``: no header of the CIK has an acceptance date strictly before ``t``.
+* R2 ``CIK_NOT_IN_HEADERS``: the linked CIK has no in-scope header record at all.
+* R3 ``NO_HEADER_BEFORE``: no in-scope header of the CIK has an acceptance date strictly before ``t``.
 * R4 ``NO_SIC_HEADER_BEFORE``: headers before ``t`` exist but none is SIC-bearing.
 * R5 ``INVALID_SIC``: the governing SIC is not exactly four ASCII digits, or is ``0000``. There is
   no carry-back to an earlier header past an invalid code.
+
+A header record is out of scope when its ``sic_block_cik`` is set and differs from its ``cik`` (the
+target CIK matched neither header block of that filing). Such records are treated as absent: they
+never govern and are not counted as headers, so a CIK whose only records are out of scope is R2,
+and one whose in-scope records all come on or after ``t`` is R3. Records with ``sic_block_cik``
+unset are in scope (no SIC was read from any block).
+
+Callers may pass ``excluded``: symbols that must not be linked. If any of them has a link (or, in
+:func:`resolve_from_intervals`, an interval) active on the session being resolved, the call raises
+:class:`ExcludedLinkError` naming every such symbol; nothing is dropped silently. An empty set (the
+default) means no check.
 
 Ineligible names are never imputed. Feed :func:`group_map` into
 ``paper_risk.apply_exposure_limits`` / ``paper_risk.pre_trade_check`` with ``group_caps`` set:
@@ -57,6 +68,7 @@ from enum import StrEnum
 
 __all__ = [
     "CikLink",
+    "ExcludedLinkError",
     "IneligibleReason",
     "SicGroupError",
     "SicHeader",
@@ -76,6 +88,27 @@ _ACCESSION_RE = re.compile(r"[0-9]{10}-[0-9]{2}-[0-9]{6}")
 
 class SicGroupError(ValueError):
     """Malformed input (bad calendar, overlapping links or intervals, malformed record)."""
+
+
+class ExcludedLinkError(SicGroupError):
+    """Symbols on the caller's exclusion list have an active link (or interval) on the session."""
+
+    def __init__(self, session: date, symbols: Sequence[str]) -> None:
+        self.session = session
+        self.symbols: tuple[str, ...] = tuple(symbols)
+        super().__init__(f"excluded symbols with an active link on {session}: {', '.join(self.symbols)}")
+
+
+def _excluded_set(excluded: Iterable[str]) -> frozenset[str]:
+    as_object: object = excluded
+    if isinstance(as_object, (str, bytes)):
+        raise SicGroupError("excluded must be a collection of symbols, not a bare str or bytes")
+    return frozenset(excluded)
+
+
+def _in_scope(h: SicHeader) -> bool:
+    """False when the SIC block's CIK is known and is not the record's CIK (filing out of scope)."""
+    return h.sic_block_cik is None or h.sic_block_cik == h.cik
 
 
 class IneligibleReason(StrEnum):
@@ -258,15 +291,24 @@ def resolve_sic2_groups(
     headers: Iterable[SicHeader],
     session: date,
     sessions: Sequence[date],
+    *,
+    excluded: Iterable[str] = frozenset(),
 ) -> dict[str, SicResolution]:
     """Resolve each symbol's PIT SIC-2 group on ``session`` from raw filing headers.
+
+    ``excluded``: symbols that must not be linked; raises :class:`ExcludedLinkError` naming every
+    one with a link active on ``session`` (empty = no check).
 
     Raises :class:`SicGroupError` on malformed input (bad calendar, ``session`` not in it,
     overlapping links for one symbol, naive/aware datetime misuse, malformed accession, or the
     same accession appearing more than once for a CIK, whether or not its acceptance times agree). A CIK may be linked to several symbols at once (share classes).
     """
     _check_sessions(sessions, session)
+    excl = _excluded_set(excluded)
     links_by_sym = _check_links(links)
+    linked_excluded = sorted(s for s in excl if _active_link(links_by_sym.get(s, []), session) is not None)
+    if linked_excluded:
+        raise ExcludedLinkError(session, linked_excluded)
     headers_by_cik: dict[str, list[SicHeader]] = {}
     seen: set[tuple[str, int]] = set()
     for h in headers:
@@ -275,7 +317,8 @@ def resolve_sic2_groups(
         if key in seen:
             raise SicGroupError(f"accession {h.accession} appears more than once for cik {h.cik}")
         seen.add(key)
-        headers_by_cik.setdefault(h.cik, []).append(h)
+        if _in_scope(h):
+            headers_by_cik.setdefault(h.cik, []).append(h)
 
     out: dict[str, SicResolution] = {}
     for sym in symbols:
@@ -309,8 +352,15 @@ def resolve_from_intervals(
     intervals: Iterable[SicInterval],
     session: date,
     sessions: Sequence[date],
+    *,
+    excluded: Iterable[str] = frozenset(),
 ) -> dict[str, SicResolution]:
     """Resolve SIC-2 groups on ``session`` from precomputed per-symbol intervals.
+
+    ``excluded``: symbols that must not be linked; intervals are built inside link windows, so an
+    excluded symbol with an interval active on ``session`` raises :class:`ExcludedLinkError`
+    (every such symbol named; empty = no check). Header scope does not apply here: intervals are
+    already built from in-scope headers.
 
     Validity is ``effective_from <= session <= effective_to`` (inclusive end), or
     ``effective_from <= session`` when ``open_end`` is set. Past a real (non-open) end the name
@@ -328,6 +378,14 @@ def resolve_from_intervals(
         for a, b in itertools.pairwise(ivs):
             if a.open_end or b.effective_from <= a.effective_to:
                 raise SicGroupError(f"{sym}: overlapping SIC intervals")
+    excl = _excluded_set(excluded)
+    hit_excluded = sorted(
+        s
+        for s in excl
+        if any(iv.effective_from <= session and (iv.open_end or session <= iv.effective_to) for iv in by_sym.get(s, []))
+    )
+    if hit_excluded:
+        raise ExcludedLinkError(session, hit_excluded)
 
     out: dict[str, SicResolution] = {}
     for sym in symbols:
