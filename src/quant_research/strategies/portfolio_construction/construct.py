@@ -11,7 +11,9 @@ writes only $QR_DESK_DIR/portfolio/targets_<date>.json (+ diagnostics).  Places 
 
 Research-only for now: this module refuses any session its SIC-2 map does not cover. The current map ends
 2021-12-31, so no current-date paper targets can be built until a post-2021 SIC-2 map is built, reviewed
-and accepted.
+and accepted. A SIC-2 map covering sessions after 2021-12-31 must be reviewed and accepted before use.
+Sector ETFs are not looked through to SIC-2 groups; a reviewed ETF-to-SIC-2 look-through is required before
+any paper use.
 
 Pipeline
  1. Point-in-time signals rebuilt from daily bars for every date (same definitions as quant.py).
@@ -809,6 +811,7 @@ def main() -> None:
     # Required construction inputs: universe file, SIC-2 map for the as-of session, ETF caps (fail closed before any data read).
     try:
         ci.validate_etf_caps(a.etf_max_pos, a.etf_sleeve_gross, a.etf_sleeve_net)
+        ci.validate_sector_etf_gross(a.sector_etf_gross, a.etf_sleeve_gross)
         a.universe_input = ci.read_universe_file(a.universe)
         SIC2 = ci.read_sic2_map(a.sic2_map, str(a.asof_bar_cutoff))
     except ci.ConstructInputError as exc_in:
@@ -1083,6 +1086,9 @@ def main() -> None:
     if GRP.etf_index:  # ETF sleeve (declared non-SIC class; hedge excluded)
         ix_e = list(GRP.etf_index)
         cons += [cp.norm1(w[ix_e]) <= a.etf_sleeve_gross, cp.abs(cp.sum(w[ix_e])) <= a.etf_sleeve_net]
+        ix_se = list(ci.sector_etf_positions(univ, GRP.etf_index))
+        if ix_se:  # declared sector ETFs inside the sleeve (not looked through to SIC-2 groups)
+            cons.append(cp.norm1(w[ix_se]) <= a.sector_etf_gross)
     bl = [s.strip() for s in a.blackout.split(",") if s.strip()]
     for s in bl:  # earnings blackout: may reduce toward 0, may not add risk
         if s in univ:
@@ -1450,6 +1456,13 @@ def main() -> None:
             f"|net| <={a.etf_sleeve_net * 100:.0f}% (hedge excluded)",
             f"{etf_x.net * 100:+.2f}%",
             abs(etf_x.net) <= a.etf_sleeve_net + 1e-6,
+        )
+        se_gross = ci.sector_etf_gross(out)
+        chk(
+            "Sector ETF gross cap",
+            f"<={a.sector_etf_gross * 100:.0f}% across declared sector ETFs (inside the ETF sleeve)",
+            f"{se_gross * 100:.2f}%",
+            se_gross <= a.sector_etf_gross + 1e-6,
         )
         chk(
             "Earnings blackout",

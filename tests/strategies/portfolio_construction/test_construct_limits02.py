@@ -43,7 +43,7 @@ def _construct_inputs():
     uni, sic = os.environ.get("QR_E2E_UNIVERSE", ""), os.environ.get("QR_E2E_SIC2_MAP", "")
     if not (uni and sic):
         pytest.skip("needs QR_E2E_UNIVERSE and QR_E2E_SIC2_MAP (universe file and SIC-2 map for the as-of session)")
-    return ["--universe", uni, "--sic2_map", sic]
+    return ["--universe", uni, "--sic2_map", sic, "--sector_etf_gross", "0.10"]
 
 
 def run(panic, breaker, *extra, proxy=("--proxy_src", "statarb", "--proxy_path", PROXY)):
