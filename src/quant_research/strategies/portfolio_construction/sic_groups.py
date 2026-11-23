@@ -58,6 +58,7 @@ from enum import StrEnum
 __all__ = [
     "CikLink",
     "IneligibleReason",
+    "SectorGroupError",
     "SicGroupError",
     "SicHeader",
     "SicInterval",
@@ -66,6 +67,7 @@ __all__ = [
     "group_map",
     "resolve_from_intervals",
     "resolve_sic2_groups",
+    "sector_constraint_groups",
     "sic2_of",
     "valid_sic",
 ]
@@ -76,6 +78,15 @@ _ACCESSION_RE = re.compile(r"[0-9]{10}-[0-9]{2}-[0-9]{6}")
 
 class SicGroupError(ValueError):
     """Malformed input (bad calendar, overlapping links or intervals, malformed record)."""
+
+
+class SectorGroupError(SicGroupError):
+    """Names that cannot be placed in a sector group. ``offenders`` lists every one with its reason."""
+
+    def __init__(self, offenders: Sequence[tuple[str, str]]) -> None:
+        self.offenders: tuple[tuple[str, str], ...] = tuple(offenders)
+        detail = "; ".join(f"{name}: {why}" for name, why in self.offenders)
+        super().__init__(f"{len(self.offenders)} name(s) cannot be sector-grouped: {detail}")
 
 
 class IneligibleReason(StrEnum):
@@ -350,3 +361,33 @@ def resolve_from_intervals(
 def group_map(resolutions: Mapping[str, SicResolution]) -> dict[str, str | None]:
     """``symbol -> SIC-2 group`` (``None`` = ineligible), for the paper_risk group-cap path."""
     return {s: r.sic2 for s, r in resolutions.items()}
+
+
+def sector_constraint_groups(names: Sequence[str], groups: Mapping[str, str | None]) -> dict[str, tuple[str, ...]]:
+    """Group ``names`` by their SIC-2 group, ready for per-group sector constraints.
+
+    ``groups`` has the shape of :func:`group_map` output (``None`` = ineligible). Returns
+    ``group -> member names``, groups in sorted order and members in the order of ``names``.
+    There is no catch-all bucket: a name that is ineligible (``None``), missing from ``groups``,
+    or listed more than once makes the call raise :class:`SectorGroupError`, which reports every
+    offending name with its reason, not only the first.
+    """
+    offenders: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    members: dict[str, list[str]] = {}
+    for name in names:
+        if name in seen:
+            offenders.append((name, "duplicate name"))
+            continue
+        seen.add(name)
+        if name not in groups:
+            offenders.append((name, "missing from group mapping"))
+            continue
+        grp = groups[name]
+        if grp is None:
+            offenders.append((name, "ineligible (no SIC-2 group)"))
+            continue
+        members.setdefault(grp, []).append(name)
+    if offenders:
+        raise SectorGroupError(offenders)
+    return {g: tuple(members[g]) for g in sorted(members)}
