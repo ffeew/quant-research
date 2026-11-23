@@ -1,9 +1,10 @@
 """Point-in-time EDGAR SIC-2 groups for paper-sizing sector caps. Pure functions, no I/O.
 
 Sector caps group names by the 2-digit SIC major group of the point-in-time EDGAR SIC code, at
-SIC-2 only with no fallback to another level and no catch-all bucket. This mirrors the PIT
-sector slot of the H1 pre-registration so both use the same grouping. It replaces the earlier
-current-snapshot classification, which had no coverage for delisted names (survivorship bias).
+SIC-2 only with no fallback to another level and no catch-all bucket, so sector caps and any
+research code using the same point-in-time sector slot share one grouping. It replaces the
+earlier current-snapshot classification, which had no coverage for delisted names
+(survivorship bias).
 
 Point-in-time rule (filing-effective interval SIC with carry-forward)
 ---------------------------------------------------------------------
@@ -35,6 +36,11 @@ Inputs are plain records supplied by the caller. Acceptance datetimes are naive 
 values (timezone-aware values are rejected rather than converted, so no timezone database is
 read). The exchange session calendar is injected as a strictly increasing sequence of dates;
 nothing here hard-codes or fetches a calendar or a data window.
+
+Header scope is the caller's responsibility. In particular, the 2014-01-01 (ET) lower bound on
+which filing headers are in scope (headers accepted before it are excluded) is applied by the
+caller when building the ``headers`` input; it is NOT enforced in this module, which treats
+every header it is given as in scope.
 
 :func:`resolve_from_intervals` is an alternative adapter for precomputed per-symbol interval rows
 whose end bound is inclusive and whose open end is marked by a flag rather than a date.
@@ -153,17 +159,30 @@ def _has_sic(h: SicHeader) -> bool:
 
 
 def _check_sessions(sessions: Sequence[date], session: date) -> None:
+    _check_calendar(sessions)
+    if session not in set(sessions):
+        raise SicGroupError(f"{session} is not a session in the injected calendar")
+
+
+def _check_calendar(sessions: Sequence[date]) -> None:
     if len(sessions) == 0:
         raise SicGroupError("session calendar is empty")
     for a, b in itertools.pairwise(sessions):
         if not a < b:
             raise SicGroupError(f"session calendar not strictly increasing at {a} -> {b}")
-    if session not in set(sessions):
-        raise SicGroupError(f"{session} is not a session in the injected calendar")
 
 
 def first_session_after(d: date, sessions: Sequence[date]) -> date | None:
-    """First session strictly after date ``d`` in a strictly increasing calendar, or ``None``."""
+    """First session strictly after date ``d``, or ``None`` if there is none.
+
+    Raises :class:`SicGroupError` if ``sessions`` is empty or not strictly increasing.
+    """
+    _check_calendar(sessions)
+    return _first_session_after(d, sessions)
+
+
+def _first_session_after(d: date, sessions: Sequence[date]) -> date | None:
+    """Binary search; ``sessions`` must already have passed :func:`_check_calendar`."""
     lo, hi = 0, len(sessions)
     while lo < hi:
         mid = (lo + hi) // 2
@@ -195,7 +214,7 @@ def _governing(
     """Apply R3/R4 and pick H(c, t) from one CIK's headers (already non-empty)."""
     before: list[SicHeader] = []
     for h in headers:
-        start = first_session_after(h.acceptance_et.date(), sessions)
+        start = _first_session_after(h.acceptance_et.date(), sessions)
         if start is not None and start <= session:
             before.append(h)
     if not before:
@@ -243,14 +262,19 @@ def resolve_sic2_groups(
     """Resolve each symbol's PIT SIC-2 group on ``session`` from raw filing headers.
 
     Raises :class:`SicGroupError` on malformed input (bad calendar, ``session`` not in it,
-    overlapping links for one symbol, naive/aware datetime misuse, malformed accession,
-    duplicate accession). A CIK may be linked to several symbols at once (share classes).
+    overlapping links for one symbol, naive/aware datetime misuse, malformed accession, or the
+    same accession appearing more than once for a CIK, whether or not its acceptance times agree). A CIK may be linked to several symbols at once (share classes).
     """
     _check_sessions(sessions, session)
     links_by_sym = _check_links(links)
     headers_by_cik: dict[str, list[SicHeader]] = {}
+    seen: set[tuple[str, int]] = set()
     for h in headers:
         _check_header(h)
+        key = (h.cik, _accession_key(h.accession))
+        if key in seen:
+            raise SicGroupError(f"accession {h.accession} appears more than once for cik {h.cik}")
+        seen.add(key)
         headers_by_cik.setdefault(h.cik, []).append(h)
 
     out: dict[str, SicResolution] = {}

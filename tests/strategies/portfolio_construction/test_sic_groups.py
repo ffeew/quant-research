@@ -205,6 +205,34 @@ def test_bad_calendar_or_non_session_raises(sessions, session):
         sg.resolve_sic2_groups(["AAA"], [LINK], [], session, sessions)
 
 
+def test_same_accession_at_different_times_raises():
+    hs = [_h(5, _et(2030, 1, 8, 9, 0), "2834"), _h(5, _et(2030, 1, 9, 9, 0), "2834")]
+    with pytest.raises(SicGroupError):
+        _one(hs, date(2030, 1, 22))
+    # raised even when neither copy would govern on the session asked about
+    with pytest.raises(SicGroupError):
+        _one(hs, date(2030, 1, 8))
+
+
+def test_same_accession_under_two_ciks_is_allowed():
+    other = "0000000002"
+    hs = [_h(5, _et(2030, 1, 8, 9, 0), "2834"), _h(5, _et(2030, 1, 8, 9, 0), "6798", cik=other)]
+    assert _one(hs, date(2030, 1, 22)).sic == "2834"
+
+
+@pytest.mark.parametrize(
+    "cal",
+    [
+        [],
+        [date(2030, 1, 8), date(2030, 1, 7)],
+        [date(2030, 1, 7), date(2030, 1, 7), date(2030, 1, 8)],
+    ],
+)
+def test_first_session_after_validates_calendar(cal):
+    with pytest.raises(SicGroupError):
+        sg.first_session_after(date(2030, 1, 7), cal)
+
+
 def test_aware_datetime_and_bad_accession_raise():
     aware = SicHeader(CIK, "0000000001-30-000001", datetime(2030, 1, 8, 9, 0, tzinfo=UTC), "2834", CIK)
     with pytest.raises(SicGroupError):
@@ -281,7 +309,7 @@ def test_interval_invalid_sic():
 
 # ------------------------------------------------------------------ caps integration (fail closed)
 
-# Example limits for tests only, not desk policy.
+# Example limits for tests only, not policy.
 EX = pr.ExposureLimits(single_name_cap=0.5, gross_cap=1.0, net_cap=1.0, group_caps={"28": 0.3, "36": 0.3})
 
 

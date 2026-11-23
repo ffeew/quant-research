@@ -1,9 +1,9 @@
 """Typed, pure-function risk helpers for PAPER position sizing.
 
 This module is research and paper-sizing code only. It does no file, network or broker I/O,
-reads no environment variables, and holds no desk limit values: every threshold is a required
+reads no environment variables, and holds no policy limit values: every threshold is a required
 parameter or config field supplied by the caller. Numbers that appear in docstrings below are
-EXAMPLES only, not desk policy.
+EXAMPLES only, not policy.
 
 Weights are fractions of equity keyed by symbol (``{"AAA": 0.10, "BBB": -0.05}``). Long weights
 are positive, short weights negative. ``gross = sum(|w|)``, ``net = sum(w)``.
@@ -73,8 +73,8 @@ __all__ = [
     "vol_target_weights",
 ]
 
-#: Structural no-leverage ceiling. This is not a desk limit; it is the hard invariant of the
-#: module (paper sizing never borrows). Desk gross limits are supplied by the caller and must be
+#: Structural no-leverage ceiling. This is not a policy limit; it is the hard invariant of the
+#: module (paper sizing never borrows). Gross limits are supplied by the caller and must be
 #: at or below this value.
 MAX_GROSS: float = 1.0
 
@@ -178,7 +178,7 @@ def _scale_net_to_cap(weights: Mapping[str, float], cap: float) -> tuple[dict[st
 
 @dataclass(frozen=True)
 class VolTargetConfig:
-    """Vol-target parameters. All fields required; no desk defaults.
+    """Vol-target parameters. All fields required; no built-in defaults.
 
     Example values (illustrative only): ``target_vol_annual=0.10, lookback=63,
     annualisation_factor=252, gross_cap=1.0``.
@@ -357,7 +357,7 @@ _SEVERITY = {BreakerState.NORMAL: 0, BreakerState.REDUCE: 1, BreakerState.FLAT: 
 
 @dataclass(frozen=True)
 class DrawdownBreakerConfig:
-    """Drawdown breaker thresholds. All fields required; no desk defaults.
+    """Drawdown breaker thresholds. All fields required; no built-in defaults.
 
     * ``reduce_at``: current drawdown at/above which the breaker signals REDUCE.
     * ``flat_at``: current drawdown at/above which it signals FLAT (must be >= ``reduce_at``).
@@ -447,7 +447,7 @@ def run_drawdown_breaker(
 
 @dataclass(frozen=True)
 class ExposureLimits:
-    """Paper-sizing exposure limits. All caps required; no desk defaults.
+    """Paper-sizing exposure limits. All caps required; no built-in defaults.
 
     * ``single_name_cap``: max ``|w|`` per symbol, in [0, 1].
     * ``gross_cap``: max ``sum(|w|)``, in (0, 1]. Values above 1.0 (leverage) are rejected.

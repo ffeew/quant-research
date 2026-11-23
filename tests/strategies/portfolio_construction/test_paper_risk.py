@@ -17,7 +17,7 @@ from quant_research.strategies.portfolio_construction.paper_risk import (
     VolTargetConfig,
 )
 
-# Example limits for tests only, not desk policy.
+# Example limits for tests only, not policy.
 EX_LIMITS = ExposureLimits(single_name_cap=0.10, gross_cap=1.0, net_cap=0.30)
 EX_BREAKER = DrawdownBreakerConfig(reduce_at=0.10, flat_at=0.20, reduce_multiplier=0.5, rearm_at=0.05)
 
