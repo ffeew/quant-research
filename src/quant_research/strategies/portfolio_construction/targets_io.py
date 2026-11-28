@@ -18,7 +18,10 @@ import hashlib
 import json
 import os
 import tempfile
+from collections.abc import Sequence
 from typing import Any
+
+from quant_research.strategies.portfolio_construction import fail_closed as fc
 
 SGT = dt.timezone(dt.timedelta(hours=8))
 LOG_SCHEMA_VERSION = 3  # v3 (2026-10-30 ~02:20, FRAMEWORK v0.7): + type ("run"|"correction"), method_version, limits_version, data_source
@@ -49,6 +52,17 @@ def write_exclusive(path: str, doc: dict[str, Any]) -> str:
         with contextlib.suppress(FileNotFoundError):
             os.unlink(tmp)
     return sha256(path)
+
+
+def write_checked(docs: Sequence[tuple[str, dict[str, Any]]]) -> list[tuple[str, dict[str, Any], str]]:
+    """Fail-closed publish: every doc's compliance must pass BEFORE any file is created.
+
+    If any check of any doc is not PASS/INFO, nothing is written (no file, no temp file, no
+    directory) and a coded stop (non-zero exit) lists every failed check. Otherwise each doc is
+    written with :func:`write_exclusive`. Returns ``[(path, doc, sha256), ...]``.
+    """
+    fc.require_compliance_pass(docs)
+    return [(p, doc, write_exclusive(p, doc)) for p, doc in docs]
 
 
 def sha256(path: str) -> str:

@@ -109,6 +109,7 @@ from quant_research.utils import paths as _QR  # data/desk roots from env (QR_DA
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from quant_research.strategies.portfolio_construction import construct_inputs as ci
 from quant_research.strategies.portfolio_construction import earnings_gate as eg
+from quant_research.strategies.portfolio_construction import fail_closed as fc
 from quant_research.strategies.portfolio_construction import targets_io as tio
 from quant_research.strategies.portfolio_construction.risk_state import ET, NYSE_HOLIDAYS, SGT, read_breaker, read_panic
 from quant_research.strategies.portfolio_construction.sic_groups import SectorGroupError
@@ -1142,8 +1143,7 @@ def main() -> None:
     fixed0: list[Any] = []
     for _it in range(4):  # drop dust positions (< min_w) and re-solve
         prob = cp.Problem(obj, cons + ([w[fixed0] == 0] if fixed0 else []))
-        prob.solve(solver="CLARABEL")
-        wv = np.array(w.value).ravel()
+        wv = np.array(fc.solve_or_stop(prob, w)).ravel()  # infeasible / failed solve: coded STOP, no fallback book
         new0 = [i for i in range(n) if abs(wv[i]) < a.min_w and abs(w0[i]) < 1e-9 and i not in fixed0]
         if not new0:
             break
@@ -2008,8 +2008,8 @@ def main() -> None:
         guard(res)
         docs.append((p_tr, res))
     paths = []
-    for p_, doc in docs:
-        digest = tio.write_exclusive(p_, doc)
+    # A FAIL in any compliance check stops the run before any targets file is created (coded non-zero exit).
+    for p_, doc, digest in tio.write_checked(docs):
         paths.append(p_)
         tio.append_log(f"{a.outdir}/targets_log.jsonl", tio.log_record(doc, p_, digest, run_id, generated, a.positions))
         if not a.no_latest:
