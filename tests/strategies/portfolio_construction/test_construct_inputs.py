@@ -227,6 +227,18 @@ def test_etf_sleeve_caps_bind_in_optimiser():
     assert abs(wv[univ.index("SPY")]) < 1e-6  # hedge has no alpha and is outside the sleeve
 
 
+def test_etf_caps_boundary_value_one_is_accepted_and_above_refused():
+    ci.validate_etf_caps(1.0, 1.0, 1.0)  # val = 1.0 is inside (0, 1]
+    ci.validate_sector_etf_gross(1.0, 1.0)
+    for bad in (1.0000001, 0.0):
+        with pytest.raises(ci.ConstructInputError):
+            ci.validate_etf_caps(bad, 0.2, 0.1)
+        with pytest.raises(ci.ConstructInputError):
+            ci.validate_sector_etf_gross(bad, 1.0)
+    with pytest.raises(ci.ConstructInputError, match="must not exceed"):
+        ci.validate_sector_etf_gross(1.0, 0.999999)
+
+
 def test_sector_etf_gross_validated():
     ci.validate_sector_etf_gross(0.10, 0.20)
     ci.validate_sector_etf_gross(0.20, 0.20)
