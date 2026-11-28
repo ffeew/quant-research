@@ -2008,7 +2008,8 @@ def main() -> None:
         guard(res)
         docs.append((p_tr, res))
     paths = []
-    # A FAIL in any compliance check stops the run before any targets file is created (coded non-zero exit).
+    # A FAIL in any compliance check (including a shadow book) stops the run before any targets
+    # file is created (coded non-zero exit); a shadow FAIL also blocks the tradable file.
     for p_, doc, digest in tio.write_checked(docs):
         paths.append(p_)
         tio.append_log(f"{a.outdir}/targets_log.jsonl", tio.log_record(doc, p_, digest, run_id, generated, a.positions))

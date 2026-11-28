@@ -36,7 +36,8 @@ unset are in scope (no SIC was read from any block). CIKs are compared as exact 
 zero-padding, trimming or other normalisation is applied anywhere, so ``"0000000100"`` and ``"100"``
 are different CIKs (callers must supply one canonical form for headers, blocks and links). Dropped
 records are counted: :func:`resolve_sic2_groups_with_report` returns their number and identities
-alongside the resolutions (:func:`resolve_sic2_groups` returns the resolutions only).
+alongside the resolutions (:func:`resolve_sic2_groups` returns the resolutions only). The dropped
+count covers all headers passed in, not only those of linked CIKs.
 
 Callers may pass ``excluded``: symbols that must not be linked. If any of them has a link (or, in
 :func:`resolve_from_intervals`, an interval) active on the session being resolved, the call raises
@@ -308,7 +309,8 @@ def _check_links(links: Iterable[CikLink]) -> dict[str, list[CikLink]]:
 class SicGroupReport:
     """Resolutions plus the out-of-scope header records that were dropped (never used, always counted).
 
-    ``dropped_out_of_scope`` holds ``(cik, accession)`` for every dropped record, sorted.
+    ``dropped_out_of_scope`` holds ``(cik, accession)`` for every dropped record, sorted. The
+    dropped count covers all headers passed in, not only those of linked CIKs.
     """
 
     resolutions: dict[str, SicResolution]
@@ -347,7 +349,8 @@ def resolve_sic2_groups_with_report(
     """Resolve each symbol's PIT SIC-2 group on ``session`` from raw filing headers.
 
     Also returns every header record dropped as out of scope (block CIK differs from record CIK)
-    in ``dropped_out_of_scope``; the duplicate-accession check applies to dropped records too.
+    in ``dropped_out_of_scope``. The dropped count covers all headers passed in, not only those
+    of linked CIKs. The duplicate-accession check applies to dropped records too.
 
     ``excluded``: symbols that must not be linked; raises :class:`ExcludedLinkError` naming every
     one with a link active on ``session`` (empty = no check).

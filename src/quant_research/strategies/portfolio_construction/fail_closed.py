@@ -6,8 +6,11 @@ and writes nothing further.
 
 Stop codes (distinct, never 0):
 
-* ``EXIT_COMPLIANCE_FAIL`` (3): a compliance check has status ``FAIL`` (or an unknown status, or the
-  compliance block is missing). No targets file is written; every failed check is listed.
+* ``EXIT_COMPLIANCE_FAIL`` (3): a compliance check has status ``FAIL`` (or any status other than
+  ``PASS``/``INFO``, including ``WARN``), or the compliance block is missing, empty, or malformed,
+  or a check's status is not a string (including unhashable values). No targets file is written;
+  every failed check is listed. A FAIL in any document, including a shadow book, also blocks the
+  tradable file.
 * ``EXIT_SOLVE_FAILED`` (4): the optimiser did not return an optimal solution (infeasible,
   unbounded, inaccurate, solver error, or no/non-finite values). There is no fallback book.
 """
@@ -54,30 +57,41 @@ def coded_stop(code: int, name: str, reasons: Sequence[str]) -> NoReturn:
 def failed_checks(compliance: object) -> list[str]:
     """Every check that is not PASS/INFO, as ``"<limit> (value <v>, threshold <t>)"``.
 
-    A missing or malformed compliance block is itself a failure (fail closed).
+    A missing, empty or malformed compliance block is itself a failure (fail closed).
+    A status that is not a string (including unhashable values) is a failure, not a TypeError.
     """
-    if not isinstance(compliance, (list, tuple)):
+    if not isinstance(compliance, (list, tuple)) or len(compliance) == 0:
         return ["compliance block missing or malformed"]
     bad: list[str] = []
     for c in compliance:
         row: Mapping[str, Any] = c if isinstance(c, Mapping) else {}
-        if row.get("status") not in _OK_STATUSES:
+        status = row.get("status")
+        # Membership is only tested for strings, so an unhashable status is a failure, not a TypeError.
+        if not (isinstance(status, str) and status in _OK_STATUSES):
             bad.append(
-                f"{row.get('limit', '?')} (status {row.get('status')!r}, "
+                f"{row.get('limit', '?')} (status {status!r}, "
                 f"value {row.get('value')!r}, threshold {row.get('threshold')!r})"
             )
     return bad
 
 
+def _doc_label(path: str) -> str:
+    """Parent directory plus basename, so shadow and tradable books (same filename) are distinct."""
+    parts = str(path).replace("\\", "/").rstrip("/").split("/")
+    return "/".join(parts[-2:]) if len(parts) >= 2 else (parts[0] if parts else str(path))
+
+
 def require_compliance_pass(docs: Sequence[tuple[str, Mapping[str, Any]]]) -> None:
     """Stop (code 3) unless every doc's compliance checks all pass; lists every failed check of every doc.
 
-    ``docs`` is ``[(target_path, doc), ...]``. Nothing is written by this function.
+    ``docs`` is ``[(target_path, doc), ...]``. Nothing is written by this function. A FAIL in any
+    document, including a shadow (non-tradable) book, also blocks every other document: the tradable
+    file is not written. The stop label for each path includes the parent directory, because both
+    books are named ``targets_<stamp>.json``.
     """
     reasons: list[str] = []
     for path, doc in docs:
-        label = str(path).rsplit("/", 1)[-1]
-        reasons.extend(f"{label}: {why}" for why in failed_checks(doc.get("compliance")))
+        reasons.extend(f"{_doc_label(path)}: {why}" for why in failed_checks(doc.get("compliance")))
     if reasons:
         coded_stop(EXIT_COMPLIANCE_FAIL, "COMPLIANCE_FAIL no targets written", reasons)
 

@@ -57,11 +57,17 @@ def write_exclusive(path: str, doc: dict[str, Any]) -> str:
 def write_checked(docs: Sequence[tuple[str, dict[str, Any]]]) -> list[tuple[str, dict[str, Any], str]]:
     """Fail-closed publish: every doc's compliance must pass BEFORE any file is created.
 
-    If any check of any doc is not PASS/INFO, nothing is written (no file, no temp file, no
-    directory) and a coded stop (non-zero exit) lists every failed check. Otherwise each doc is
-    written with :func:`write_exclusive`. Returns ``[(path, doc, sha256), ...]``.
+    If any check of any doc is not PASS/INFO (including a FAIL in a shadow book), nothing is
+    written for any doc (no file, no temp file, no directory) and a coded stop (non-zero exit)
+    lists every failed check: a shadow-book FAIL also blocks the tradable file. Every path is
+    checked with ``os.path.lexists`` before the first write, so a clash on a later doc means
+    nothing is written for an earlier one either. Otherwise each doc is written with
+    :func:`write_exclusive`. Returns ``[(path, doc, sha256), ...]``.
     """
     fc.require_compliance_pass(docs)
+    taken = [p for p, _ in docs if os.path.lexists(p)]
+    if taken:
+        raise FileExistsError("refusing to overwrite existing targets file: " + ", ".join(taken))
     return [(p, doc, write_exclusive(p, doc)) for p, doc in docs]
 
 

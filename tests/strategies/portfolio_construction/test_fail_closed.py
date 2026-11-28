@@ -61,7 +61,8 @@ def test_compliance_fail_stops_with_code_and_lists_every_failed_check(capsys):
     err = capsys.readouterr().err
     for name in ("Max notional per position", "Sector ETF gross cap", "Gross"):
         assert name in err
-    assert "shadow/t.json" not in err.split("STOP")[0] and "t.json: Sector ETF gross cap" in err
+    assert "shadow/t.json: Max notional per position" in err
+    assert "targets/t.json: Sector ETF gross cap" in err
 
 
 def test_compliance_pass_returns_quietly():
@@ -189,6 +190,75 @@ def test_solver_exception_is_a_stop():
 
 def test_stop_codes_are_distinct_and_nonzero():
     assert len({0, fc.EXIT_COMPLIANCE_FAIL, fc.EXIT_SOLVE_FAILED}) == 3
+
+
+def test_exit_codes_are_literal_3_and_4():
+    assert fc.EXIT_COMPLIANCE_FAIL == 3 and fc.EXIT_SOLVE_FAILED == 4
+    with pytest.raises(SystemExit) as ei:
+        fc.require_compliance_pass([("/out/targets/t.json", _doc(_chk("a", "FAIL")))])
+    assert ei.value.code == 3
+    w, prob = _problem(1.0, 0.0)
+    with pytest.raises(SystemExit) as ei:
+        fc.solve_or_stop(prob, w)
+    assert ei.value.code == 4
+
+
+def test_empty_compliance_list_is_malformed_and_stops():
+    assert fc.failed_checks([]) == ["compliance block missing or malformed"]
+    with pytest.raises(SystemExit) as ei:
+        fc.require_compliance_pass([("/out/targets/t.json", _doc())])
+    assert ei.value.code == 3
+
+
+def test_unhashable_status_is_coded_stop_not_typeerror():
+    got = fc.failed_checks([dict(limit="a", status=["FAIL"], value=None, threshold=None)])
+    assert got and got[0].startswith("a (status ['FAIL']")
+    with pytest.raises(SystemExit) as ei:
+        fc.require_compliance_pass(
+            [("/out/targets/t.json", _doc(dict(limit="a", status={"k": 1}, value=None, threshold=None)))]
+        )
+    assert ei.value.code == 3
+
+
+def test_warn_status_stops():
+    with pytest.raises(SystemExit) as ei:
+        fc.require_compliance_pass([("/out/targets/t.json", _doc(_chk("Gross", "WARN")))])
+    assert ei.value.code == 3 and "WARN" in str(ei.value.reasons if hasattr(ei.value, "reasons") else "")
+    # also visible in the listed reasons
+    assert any("WARN" in r for r in ei.value.reasons)
+
+
+def test_stop_label_includes_parent_dir(capsys):
+    stamp = "targets_20261123T153000SGT.json"
+    with pytest.raises(SystemExit):
+        fc.require_compliance_pass(
+            [
+                (f"/out/shadow/{stamp}", _doc(_chk("a", "FAIL"))),
+                (f"/out/targets/{stamp}", _doc(_chk("b", "FAIL"))),
+            ]
+        )
+    err = capsys.readouterr().err
+    assert f"shadow/{stamp}: a" in err
+    assert f"targets/{stamp}: b" in err
+
+
+def test_write_checked_fail_in_first_doc_writes_nothing(tmp_path):
+    p_sh, p_tr = str(tmp_path / "shadow" / "t.json"), str(tmp_path / "targets" / "t.json")
+    with pytest.raises(SystemExit) as ei:
+        tio.write_checked([(p_sh, _doc(_chk("a", "FAIL"))), (p_tr, _doc(_chk("b", "PASS")))])
+    assert ei.value.code == 3
+    assert _entries(tmp_path) == []
+
+
+def test_write_checked_lexists_later_path_writes_nothing_for_earlier(tmp_path):
+    p_sh = tmp_path / "shadow" / "t.json"
+    p_tr = tmp_path / "targets" / "t.json"
+    p_tr.parent.mkdir()
+    p_tr.write_text("{}")
+    with pytest.raises(FileExistsError):
+        tio.write_checked([(str(p_sh), _doc(_chk("a", "PASS"))), (str(p_tr), _doc(_chk("b", "PASS")))])
+    assert not p_sh.exists() and not p_sh.parent.exists()
+    assert p_tr.read_text() == "{}"
 
 
 # ---------------------------------------------------------------- construct.py wiring (source level; main is not run)
