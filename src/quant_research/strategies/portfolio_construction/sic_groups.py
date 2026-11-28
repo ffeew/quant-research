@@ -32,7 +32,11 @@ A header record is out of scope when its ``sic_block_cik`` is set and differs fr
 target CIK matched neither header block of that filing). Such records are treated as absent: they
 never govern and are not counted as headers, so a CIK whose only records are out of scope is R2,
 and one whose in-scope records all come on or after ``t`` is R3. Records with ``sic_block_cik``
-unset are in scope (no SIC was read from any block).
+unset are in scope (no SIC was read from any block). CIKs are compared as exact strings: no
+zero-padding, trimming or other normalisation is applied anywhere, so ``"0000000100"`` and ``"100"``
+are different CIKs (callers must supply one canonical form for headers, blocks and links). Dropped
+records are counted: :func:`resolve_sic2_groups_with_report` returns their number and identities
+alongside the resolutions (:func:`resolve_sic2_groups` returns the resolutions only).
 
 Callers may pass ``excluded``: symbols that must not be linked. If any of them has a link (or, in
 :func:`resolve_from_intervals`, an interval) active on the session being resolved, the call raises
@@ -72,6 +76,7 @@ __all__ = [
     "IneligibleReason",
     "SectorGroupError",
     "SicGroupError",
+    "SicGroupReport",
     "SicHeader",
     "SicInterval",
     "SicResolution",
@@ -79,6 +84,7 @@ __all__ = [
     "group_map",
     "resolve_from_intervals",
     "resolve_sic2_groups",
+    "resolve_sic2_groups_with_report",
     "sector_constraint_groups",
     "sic2_of",
     "valid_sic",
@@ -118,7 +124,9 @@ def _excluded_set(excluded: Iterable[str]) -> frozenset[str]:
 
 
 def _in_scope(h: SicHeader) -> bool:
-    """False when the SIC block's CIK is known and is not the record's CIK (filing out of scope)."""
+    """False when the SIC block's CIK is known and is not the record's CIK (filing out of scope).
+
+    Exact string comparison: no zero-padding or other normalisation."""
     return h.sic_block_cik is None or h.sic_block_cik == h.cik
 
 
@@ -296,6 +304,21 @@ def _check_links(links: Iterable[CikLink]) -> dict[str, list[CikLink]]:
     return by_sym
 
 
+@dataclass(frozen=True)
+class SicGroupReport:
+    """Resolutions plus the out-of-scope header records that were dropped (never used, always counted).
+
+    ``dropped_out_of_scope`` holds ``(cik, accession)`` for every dropped record, sorted.
+    """
+
+    resolutions: dict[str, SicResolution]
+    dropped_out_of_scope: tuple[tuple[str, str], ...]
+
+    @property
+    def dropped_count(self) -> int:
+        return len(self.dropped_out_of_scope)
+
+
 def resolve_sic2_groups(
     symbols: Iterable[str],
     links: Iterable[CikLink],
@@ -305,7 +328,26 @@ def resolve_sic2_groups(
     *,
     excluded: Iterable[str] = frozenset(),
 ) -> dict[str, SicResolution]:
+    """Resolve each symbol's PIT SIC-2 group on ``session``; see :func:`resolve_sic2_groups_with_report`.
+
+    Returns the resolutions only. Use the report variant to also get the dropped-record count.
+    """
+    return resolve_sic2_groups_with_report(symbols, links, headers, session, sessions, excluded=excluded).resolutions
+
+
+def resolve_sic2_groups_with_report(
+    symbols: Iterable[str],
+    links: Iterable[CikLink],
+    headers: Iterable[SicHeader],
+    session: date,
+    sessions: Sequence[date],
+    *,
+    excluded: Iterable[str] = frozenset(),
+) -> SicGroupReport:
     """Resolve each symbol's PIT SIC-2 group on ``session`` from raw filing headers.
+
+    Also returns every header record dropped as out of scope (block CIK differs from record CIK)
+    in ``dropped_out_of_scope``; the duplicate-accession check applies to dropped records too.
 
     ``excluded``: symbols that must not be linked; raises :class:`ExcludedLinkError` naming every
     one with a link active on ``session`` (empty = no check).
@@ -322,6 +364,7 @@ def resolve_sic2_groups(
         raise ExcludedLinkError(session, linked_excluded)
     headers_by_cik: dict[str, list[SicHeader]] = {}
     seen: set[tuple[str, int]] = set()
+    dropped: list[tuple[str, str]] = []
     for h in headers:
         _check_header(h)
         key = (h.cik, _accession_key(h.accession))
@@ -330,6 +373,8 @@ def resolve_sic2_groups(
         seen.add(key)
         if _in_scope(h):
             headers_by_cik.setdefault(h.cik, []).append(h)
+        else:
+            dropped.append((h.cik, h.accession))
 
     out: dict[str, SicResolution] = {}
     for sym in symbols:
@@ -355,7 +400,7 @@ def resolve_sic2_groups(
             None if sic2 is not None else IneligibleReason.INVALID_SIC,
             gov.accession,
         )
-    return out
+    return SicGroupReport(out, tuple(sorted(dropped)))
 
 
 def resolve_from_intervals(

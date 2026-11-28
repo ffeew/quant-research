@@ -4,10 +4,10 @@ All data are synthetic literals. Sessions are Monday-Friday from 2015-12-31 to 2
 synthetic calendar; holidays are not removed). Reason codes: R1 no CIK link, R2 CIK has no header
 rows, R3 no header before t, R4 no SIC-bearing header before t, R5 invalid SIC.
 
-Header scope is the caller's job: a filing whose header blocks do not match the target CIK is
-dropped by the caller before it reaches ``resolve_sic2_groups``. The main vector tests follow that
-convention; the ``*_unfiltered`` tests pass such rows through to document what the module does
-when the caller does not drop them.
+Header scope: a filing whose header blocks do not match the target CIK is out of scope. The main
+vector tests pass the already-filtered rows; the ``*_unfiltered`` tests pass the raw rows and show
+that the module itself drops them (treated as absent, so R2 or R3, never R4) and that eligible
+results are identical either way. Dropped records are counted, see ``test_sic_groups_scope.py``.
 """
 
 from __future__ import annotations
